@@ -30,6 +30,9 @@ prevents duplicate native launchers. Browser previews remain separate.
 5. Verify downloads and check for updates from an older installed app. A green build
    alone does not prove the installation/restart path or macOS permissions.
 
+CI selects Xcode 26.3 explicitly to compile the macOS 26 glass APIs while retaining
+the macOS 14 deployment target. The runner default Xcode 16 SDK cannot compile them.
+
 The workflow can also be dispatched for an existing tag to retry an unpublished
 release. The first release may be packaged locally with the same build and
 `node scripts/package-release.mjs`, then uploaded as a complete draft before publishing.
