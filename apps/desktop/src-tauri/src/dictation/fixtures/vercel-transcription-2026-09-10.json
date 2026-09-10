@@ -1,0 +1,279 @@
+{
+  "data": [
+    {
+      "id": "fish-audio/transcribe-1",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1772323200,
+      "owned_by": "fish-audio",
+      "name": "Transcribe-1",
+      "description": "Turn spoken audio into accurate text \u2014 with timed segments \u2014 using Fish Audio\u2019s ASR model. Send an audio file, get back the transcript, its duration, and timestamped segments.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "none",
+      "tags": [
+        "free"
+      ],
+      "supported_specifications": [
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {}
+    },
+    {
+      "id": "fish-audio/transcribe-1-free",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1772323200,
+      "owned_by": "fish-audio",
+      "name": "Transcribe-1 (Free)",
+      "description": "Turn spoken audio into accurate text \u2014 with timed segments \u2014 using Fish Audio\u2019s ASR model. Send an audio file, get back the transcript, its duration, and timestamped segments.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "none",
+      "tags": [
+        "free"
+      ],
+      "supported_specifications": [
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {}
+    },
+    {
+      "id": "google/gemini-3.5-transcribe",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1787702400,
+      "owned_by": "google",
+      "name": "Gemini 3.5 Transcribe",
+      "description": "Transcription by google",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {
+        "input": "0.000002",
+        "output": "0.000012",
+        "audio_input_token_cost": "0.000002"
+      }
+    },
+    {
+      "id": "google/gemini-3.5-transcribe-live",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1787702400,
+      "owned_by": "google",
+      "name": "Gemini 3.5 Transcribe Live",
+      "description": "Live transcription by Google",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "tags": [
+        "websocket-transcription"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {
+        "input": "0.0000000001",
+        "transcription_duration_cost_per_second": "0.00015"
+      }
+    },
+    {
+      "id": "openai/gpt-4o-mini-transcribe",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1710288000,
+      "owned_by": "openai",
+      "name": "GPT-4o mini Transcribe",
+      "description": "GPT-4o mini Transcribe is a speech-to-text model that uses GPT-4o mini to transcribe audio. It offers improvements to word error rate and better language recognition and accuracy compared to original Whisper models. Use it for more accurate transcripts.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "deprecated_at": 1803600000000,
+      "pricing": {
+        "input": "0.00000125",
+        "output": "0.000005",
+        "audio_input_token_cost": "0.00000125"
+      }
+    },
+    {
+      "id": "openai/gpt-4o-transcribe",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1710288000,
+      "owned_by": "openai",
+      "name": "GPT-4o Transcribe",
+      "description": "GPT-4o Transcribe is a speech-to-text model that uses GPT-4o to transcribe audio. It offers improvements to word error rate and better language recognition and accuracy compared to original Whisper models. Use it for more accurate transcripts.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "deprecated_at": 1803600000000,
+      "pricing": {
+        "input": "0.0000025",
+        "output": "0.00001",
+        "audio_input_token_cost": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-realtime-whisper",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1778112000,
+      "owned_by": "openai",
+      "name": "gpt-realtime-whisper",
+      "description": "GPT Realtime Whisper is a streaming speech-to-text model for applications that need low-latency transcript deltas from live audio. It is designed for realtime use cases where developers need to tune latency and accuracy. GPT Realtime Whisper is priced by audio duration rather than text tokens.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "tags": [
+        "websocket-realtime",
+        "websocket-transcription"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {
+        "input": "0.0000000002",
+        "transcription_duration_cost_per_second": "0.000284"
+      }
+    },
+    {
+      "id": "openai/whisper-1",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1663718400,
+      "owned_by": "openai",
+      "name": "Whisper",
+      "description": "Whisper is a general-purpose speech recognition model, trained on a large dataset of diverse audio. You can also use it as a multitask model to perform multilingual speech recognition as well as speech translation and language identification.",
+      "type": "transcription",
+      "zdr": "none",
+      "no_training": "all",
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "deprecated_at": 1803600000000,
+      "pricing": {
+        "input": "0.0000000001",
+        "transcription_duration_cost_per_second": "0.0001"
+      }
+    },
+    {
+      "id": "spacexai/grok-stt",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1773619200,
+      "owned_by": "spacexai",
+      "name": "Grok STT",
+      "description": "Transcribe audio to text in 25 languages with batch and streaming modes.",
+      "type": "transcription",
+      "zdr": "all",
+      "no_training": "all",
+      "tags": [
+        "websocket-transcription"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "pricing": {
+        "input": "0",
+        "transcription_duration_cost_per_second": "0.000028"
+      }
+    }
+  ]
+}

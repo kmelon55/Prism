@@ -1,0 +1,49 @@
+[package]
+name = "prism-desktop"
+version = "0.1.0"
+description = "Prism desktop command palette"
+authors = ["Prism contributors"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "prism_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+zeroize = "1"
+rfd = "0.15"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+arboard = { version = "3.6", default-features = false }
+notify = "8"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+tokio = { version = "1", features = ["sync", "macros", "time", "process", "io-util"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["macos-private-api"] }
+unicode-normalization = "0.1"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+window-vibrancy = "0.6"
+security-framework = "3.7"
+accessibility-sys = "0.2"
+base64 = "0.22"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tiff"] }
+objc2 = { version = "0.6", features = ["exception"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "libc", "objc2-quartz-core", "NSBitmapImageRep", "NSColor", "NSEvent", "NSGlassEffectView", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSRunningApplication", "NSScreen", "NSUserInterfaceItemIdentification", "NSView", "NSVisualEffectView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSObject", "NSString", "NSValue", "NSKeyValueCoding"] }
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer"] }

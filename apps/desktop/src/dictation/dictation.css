@@ -1,0 +1,48 @@
+.dictation-settings { display: grid; gap: 18px; }
+.dictation-settings button, .dictation-settings summary, .dictation-permissions button { cursor: pointer; }
+.dictation-settings button:disabled { cursor: default; opacity: .45; }
+.dictation-options { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 18px; }
+.dictation-options button { padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
+.dictation-options button[aria-pressed="true"] { background: var(--accent-soft, rgba(120,120,230,.14)); border-color: var(--accent, #817cf0); }
+.dictation-field { display: grid; gap: 7px; padding: 10px 18px; font-size: 12px; }
+.dictation-field input, .dictation-field textarea, .dictation-key-row input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--line); border-radius: 7px; background: var(--input-bg, rgba(120,120,120,.06)); color: inherit; padding: 8px 10px; font: inherit; }
+.dictation-file, .dictation-key-row, .dictation-actions { display: flex; gap: 8px; align-items: center; }
+.dictation-file input, .dictation-key-row input { flex: 1; }
+.dictation-key-row { padding: 0 18px 12px; }
+.dictation-key-row button, .dictation-file button, .dictation-actions button { flex-shrink: 0; }
+.dictation-notice { font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin: 0; padding: 8px 18px; }
+.dictation-command { padding: 0 12px; }
+.dictation-command .command-alias-input { display: none; }
+.dictation-command .settings-command-row { grid-template-columns: 32px minmax(0, 1fr) auto; }
+.dictation-advanced summary { padding: 14px 18px; font-size: 12px; }
+.dictation-settings [role="alert"], .dictation-permissions [role="alert"] { color: var(--danger, #d87766); font-size: 12px; }
+.dictation-settings [role="status"] { font-size: 12px; }
+.dictation-actions button { display: inline-flex; gap: 6px; align-items: center; }
+
+.dictation-settings > .settings-group { margin-bottom: 0; }
+.dictation-settings .settings-row > span, .dictation-permissions .settings-row > span { font-size: 12px; line-height: 1.55; color: var(--text-secondary); }
+
+.dictation-model-list { display: grid; gap: 6px; padding: 0 16px; max-height: 320px; overflow-y: auto; }
+.dictation-model { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px; text-align: left; color: inherit; border: 1px solid var(--line); border-radius: 10px; background: transparent; cursor: pointer; font: inherit; font-size: 11px; }
+.dictation-model[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.dictation-model:disabled { opacity: .5; cursor: default; }
+.dictation-model-heading { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.dictation-model-id, .dictation-model-description { color: var(--text-secondary); overflow-wrap: anywhere; }
+.dictation-model-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.dictation-current-model { margin-bottom: 16px; }
+.dictation-selector-popover { z-index: 45; width: min(580px, 100%); max-height: min(680px, 75vh); overflow-y: auto; }
+.dictation-selector-popover .dictation-model-list { padding: 0; max-height: 280px; }
+.dictation-selector-popover .dictation-model { display: flex; align-items: stretch; justify-content: start; flex-direction: column; border-radius: 6px; padding: 9px; }
+.dictation-selector-popover .dictation-model-description { display: none; }
+.dictation-selector-popover .dictation-notice { margin: 8px 0; padding: 0; }
+.dictation-selector-popover .ai-picker-providers { flex-wrap: wrap; }
+
+.dictation-recording-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.dictation-recording-controls select { max-width: 210px; }
+.dictation-recording-controls .shortcut-recorder { min-width: 90px; }
+
+.dictation-saved-key { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 0 18px 12px; font-size: 12px; }
+.dictation-saved-key > svg { color: var(--success, #579977); }
+.dictation-saved-key code { flex: 1; color: var(--text-secondary); white-space: nowrap; }
+.dictation-recording-controls .shortcut-recorder[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }

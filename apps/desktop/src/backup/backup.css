@@ -1,0 +1,20 @@
+.backup-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.backup-categories { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); }
+.backup-categories legend { padding: 0; font-size: 12px; font-weight: 600; }
+.backup-categories label { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+.backup-categories input { accent-color: var(--text); }
+.backup-hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+.backup-review { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); padding-top: 18px; }
+.backup-review h3 { margin: 0; font-size: 14px; }
+.backup-review table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.backup-review caption { text-align: left; margin-bottom: 8px; color: var(--text-secondary); }
+.backup-review th, .backup-review td { text-align: right; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.backup-review th:first-child { text-align: left; }
+.backup-preferences { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 12px; }
+.backup-preferences dl { margin: 0; display: flex; gap: 22px; flex-wrap: wrap; }
+.backup-preferences dt { color: var(--text-secondary); margin-bottom: 3px; }
+.backup-preferences dd { margin: 0; }
+
+.backup-reference-list { display: grid; gap: 10px; padding-inline-start: 20px; max-height: 260px; overflow: auto; }
+.backup-reference-list li { display: grid; gap: 3px; overflow-wrap: anywhere; }
+.backup-reference-list code { white-space: pre-wrap; font-size: 11px; }

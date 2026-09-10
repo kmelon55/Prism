@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="surface" x1="220" y1="138" x2="826" y2="886" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#181D24"/>
+      <stop offset="1" stop-color="#0B0E12"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="300" y1="268" x2="752" y2="782" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BC8FF"/>
+      <stop offset="0.52" stop-color="#AEA1FF"/>
+      <stop offset="1" stop-color="#E9A6BA"/>
+    </linearGradient>
+    <filter id="shadow" x="140" y="132" width="744" height="770" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="28" stdDeviation="34" flood-color="#000000" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="216" fill="url(#surface)"/>
+  <rect x="73.5" y="73.5" width="877" height="877" rx="214.5" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="3"/>
+  <g filter="url(#shadow)">
+    <path d="M512 228L782 692L512 832L242 692L512 228Z" fill="#151A20" stroke="#89929D" stroke-width="20" stroke-linejoin="round"/>
+    <path d="M512 228V832L242 692L512 228Z" fill="#20262E"/>
+    <path d="M512 228L782 692L512 832V228Z" fill="#101419"/>
+    <path d="M512 228L618 594L512 832L406 594L512 228Z" fill="url(#edge)" fill-opacity="0.24"/>
+    <path d="M512 228L618 594L512 832L406 594L512 228Z" stroke="url(#edge)" stroke-width="14" stroke-linejoin="round"/>
+  </g>
+</svg>

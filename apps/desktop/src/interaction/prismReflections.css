@@ -1,0 +1,32 @@
+/* Whisp GlassOpticsLayer: original restrained lighting, no rotating interior color wash.
+   MIT: see src-tauri/native/dictation/LICENSE-Whisp. Shared material/pointer driver unchanged. */
+@keyframes whisp-face-arrive { from { opacity: 0; } to { opacity: var(--reflection-intensity, .65); } }
+.prism-shell::after {
+  display: block;
+  background:
+    radial-gradient(circle at var(--glass-x) var(--glass-y), #ffffff1b, #ffffff06 32%, transparent 56%),
+    linear-gradient(to bottom, rgb(255 255 255 / .045), rgb(255 255 255 / .008) 34%, transparent 62%, rgb(0 0 0 / .012));
+  mask-image: none;
+  opacity: var(--reflection-intensity, .65);
+  animation: whisp-face-arrive 280ms ease-out both;
+}
+/* Keep dispersion local to the highlight. A softer, narrower white core lets
+   the adjacent spectrum read without turning the whole border into a rainbow. */
+.prism-shell::before {
+  background:
+    conic-gradient(from var(--glass-angle) at 50% 50%,
+      transparent 0% 6.5%,
+      rgb(255 76 68 / calc(.22 + var(--reflection-edge, .2) * .2)) 8%,
+      rgb(255 155 50 / calc(.22 + var(--reflection-edge, .2) * .2)) 9.5%,
+      rgb(255 221 80 / calc(.22 + var(--reflection-edge, .2) * .2)) 11%,
+      rgb(73 215 133 / calc(.22 + var(--reflection-edge, .2) * .2)) 12%,
+      rgb(234 250 255 / var(--reflection-highlight, .4)) 12.5%,
+      rgb(58 166 255 / calc(.22 + var(--reflection-edge, .2) * .2)) 13.5%,
+      rgb(85 100 225 / calc(.22 + var(--reflection-edge, .2) * .2)) 15%,
+      rgb(170 100 225 / calc(.22 + var(--reflection-edge, .2) * .2)) 16.5%,
+      transparent 21.5% 57%, rgb(255 255 255 / calc(var(--reflection-highlight, .4) * .35)) 62%, transparent 69% 100%), linear-gradient(#ffffff12, #ffffff12);
+}
+:root[data-reduce-motion="true"] .prism-shell::after { display: block; animation: none; }
+@media (prefers-reduced-motion: reduce) { .prism-shell::after { display: block; animation: none; } }
+@media (prefers-contrast: more) { .prism-shell::after { display: none; } }
+.reflection-settings { padding-left: 12px; }

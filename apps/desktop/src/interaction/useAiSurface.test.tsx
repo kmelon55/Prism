@@ -1,0 +1,43 @@
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useAiSurface } from "./useAiSurface";
+let root: Root;
+let host: HTMLDivElement;
+let surface: ReturnType<typeof useAiSurface>;
+function Harness({ reduced = false }: { reduced?: boolean }) { surface = useAiSurface(reduced); return null; }
+beforeEach(() => { vi.useFakeTimers(); host = document.createElement("div"); root = createRoot(host); });
+afterEach(async () => { await act(async () => root.unmount()); vi.useRealTimers(); });
+it("retains outgoing content before collapsing and cancels a stale close on reopen", async () => {
+  await act(async () => root.render(<Harness />));
+  await act(async () => surface.change(true));
+  await act(async () => vi.advanceTimersByTime(500));
+  expect(surface.phase).toBe("open");
+  await act(async () => surface.change(false));
+  expect(surface.open).toBe(true);
+  expect(surface.phase).toBe("closing");
+  await act(async () => vi.advanceTimersByTime(60));
+  await act(async () => surface.change(true));
+  await act(async () => vi.advanceTimersByTime(500));
+  expect(surface.open).toBe(true);
+  expect(surface.phase).toBe("open");
+  await act(async () => surface.change(false));
+  await act(async () => vi.advanceTimersByTime(120));
+  expect(surface.open).toBe(false);
+  expect(surface.phase).toBe("returning");
+  await act(async () => vi.advanceTimersByTime(360));
+  expect(surface.phase).toBe("closed");
+});
+it("settles an interrupted transition immediately when reduced motion is enabled", async () => {
+  await act(async () => root.render(<Harness />));
+  await act(async () => surface.change(true));
+  await act(async () => surface.change(false));
+  expect(surface.open).toBe(true);
+  await act(async () => root.render(<Harness reduced />));
+  expect(surface.open).toBe(false);
+  expect(surface.phase).toBe("closed");
+  await act(async () => surface.change(true));
+  expect(surface.phase).toBe("open");
+  await act(async () => vi.advanceTimersByTime(1000));
+  expect(surface.open).toBe(true);
+});

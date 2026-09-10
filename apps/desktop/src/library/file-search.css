@@ -1,0 +1,7 @@
+.file-search-folders { margin: 0 0 8px; font-size: 12px; color: var(--text-secondary, #8b8b92); }
+.file-search-folders summary { cursor: pointer; width: fit-content; padding: 4px 0; }
+.file-search-folders p { margin: 6px 0; }
+.file-search-folders > button { display: inline-flex; align-items: center; gap: 5px; margin: 4px 0; }
+
+.file-search-broader { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.file-search-scope { margin: 0 0 8px; font-size: 12px; color: var(--text-secondary, #8b8b92); }

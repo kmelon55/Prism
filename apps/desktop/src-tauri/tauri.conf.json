@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Prism",
+  "version": "0.1.0",
+  "identifier": "dev.prism.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Prism",
+        "width": 760,
+        "height": 500,
+        "minWidth": 760,
+        "minHeight": 500,
+        "center": true,
+        "resizable": false,
+        "decorations": false,
+        "visible": false,
+        "skipTaskbar": true,
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "shadow": true,
+        "alwaysOnTop": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "shortDescription": "A keyboard-first command palette for desktop.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "14.0",
+      "infoPlist": "Info.plist",
+      "entitlements": "Entitlements.plist",
+      "signingIdentity": "-"
+    },
+    "resources": [
+      "native/dictation/LICENSE-Whisp"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0OTQzMTVBMzU5RDM0QTcKUldTbk5KMDFXakdVTkZKSGlUT0JjcnJ6MloxcDFVL1NKYkhGSlFYaTlJRm5Dbk9ESTNxUktoREwK",
+      "endpoints": [
+        "https://github.com/kmelon55/Prism/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

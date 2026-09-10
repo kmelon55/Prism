@@ -1,0 +1,61 @@
+[
+  [
+    "Use {query} in the URL query to ask for a search term.",
+    "URL 쿼리에 {query}를 넣어 검색어를 입력받으세요."
+  ],
+  [
+    "Use {date}, {time}, and {clipboard} for the date, time, and clipboard.",
+    "{date}, {time}, {clipboard}로 날짜, 시간, 클립보드를 넣으세요."
+  ],
+  ["Query", "검색어"],
+  ["All files", "모든 파일"],
+  ["Document", "문서"],
+  ["Refresh preview", "미리보기 새로고침"],
+  ["Loading preview…", "미리보기를 불러오는 중…"],
+  ["Modified", "수정한 날짜"],
+  ["Execution preview", "실행 미리보기"],
+  [
+    "Review the preview before running this entry.",
+    "실행 전에 미리보기를 확인하세요."
+  ],
+  ["Symbolic links are not supported.", "심볼릭 링크는 지원하지 않습니다."],
+  ["Done.", "완료했습니다."],
+  [
+    "Preview is not available for this file.",
+    "이 파일은 미리보기를 지원하지 않습니다."
+  ],
+  ["Image", "이미지"],
+  ["This file type is not supported.", "지원하지 않는 파일 종류입니다."],
+  ["Size", "크기"],
+  ["Text", "텍스트"],
+  ["File search results", "파일 검색 결과"],
+  ["File preview", "파일 미리보기"],
+  ["File type", "파일 종류"],
+  ["Only part of this file is shown.", "파일의 일부만 표시합니다."],
+  [
+    "Query placeholders can only appear in the URL query.",
+    "검색어 자리표시는 URL 쿼리에만 사용할 수 있습니다."
+  ],
+  ["Enter a search term.", "검색어를 입력하세요."],
+  [
+    "The preview expired. Load it again.",
+    "미리보기가 만료되었습니다. 다시 불러오세요."
+  ],
+  ["Could not read the preview.", "미리보기를 읽지 못했습니다."],
+  ["Only regular files can be previewed.", "일반 파일만 미리볼 수 있습니다."],
+  ["The clipboard text is too long.", "클립보드 텍스트가 너무 깁니다."],
+  ["The clipboard does not contain text.", "클립보드에 텍스트가 없습니다."],
+  [
+    "The file list expired. Refresh the list.",
+    "파일 목록이 만료되었습니다. 목록을 새로고침하세요."
+  ],
+  ["Could not access the file.", "파일에 접근하지 못했습니다."],
+  [
+    "The entry changed. Load the preview again.",
+    "항목이 변경되었습니다. 미리보기를 다시 불러오세요."
+  ],
+  [
+    "Expanded content must be at most 128 KB.",
+    "확장한 내용은 최대 128 KB입니다."
+  ]
+]

@@ -1,0 +1,18 @@
+{
+  "name": "prism",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An open-source, keyboard-first command palette for desktop.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @prism/desktop build",
+    "desktop:bundle": "pnpm tauri build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test",
+    "tauri": "pnpm --filter @prism/desktop tauri"
+  }
+}
