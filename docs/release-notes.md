@@ -1,12 +1,13 @@
-Prism is an open-source keyboard-first launcher for macOS 14 and later.
+Prism 0.1.1 adds clearer dictation controls and AI usage reporting.
 
-- Download the universal DMG or ZIP for Apple Silicon and Intel Macs.
-- Install one copy at `/Applications/Prism.app`; opening it again focuses the running instance.
-- Get automatic update checks, signed update downloads, and an explicit restart when ready.
-- Read installation and usage instructions in English or Korean.
+- Choose speech cleanup, prompt formatting, or plain dictation. Configure a separate model and processing prompt for each enhancement.
+- Assign an optional shortcut to format and paste a prompt while keeping ordinary dictation available.
+- Review AI usage, tokens, and reported or estimated costs in the AI settings tab, with daily charts and feature, provider, and model breakdowns.
+- Use consistent model and settings selectors on macOS, including local speech models in the provider picker.
+- Verify the app signing identity before installing future updates, in addition to verifying the updater download signature.
 
-This release is ad-hoc signed and is not Apple notarized. After the first blocked launch,
-open System Settings → Privacy & Security → Open Anyway. See the README for details.
-macOS may require renewed Accessibility or microphone permission after an update.
+Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can check for updates in Settings → General, install, and restart when ready.
 
-Keep your provider keys and local history: app updates do not reset application data.
+This release uses the persistent Prism Local Signing certificate and is not Apple notarized. First installation may require System Settings → Privacy & Security → Open Anyway. Earlier ad-hoc installations may need a one-time permission approval when moving to this certificate. Updates from an installation already using the same certificate retain the signing identity.
+
+Provider keys, preferences, and local history are preserved by app updates.

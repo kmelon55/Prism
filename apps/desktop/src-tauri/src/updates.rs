@@ -73,7 +73,22 @@ pub async fn install_update(app: AppHandle, state: State<'_, Updates>) -> Result
     let update = state.pending.lock().unwrap().clone().ok_or("Check for an update first.")?;
     let version = Some(update.version.clone());
     publish(&app, &state, "installing", version.clone(), None);
-    match update.download_and_install(|_, _| {}, || {}).await {
+    let result: Result<(), String> = async {
+        // download() verifies the updater signature before returning the bytes.
+        let bytes = update.download(|_, _| {}, || {}).await.map_err(|error| error.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || {
+            #[cfg(target_os = "macos")]
+            {
+                let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+                let installed = executable.ancestors()
+                    .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+                    .ok_or("Install Prism in Applications before updating.")?;
+                crate::update_signature::verify(&bytes, installed)?;
+            }
+            update.install(&bytes).map_err(|error| error.to_string())
+        }).await.map_err(|error| error.to_string())?
+    }.await;
+    match result {
         Ok(()) => {
             *state.pending.lock().unwrap() = None;
             Ok(publish(&app, &state, "installed", version, None))

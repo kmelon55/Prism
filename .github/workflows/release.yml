@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: ${{ vars.MACOS_RELEASE_CI_ENABLED == 'true' }}
     runs-on: macos-15
     timeout-minutes: 60
     env:
@@ -32,6 +33,17 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Require persistent signing and notarization credentials
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: node --input-type=module -e 'import { requireReleaseCredentials } from "./scripts/macos-signing.mjs"; requireReleaseCredentials(process.env);'
+      - run: node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
@@ -43,10 +55,19 @@ jobs:
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Build universal app and signed updates
         env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: pnpm tauri build --target universal-apple-darwin
       - run: node scripts/package-release.mjs
+        env:
+          PRISM_RELEASE_MODE: notarized
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Publish complete release
         env:
           GH_TOKEN: ${{ github.token }}

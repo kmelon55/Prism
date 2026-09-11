@@ -19,7 +19,7 @@ Requires **macOS 14 or later**. The universal build supports **Apple Silicon and
 
 ### First launch: Open Anyway
 
-Prism is currently **ad-hoc signed, without Apple Developer ID signing or notarization**.
+Prism 0.1.1 uses a **persistent local signing certificate, without Apple notarization**.
 macOS may block the first launch because it cannot verify the developer.
 After trying to open Prism, go to **System Settings → Privacy & Security → Open Anyway**,
 then confirm **Open**. Only do this for a download you trust from this repository.
@@ -27,9 +27,9 @@ See [Apple's instructions](https://support.apple.com/en-us/102445).
 
 Prism asks for permissions when a feature needs them. Accessibility enables window
 management and inserting text into other apps; dictation needs microphone access.
-Without a stable Apple Developer ID signature, macOS may ask you to grant permissions
-again after an update. Update signatures verify Prism's release files independently
-of Apple notarization.
+Existing ad-hoc installations may need one-time authorization when moving to the
+persistent certificate. Subsequent updates verify the app signing identity before
+replacement. Update archive signatures are separate from Apple notarization.
 
 ## Updates and everyday use
 

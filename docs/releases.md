@@ -1,77 +1,96 @@
 # Release Prism
 
-## One installed app
+Keep `/Applications/Prism.app`, the product name `Prism`, and bundle identifier
+`dev.prism.desktop` stable. Do not replace or restart the installed app during a
+release build. Preserve running development servers and unrelated worktree changes.
 
-Use `/Applications/Prism.app` for daily work. Keep the bundle identifier
-`dev.prism.desktop` and product name `Prism` stable. Do not create alternate test
-identities or apps pointing to a development server. Quit the installed app before
-an explicitly requested native development session; single-instance protection
-prevents duplicate native launchers. Browser previews remain separate.
-
-## Publish a version
+## Prepare a version
 
 1. Update the version in root `package.json`, `apps/desktop/package.json`,
-   `apps/desktop/src-tauri/tauri.conf.json`, and the package entry in
-   `apps/desktop/src-tauri/Cargo.toml`. Refresh the Cargo lockfile with `cargo check`.
+   `apps/desktop/src-tauri/tauri.conf.json`, and `apps/desktop/src-tauri/Cargo.toml`.
+   Refresh the Prism package entry in `Cargo.lock`.
 2. Update `docs/release-notes.md` in English. Run `pnpm typecheck`, `pnpm test`,
-   `pnpm build`, and `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`.
-3. Review the diff and commit in English. Push `main`, then an annotated version tag:
+   `pnpm build`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
+   and `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`.
+3. Build and verify the complete release before publishing. Commit in English,
+   push `main`, then push an annotated version tag such as `v0.1.1`.
+4. Create a draft GitHub release with `docs/release-notes.md`, upload every file in
+   `dist/releases/v0.1.1`, verify the assets, then publish it as latest.
+   Published releases are immutable; use a new version to correct mistakes.
+5. Verify the public `releases/latest/download/latest.json`, archive signature,
+   checksums, and both macOS architecture entries. Artifact checks do not prove an
+   actual installation, restart, or permission behavior on a user's Mac.
 
-   ```sh
-   git tag -a v0.1.1 -m 'Release Prism 0.1.1'
-   git push origin main
-   git push origin v0.1.1
-   ```
+## Signing and notarization
 
-4. The **Release macOS** workflow builds a universal app, verifies its ad-hoc code
-   signature, creates DMG and ZIP downloads, signs the updater archive, and publishes
-   `latest.json` and SHA-256 checksums. It keeps the release draft until every asset
-   is uploaded. A published release is immutable: fix mistakes with a new version.
-5. Verify downloads and check for updates from an older installed app. A green build
-   alone does not prove the installation/restart path or macOS permissions.
+Automatic updates do not require Apple notarization. They require the existing
+Tauri updater private key and its matching public key in `tauri.conf.json`.
+The DMG is a manual installer; automatic updates use the `.app.tar.gz`, `.sig`,
+and `latest.json` assets. Never replace the updater key or publish it in Git.
 
-CI selects Xcode 26.3 explicitly to compile the macOS 26 glass APIs while retaining
-the macOS 14 deployment target. The runner default Xcode 16 SDK cannot compile them.
+Prism also requires a persistent macOS code-signing certificate so updates keep
+the app's identity. The updater archive signature and macOS code signature are
+separate checks. Packaged builds reject missing identities and ad-hoc signing.
+Never regenerate a certificate during a build, reset TCC, or weaken Keychain ACLs.
+Keep certificate backups and private keys outside the repository.
 
-The workflow can also be dispatched for an existing tag to retry an unpublished
-release. The first release may be packaged locally with the same build and
-`node scripts/package-release.mjs`, then uploaded as a complete draft before publishing.
+### Non-notarized release from the signing Mac
 
-## Signing
+Use the existing `Prism Local Signing` identity. The Tauri wrapper reads the
+existing `~/Library/Application Support/Prism Signing/identity.json` configuration
+and unlocks only that identity's dedicated keychain. An explicit
+`APPLE_SIGNING_IDENTITY` can select an already-provisioned certificate instead.
+The packaging step compares both designated requirements against the installed
+app across all architectures and rejects an incompatible signer.
 
-GitHub Actions requires the repository secret `TAURI_SIGNING_PRIVATE_KEY`.
-The private key must stay outside Git. Back it up securely; losing it prevents
-updates for existing installations. The corresponding public key is in the Tauri
-configuration. The current key has no passphrase and is protected by file permissions
-locally and encrypted GitHub repository secrets in CI.
-
-For a local release build, set `TAURI_SIGNING_PRIVATE_KEY` to your private key path,
-set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to an empty string, install Rust targets
-`aarch64-apple-darwin` and `x86_64-apple-darwin`, and run:
+Set `TAURI_SIGNING_PRIVATE_KEY` to the existing updater private key path and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to its passphrase (empty for the current key).
+Install Rust targets `aarch64-apple-darwin` and `x86_64-apple-darwin`, then run:
 
 ```sh
-pnpm tauri build --target universal-apple-darwin
-node scripts/package-release.mjs
+pnpm tauri build --target universal-apple-darwin --bundles app
+node scripts/create-release-dmg.mjs
+PRISM_RELEASE_MODE=local-signed PRISM_INSTALLED_APP=/Applications/Prism.app node scripts/package-release.mjs
 ```
 
-Updater signatures and Apple signing are independent. Current builds use ad-hoc
-Apple signing and have no notarization. Do not claim Apple verification. When a
-Developer ID certificate becomes available, add signing and notarization credentials
-to CI, replace the ad-hoc identity, and test the upgrade and permissions behavior.
+This builds without controlling Finder or replacing the installed app. Packaging
+verifies the updater signature against the configured public key, produces the
+DMG, ZIP, updater archive and signature, feed, and SHA-256 checksums.
+
+Clearly label the release as not notarized. New downloads may require
+System Settings → Privacy & Security → Open Anyway. Moving from an older ad-hoc
+build to a persistent certificate may require a one-time permission approval.
+Switching from the local certificate to Developer ID is a separate identity
+migration, not an interchangeable build setting.
+
+### Notarized releases in GitHub Actions
+
+The **Release macOS** job is opt-in through the repository variable
+`MACOS_RELEASE_CI_ENABLED=true`. Leave it disabled while the persistent certificate
+is held only on the signing Mac; pushing tags still permits local publication.
+Do not enable it until the certificate is provisioned and the installed-app
+identity migration has been addressed.
+
+The job requires `APPLE_SIGNING_IDENTITY` (Developer ID Application name),
+`APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`,
+`APPLE_PASSWORD`, `APPLE_TEAM_ID`, and `TAURI_SIGNING_PRIVATE_KEY` secrets.
+It never falls back to ad-hoc signing. `PRISM_RELEASE_MODE=notarized` additionally
+requires a Developer ID signature and a valid stapled notarization ticket.
+CI selects Xcode 26.3 to compile macOS 26 glass APIs while retaining macOS 14 support.
+The workflow can be dispatched for an existing tag to retry an unpublished release.
 
 ## Update behavior
 
 The native process checks GitHub 20 seconds after startup and every six hours.
-Settings → General can trigger a manual check. Checks and installations are serialized
-across windows. Downloads are signature-verified by the Tauri updater before replacing
-the bundle. The user installs explicitly and restarts separately to finish ongoing work.
-Errors are shown in Settings and do not restart the app. Debug builds cannot install updates.
+Settings → General provides a manual check. Checks and installs are serialized
+across windows. Tauri verifies the download signature, then Prism verifies the
+extracted app's code signature and mutual compatibility with the installed app.
+An ad-hoc or different signer is rejected before replacement. Installation is
+explicit; restarting is a separate action. Errors do not restart the app.
+Development builds cannot install updates.
 
 ## Cleanup
 
 Build artifacts are disposable; application data and signing keys are not.
-After quitting a packaged test app, remove obsolete test bundles and release staging
-folders. Remove Rust `target` output only when no Cargo/Tauri build or native development
-process is using it. Keep dependencies and caches needed by an active development server.
-Never delete Application Support, WebKit storage, Keychain items, or user-created scripts
-as build cleanup. Back up old test application data before migrating it to the stable identity.
+Remove release staging folders only when no build is using them. Never remove
+Application Support, WebKit storage, Keychain items, or user scripts as build cleanup.

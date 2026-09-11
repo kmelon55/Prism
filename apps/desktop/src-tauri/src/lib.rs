@@ -1,4 +1,6 @@
 mod updates;
+#[cfg(target_os = "macos")]
+mod update_signature;
 mod ai;
 mod ai_history;
 mod ai_usage;
