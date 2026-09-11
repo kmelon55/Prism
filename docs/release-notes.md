@@ -1,12 +1,13 @@
-Prism 0.1.4 improves window shortcuts and background launcher behavior.
+Prism 0.1.5 makes updates easier and fixes saved-key access and dictation error languages.
 
-- Keep repeated Right Half layouts aligned to the right edge through the half, one-third, and two-thirds cycle. Make room before expanding windows whose apps constrain resizing at screen edges, and track the actual applied frame for subsequent shortcuts.
-- Run window, app-launch, and system shortcuts without briefly opening the command palette. Failed commands still show their error.
-- Keep Prism running when Cmd+Q is pressed. Use the explicit Quit Prism application-menu action to exit.
-- Suppress unsolicited login-Keychain password dialogs and silently reuse already-authorized AI and dictation keys after restart. Settings explain the Always Allow option. Local-signed updates can still require renewed Keychain approval; this release does not remove that macOS signing limitation.
+- Show available updates in the launcher automatically, with direct install and restart actions. Background checks run after startup and every six hours.
+- Add Install updates automatically in Settings → General. It is off by default. When enabled, Prism downloads and verifies new versions in the background; changes take effect on the next restart without interrupting current work.
+- Request required Keychain authorization when starting dictation or an AI request, without a detour through Settings. Keep settings checks silent, reuse authorized keys, and distinguish canceled authorization from other failures.
+- Make native dictation errors follow the app language, including saved-key failures on the first recording attempt. Language changes apply without editing dictation settings.
+- Keep the launcher running when its window is closed. Cmd+Q closes the current window instead of quitting Prism. Add explicit Quit Prism actions in the launcher and settings. Escape closes the settings window.
 
-These downloads are for macOS; no Windows, Linux, or Android public release is included.
+Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can install this release through Settings → General → Check for updates. The new launcher notifications and automatic-install setting become available after upgrading to 0.1.5.
 
-Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can use Settings → General → Check for updates, then install and restart when ready.
+The macOS app uses the existing Prism Local Signing certificate and updater key. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway. Local-signed updates can still require renewed macOS Keychain approval.
 
-The macOS app uses the same persistent Prism Local Signing certificate and updater key. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway.
+No Windows, Linux, or Android public release is included.

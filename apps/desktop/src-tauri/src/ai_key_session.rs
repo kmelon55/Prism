@@ -22,6 +22,20 @@ impl KeySession {
     pub fn allow_retry(&mut self) {
         self.denied = None;
     }
+    /// Restore previously authorized access without recording a user denial.
+    /// A settings probe must not suppress the next deliberate feature request.
+    pub fn load_silent(
+        &mut self,
+        read: impl FnOnce() -> Result<Option<Vec<u8>>, String>,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>, String> {
+        if self.key.is_some() {
+            return Ok(self.key.clone());
+        }
+        if let Some(key) = read()? {
+            self.replace(key);
+        }
+        Ok(self.key.clone())
+    }
     pub fn load(
         &mut self,
         read: impl FnOnce() -> Result<Option<Vec<u8>>, String>,
@@ -54,6 +68,39 @@ impl KeySession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn settings_denial_does_not_block_feature_authorization() {
+        let mut session = KeySession::default();
+        assert!(session
+            .load_silent(|| Err("interaction required".into()))
+            .is_err());
+        assert_eq!(
+            session
+                .load(|| Ok(Some(b"fixture".to_vec())))
+                .unwrap()
+                .unwrap()
+                .as_slice(),
+            b"fixture"
+        );
+        assert!(session
+            .load_silent(|| panic!("reuse authorized access"))
+            .unwrap()
+            .is_some());
+    }
+    #[test]
+    fn settings_probe_does_not_clear_a_cancelled_feature_request() {
+        let mut session = KeySession::default();
+        assert!(session.load(|| Err("canceled".into())).is_err());
+        assert!(session
+            .load_silent(|| Err("interaction required".into()))
+            .is_err());
+        assert_eq!(
+            session
+                .load(|| panic!("do not reopen canceled dialog"))
+                .unwrap_err(),
+            "canceled"
+        );
+    }
     #[test]
     fn repeated_reads_share_one_authorization_and_replacement_invalidates_old_key() {
         let mut session = KeySession::default();
@@ -96,10 +143,18 @@ mod tests {
     #[test]
     fn explicit_authorization_can_retry_a_recent_silent_denial() {
         let mut session = KeySession::default();
-        assert!(session.load(|| Err("authorization required".into())).is_err());
+        assert!(session
+            .load(|| Err("authorization required".into()))
+            .is_err());
         session.allow_retry();
-        assert!(session.load(|| Ok(Some(b"fixture".to_vec()))).unwrap().is_some());
+        assert!(session
+            .load(|| Ok(Some(b"fixture".to_vec())))
+            .unwrap()
+            .is_some());
         session.allow_retry();
-        assert!(session.load(|| panic!("an authorized key stays cached")).unwrap().is_some());
+        assert!(session
+            .load(|| panic!("an authorized key stays cached"))
+            .unwrap()
+            .is_some());
     }
 }

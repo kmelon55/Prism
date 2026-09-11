@@ -80,12 +80,15 @@ export function usePaletteKeyboard(context: KeyboardContext) {
         }
         return;
       }
-      if (ctx.recording || ctx.settings) return;
-      if (modifier && event.key.toLowerCase() === "w") {
+      if (ctx.recording) return;
+      if (!event.shiftKey && !event.altKey
+        && ((modifier && event.key.toLowerCase() === "w")
+          || (event.metaKey && !event.ctrlKey && event.key.toLowerCase() === "q"))) {
         consume();
         if (!event.repeat) ctx.hide();
         return;
       }
+      if (ctx.settings) return;
       if (ctx.actionItem) {
         // Text editing in the action search must not copy a command's path instead of selected text.
         const target = event.target;

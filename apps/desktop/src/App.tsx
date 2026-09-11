@@ -18,6 +18,7 @@ import { startScriptSession } from "./scripts/runStore";
 import { LibraryRunDialog, needsLibraryRun, type LibraryRunAction } from "./library/LibraryRunDialog";
 import { SettingsView, type SettingsPreferences as Preferences, type ThemePreference } from "./settings/SettingsView";
 import { t, useLocale, localizeCommand, bilingual, notifyLanguageChanged, type Language } from "./i18n";
+import { Updates } from "./Updates";
 import { LibraryPanel } from "./LibraryPanel";
 import { fileIcons } from "./fileIcons";
 import { resultSubtitle } from "./resultPresentation";
@@ -803,6 +804,13 @@ export function App() {
 
   useEffect(() => {
     if (!nativeRuntime) return;
+    void invoke("dictation_set_ui_language", { locale }).catch((error) => {
+      console.error("Could not synchronize the native dictation language", error);
+    });
+  }, [nativeRuntime, locale]);
+
+  useEffect(() => {
+    if (!nativeRuntime) return;
     let active = true;
     let stopListening: (() => void) | undefined;
     void onClipboardHistorySettingChanged((enabled) => {
@@ -1292,6 +1300,18 @@ export function App() {
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const quitPrism = async () => {
+    if (!nativeRuntime) {
+      setToast(t("Quit Prism is available in the desktop app"));
+      return;
+    }
+    try {
+      await invoke("quit_prism");
+    } catch (error) {
+      setToast(errorMessage(error, t("Prism could not quit.")));
+    }
+  };
+
   const recordShortcut = (accelerator: string) => {
     if (!accelerator) {
       setShortcutError(t("Include at least one modifier key in the global shortcut."));
@@ -1614,6 +1634,7 @@ export function App() {
       }
       else if (action.id === prismActionIds.cycleTheme) cycleTheme();
       else if (action.id === prismActionIds.hide) await dismissPalette();
+      else if (action.id === prismActionIds.quit) await quitPrism();
       else if (action.id === prismActionIds.refreshApplications) await refreshApplications();
       else if (action.id === prismActionIds.clearIconCache) await clearIconCache();
       else if (action.id === prismActionIds.clearClipboardHistory) await clearClipboard();
@@ -1767,7 +1788,7 @@ export function App() {
     },
     clearQuery,
     goBack,
-    hide: () => { void dismissPalette(); },
+    hide: () => { void (settingsWindow ? closePreferences() : dismissPalette()); },
     openSettings: () => { void openPreferences(); },
     openAiChat: () => {
       setAiEntry((entry) => ({ id: entry.id + 1, text: /^(ai|chat|대화)$/i.test(query.trim()) ? "" : query }));
@@ -1810,6 +1831,7 @@ export function App() {
           preferences={preferences}
           onChange={updatePreferences}
           onClose={() => void closePreferences()}
+          onQuit={() => void quitPrism()}
           nativeRuntime={nativeRuntime}
           commandKey={commandKey}
           shortcut={shortcut}
@@ -2028,6 +2050,7 @@ export function App() {
         />
       ) : null}
       <div className={`toast ${toast ? "visible" : ""}`} role="status" aria-live="polite">{t(toast)}</div>
+      {!preferencesOpen && !settingsWindow && <Updates compact />}
     </main>
   );
 }

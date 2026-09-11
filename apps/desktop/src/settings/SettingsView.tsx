@@ -49,6 +49,7 @@ export interface SettingsViewProps {
   preferences: SettingsPreferences;
   onChange: (next: SettingsPreferences) => void;
   onClose: () => void;
+  onQuit: () => void;
   nativeRuntime: boolean;
   commandKey: boolean;
   shortcut: GlobalShortcutSetting;
@@ -640,6 +641,10 @@ export function SettingsView(props: SettingsViewProps) {
                 <h3 className="settings-group-title">{t("Behavior")}</h3>
                 <div className="settings-row"><div className="preference-copy"><strong>{t("Application icons")}</strong></div><button className={`switch ${preferences.showApplicationIcons ? "active" : ""}`} role="switch" aria-label={t("Show application icons")} aria-checked={preferences.showApplicationIcons} onClick={() => onChange({ ...preferences, showApplicationIcons: !preferences.showApplicationIcons })}><span /></button></div>
                 <AnimationSettings preferences={preferences} onChange={onChange} />
+                <div className="settings-row">
+                  <div className="preference-copy"><strong>{t("Quit Prism")}</strong><span>{t("Stop Prism and its background shortcuts")}</span></div>
+                  <div className="preference-actions"><button disabled={!nativeRuntime} onClick={props.onQuit}>{t("Quit Prism")}</button></div>
+                </div>
               </div>
               {nativeRuntime ? (
                 <div className="settings-group" role="group" aria-label={t("Application index")}>

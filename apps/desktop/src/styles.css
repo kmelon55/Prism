@@ -2488,6 +2488,7 @@ kbd {
   color: var(--text-secondary);
 }
 
-.prism-update-notice { position: fixed; z-index: 1000; bottom: 18px; left: 18px; right: 18px; border: 1px solid rgba(128,128,128,.35); border-radius: 14px; background: var(--surface, Canvas); color: var(--text, CanvasText); box-shadow: 0 8px 30px #0003; padding: 4px 12px; }
+.prism-update-notice { position: fixed; z-index: 1000; bottom: 54px; left: 18px; right: 18px; border: 1px solid var(--line-strong); border-radius: 14px; background: #24262d; color: var(--text); box-shadow: 0 8px 30px #0003; padding: 4px 12px; }
+:root[data-theme="light"] .prism-update-notice { background: #f6f7fa; }
 .prism-update-notice .settings-row { gap: 16px; }
 .prism-update-notice .preference-copy { min-width: 0; }

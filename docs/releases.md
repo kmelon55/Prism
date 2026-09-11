@@ -114,13 +114,19 @@ The native process checks GitHub 20 seconds after startup and every six hours.
 Settings → General provides a manual check. Checks and installs are serialized
 across windows. Tauri verifies the download signature, then Prism verifies the
 extracted app's code signature and mutual compatibility with the installed app.
-An ad-hoc or different signer is rejected before replacement. Installation is
-explicit; restarting is a separate action. Errors do not restart the app.
+An ad-hoc or different signer is rejected before replacement. Available updates
+appear in a launcher notice without opening Settings or manually checking.
+Installation is manual by default. Settings → General → Install updates
+automatically opts into background download and verified installation, including
+an already-discovered update. This preference persists across restarts. Restarting
+remains a separate action, so automatic installation does not interrupt active work.
+Errors remain retryable and do not restart the app.
 Development builds cannot install updates.
 
-Chat and dictation read already-authorized keys without permitting a macOS password
-dialog. When authorization is required, their settings provide an explicit **Allow
-key use** action. Status reads silently reuse already-authorized keys and fall back to metadata when access is denied. Successfully opened
+Chat and dictation reuse already-authorized keys and request required macOS
+authorization when the user starts the feature. Settings also provide an explicit
+**Allow key use** action. Status reads remain silent and fall back to metadata when
+access is denied. Successfully opened
 keys stay in zeroizing process memory, and no credentials move to plaintext settings.
 
 ## Cleanup

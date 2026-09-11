@@ -4,7 +4,7 @@ import AVFoundation
 import SwiftUI
 
 struct AppLanguage {
-    var english = false
+    var english = Locale.preferredLanguages.first?.hasPrefix("ko") != true
     func text(_ korean: String, _ english: String) -> String { self.english ? english : korean }
 }
 enum RemoteProvider: String, Decodable { case openAI = "openai", vercel, xAI = "xai", groq, custom }
@@ -58,6 +58,16 @@ final class DictationController: ObservableObject {
     @Published var amplitude = 0.0
     @Published var message = ""
     var language = AppLanguage()
+    var messages = NativeMessages()
+    private var preferredUILanguage: String?
+    func setUILanguage(_ locale: String) {
+        guard ["en", "ko"].contains(locale) else { return }
+        preferredUILanguage = locale
+        language.english = locale == "en"
+        message = messages.translate(message, english: language.english)
+        if phase != "idle" { show() }
+        emit()
+    }
     var callback: DictationCallback?
     private lazy var overlay = OverlayPresenter(appState: self)
     var overlaySettings = OverlaySettings()
@@ -145,7 +155,7 @@ final class DictationController: ObservableObject {
         do {
             let config = try JSONDecoder().decode(DictationConfiguration.self, from: Data(json.utf8))
             if processingMode != "prompt" { processingMode = config.cleanupEnabled ? "cleanup" : "none" }
-            configuration = config; language.english = config.uiLanguage == "en"
+            configuration = config; language.english = (preferredUILanguage ?? config.uiLanguage) == "en"
             overlaySettings = (try? JSONDecoder().decode(OverlaySettings.self, from: Data(json.utf8))) ?? OverlaySettings()
             controls.settings = overlaySettings; installCancel()
             work = Task {
@@ -274,7 +284,7 @@ final class DictationController: ObservableObject {
         configuration = nil; target = nil; removeCancel(); overlayPreviewPhase = nil; if presentsOverlay { overlay.hide() }
     }
     func fail(_ text: String) {
-        clear(); phase = "error"; message = text; show(); emit(); dismissLater(after: 5, session: generation)
+        clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: 5, session: generation)
     }
     private func dismissLater(after seconds: Double, session: UInt64) {
         timer = Task {
@@ -287,7 +297,7 @@ final class DictationController: ObservableObject {
         guard !busy else { return }
         clear(); generation &+= 1; phase = "preview"; amplitude = 0.48; message = ""
         if let json, let settings = try? JSONDecoder().decode(OverlaySettings.self, from: Data(json.utf8)) {
-            overlaySettings = settings; language.english = settings.uiLanguage == "en"
+            overlaySettings = settings; language.english = (preferredUILanguage ?? settings.uiLanguage) == "en"
         }
         let session = generation
         overlayPreviewPhase = "recording"
@@ -358,6 +368,14 @@ final class DictationController: ObservableObject {
 
 @_cdecl("prism_dictation_init") func prismDictationInit(_ callback: @escaping DictationCallback) {
     MainActor.assumeIsolated { DictationController.shared.callback = callback; DictationController.shared.emit() }
+}
+@_cdecl("prism_dictation_set_messages") func prismDictationSetMessages(_ json: UnsafePointer<CChar>) {
+    let text = String(cString: json)
+    MainActor.assumeIsolated { DictationController.shared.messages = NativeMessages(json: text) }
+}
+@_cdecl("prism_dictation_set_ui_language") func prismDictationSetUILanguage(_ locale: UnsafePointer<CChar>) {
+    let text = String(cString: locale)
+    MainActor.assumeIsolated { DictationController.shared.setUILanguage(text) }
 }
 @_cdecl("prism_dictation_toggle") func prismDictationToggle(_ pid: Int32) { MainActor.assumeIsolated { DictationController.shared.toggle(fallbackPID: pid) } }
 @_cdecl("prism_dictation_action") func prismDictationAction(_ action: Int32) {

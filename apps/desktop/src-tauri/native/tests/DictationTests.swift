@@ -46,6 +46,24 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
 }
 @main struct DictationTests {
     @MainActor static func main() async throws {
+        let catalog = NativeMessages(json: try String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8))
+        let oldKeyError = "저장된 키를 사용하려면 설정에서 ‘키 사용 허용’을 눌러 주세요."
+        let englishKeyError = catalog.translate(oldKeyError, english: true)
+        precondition(englishKeyError != oldKeyError && englishKeyError.contains("Allow key use"))
+        let deniedKeyError = "Keychain access was denied. Try again and approve access in the macOS dialog."
+        precondition(catalog.translate(deniedKeyError, english: false).contains("키체인 접근이 거부"))
+        precondition(catalog.translate("Could not read the saved key (macOS error -36).", english: false) == "저장된 키를 읽지 못했습니다(macOS 오류 -36).")
+        precondition(catalog.translate("fixture-provider-detail", english: true) == "fixture-provider-detail")
+        let languageController = DictationController(recorder: FakeRecorder(), presentsOverlay: false)
+        languageController.messages = catalog
+        languageController.setUILanguage("en")
+        languageController.toggle(fallbackPID: 0)
+        languageController.configurationFailed(oldKeyError, session: 1)
+        precondition(languageController.phase == "error" && languageController.message == englishKeyError)
+        languageController.setUILanguage("ko")
+        precondition(languageController.message == oldKeyError)
+        languageController.cancel()
+        print("PASS: shared native translations, status codes, first-use configuration failure and live language changes")
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("prism-dictation-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: temp) }
@@ -96,6 +114,12 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         let json = """
         {"provider":"local","model":"","baseURL":"","language":"auto","prompt":"","vocabulary":[],"whisperPath":"/fixture","modelPath":"/fixture.bin","uiLanguage":"en","apiKey":""}
         """
+        // A valid but stale dictation configuration must not override the app language.
+        languageController.setUILanguage("en")
+        languageController.toggle(fallbackPID: 0)
+        languageController.configure(json.replacingOccurrences(of: "\"uiLanguage\":\"en\"", with: "\"uiLanguage\":\"ko\""), session: 3)
+        precondition(languageController.language.english)
+        languageController.cancel()
         let recorder = FakeRecorder()
         let controller = DictationController(recorder: recorder, presentsOverlay: false)
         controller.toggle(fallbackPID: 0)

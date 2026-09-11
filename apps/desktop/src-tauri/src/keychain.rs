@@ -1,4 +1,4 @@
-//! Password reads may prompt only through an explicit key-authorization action.
+//! Settings reads stay silent; deliberate feature use may request authorization.
 use core_foundation::{
     base::TCFType,
     string::{CFString, CFStringRef},
@@ -77,7 +77,17 @@ pub fn read(service: &str, account: &str, allow_prompt: bool) -> Result<Option<V
     }) {
         Ok(key) => Ok(Some(key)),
         Err(error) if error.code() == -25300 => Ok(None),
-        Err(_) => Err("저장된 키를 사용하려면 설정에서 ‘키 사용 허용’을 눌러 주세요.".into()),
+        Err(error) => Err(read_error(error.code(), allow_prompt)),
+    }
+}
+
+fn read_error(status: i32, allow_prompt: bool) -> String {
+    match status {
+        -128 => "Keychain authorization was canceled. Try the action again when ready.".into(),
+        -25293 | -25308 if !allow_prompt => "Keychain authorization is required.".into(),
+        -25293 => "Keychain access was denied. Try again and approve access in the macOS dialog.".into(),
+        -25308 => "macOS could not show the Keychain authorization dialog. Unlock your session and try again.".into(),
+        _ => format!("Could not read the saved key (macOS error {status})."),
     }
 }
 
@@ -115,6 +125,18 @@ pub fn delete(service: &str, account: &str) -> SecurityResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn read_errors_distinguish_cancellation_authorization_and_storage_failure() {
+        assert!(read_error(-128, true).contains("canceled"));
+        assert!(read_error(-25293, true).contains("denied"));
+        assert!(read_error(-25308, true).contains("could not show"));
+        assert_eq!(
+            read_error(-25308, false),
+            "Keychain authorization is required."
+        );
+        assert!(read_error(-36, true).contains("-36"));
+        assert!(!read_error(-36, true).contains("authorization"));
+    }
     #[test]
     fn silent_policy_restores_the_previous_state_after_success_and_error() {
         // No credentials are accessed. Check the real macOS process policy while

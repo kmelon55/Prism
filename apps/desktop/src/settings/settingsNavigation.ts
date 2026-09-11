@@ -12,7 +12,7 @@ export interface SettingsSection {
 
 export const preferenceSections: readonly SettingsSection[] = [
   { id: "general", label: "General", description: "Appearance and application behavior", icon: Paintbrush,
-    keywords: ["Language", "App language", "Follow system", "Appearance", "Prism highlights", "프리즘 하이라이트", "Theme", "Dark", "Light", "Background opacity", "Background blur", "Behavior", "Application icons", "Reduce motion", "Animations", "애니메이션", "프리즘 반사광", "Opening light animation", "열릴 때 광원 애니메이션", "내부 반사광", "테두리 색감", "테두리 흰 반사광", "반사광 회전 주기", "Clear Icons"] },
+    keywords: ["Language", "App language", "Follow system", "Appearance", "Prism highlights", "프리즘 하이라이트", "Theme", "Dark", "Light", "Background opacity", "Background blur", "Behavior", "Application icons", "Reduce motion", "Animations", "애니메이션", "프리즘 반사광", "Opening light animation", "열릴 때 광원 애니메이션", "내부 반사광", "테두리 색감", "테두리 흰 반사광", "반사광 회전 주기", "Clear Icons", "Quit Prism", "quit", "exit", "종료"] },
   { id: "shortcut", label: "Launcher", description: "Open Prism from anywhere", icon: Keyboard,
     keywords: ["Global hotkey", "Open or hide Prism", "Shortcut", "Reset"] },
   { id: "ai", label: "AI", description: "API 키 연결과 기본 모델 선택", icon: Sparkles,

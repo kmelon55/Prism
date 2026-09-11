@@ -19,6 +19,7 @@ export const prismCommandIds = {
   preferences: "prism:preferences",
   theme: "prism:cycle-theme",
   hide: "prism:hide",
+  quit: "prism:quit",
   refreshApplications: "prism:refresh-application-index",
   clearIconCache: "prism:clear-application-icon-cache",
   clearClipboardHistory: "clipboard:clear-history",
@@ -61,6 +62,7 @@ export const prismActionIds = {
   openPreferences: "open-settings",
   cycleTheme: "cycle-theme",
   hide: "hide-prism",
+  quit: "quit-prism",
   refreshApplications: "refresh-application-index",
   clearIconCache: "clear-application-icon-cache",
   clearClipboardHistory: "clear-clipboard-history",
@@ -227,6 +229,17 @@ const commonDefinitions: readonly CommandDefinition[] = [
       },
     ],
     management: manageableBuiltInManagement,
+  },
+  {
+    id: prismCommandIds.quit,
+    get title() { return t("Quit Prism"); },
+    get subtitle() { return t("Stop Prism and its background shortcuts"); },
+    section: "Prism",
+    kind: "command",
+    keywords: ["quit", "exit", "stop", "prism", "종료", "프리즘"],
+    icon: "power",
+    actions: [{ id: prismActionIds.quit, get title() { return t("Quit Prism"); } }],
+    management: requiredBuiltInManagement,
   },
 ];
 

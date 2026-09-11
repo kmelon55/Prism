@@ -22,7 +22,7 @@ pub(crate) fn read_key(provider: Provider) -> Result<Option<zeroize::Zeroizing<V
         .map_err(|_| "AI 키 상태를 읽지 못했습니다.")?
         .entry(provider.account())
         .or_default()
-        .load(|| read_key_storage(provider))
+        .load(|| read_key_storage(provider, true))
 }
 fn cached_key(provider: Provider) -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
     key_sessions()
@@ -67,11 +67,11 @@ pub struct Message {
 pub struct AiRequests(Mutex<std::collections::HashMap<String, oneshot::Sender<()>>>);
 
 #[cfg(target_os = "macos")]
-fn read_key_storage(provider: Provider) -> Result<Option<Vec<u8>>, String> {
-    crate::keychain::read(SERVICE, provider.account(), false)
+fn read_key_storage(provider: Provider, allow_prompt: bool) -> Result<Option<Vec<u8>>, String> {
+    crate::keychain::read(SERVICE, provider.account(), allow_prompt)
 }
 #[cfg(not(target_os = "macos"))]
-fn read_key_storage(provider: Provider) -> Result<Option<Vec<u8>>, String> {
+fn read_key_storage(provider: Provider, _allow_prompt: bool) -> Result<Option<Vec<u8>>, String> {
     prism_desktop_platform::credentials::read(SERVICE, provider.account())
 }
 
@@ -107,7 +107,7 @@ fn inspect_key(provider: Provider) -> Result<KeyInfo, String> {
     }
     #[cfg(target_os = "macos")]
     {
-        if let Ok(key) = session.load(|| read_key_storage(provider)) {
+        if let Ok(key) = session.load_silent(|| read_key_storage(provider, false)) {
             return Ok(key_info(key.as_ref().map(|key| key.as_slice())));
         }
         Ok(KeyInfo {
@@ -144,7 +144,7 @@ pub async fn ai_unlock_key(provider: Provider) -> Result<KeyInfo, String> {
         #[cfg(target_os = "macos")]
         let key = session.load(|| crate::keychain::read(SERVICE, provider.account(), true))?;
         #[cfg(not(target_os = "macos"))]
-        let key = session.load(|| read_key_storage(provider))?;
+        let key = session.load(|| read_key_storage(provider, true))?;
         Ok(key_info(key.as_ref().map(|key| key.as_slice())))
     })
     .await

@@ -385,7 +385,7 @@ pub async fn dictation_key_info(provider: String) -> Result<crate::ai::KeyInfo, 
                 .lock()
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?;
             let session = sessions.entry(account).or_default();
-            if let Ok(key) = session.load(|| crate::keychain::read(KEY_SERVICE, account, false)) {
+            if let Ok(key) = session.load_silent(|| crate::keychain::read(KEY_SERVICE, account, false)) {
                 return Ok(crate::ai::key_info(key.as_ref().map(|key| key.as_slice())));
             }
             Ok(crate::ai::KeyInfo {
@@ -509,7 +509,7 @@ fn read_provider_key(provider: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, Stri
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?
                 .entry(account)
                 .or_default()
-                .load(|| crate::keychain::read(KEY_SERVICE, account, false))?
+                .load(|| crate::keychain::read(KEY_SERVICE, account, true))?
                 .ok_or("받아쓰기 설정에서 API 키를 저장하세요.")?
         }
         #[cfg(not(target_os = "macos"))]
@@ -567,6 +567,8 @@ fn configuration(app: &tauri::AppHandle, prompt_mode: bool) -> Result<zeroize::Z
 #[cfg(target_os = "macos")]
 extern "C" {
     fn prism_dictation_init(callback: extern "C" fn(*const std::ffi::c_char));
+    fn prism_dictation_set_messages(json: *const std::ffi::c_char);
+    fn prism_dictation_set_ui_language(locale: *const std::ffi::c_char);
     fn prism_dictation_toggle(pid: i32);
     fn prism_dictation_prompt_toggle(pid: i32);
     fn prism_dictation_action(action: i32);
@@ -624,7 +626,27 @@ pub fn install(app: &tauri::AppHandle) {
     let _ = APP.set(app.clone());
     #[cfg(target_os = "macos")]
     unsafe {
+        let messages = std::ffi::CString::new(include_str!("../../src/locales/messages.json"))
+            .expect("The message catalog cannot contain a literal NUL");
+        prism_dictation_set_messages(messages.as_ptr());
         prism_dictation_init(native_event);
+    }
+}
+#[tauri::command]
+pub fn dictation_set_ui_language(app: tauri::AppHandle, locale: String) -> Result<(), String> {
+    if !matches!(locale.as_str(), "en" | "ko") {
+        return Err("Unsupported interface language.".into());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let locale = std::ffi::CString::new(locale).map_err(|_| "Invalid interface language.")?;
+        app.run_on_main_thread(move || unsafe { prism_dictation_set_ui_language(locale.as_ptr()) })
+            .map_err(|_| "Could not update the dictation language.".into())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(())
     }
 }
 #[tauri::command]

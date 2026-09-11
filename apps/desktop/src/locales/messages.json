@@ -1,4 +1,16 @@
 [
+  ["Install updates automatically", "업데이트 자동 설치"],
+  ["Download and install new versions in the background. Changes take effect when you restart Prism.", "새 버전을 백그라운드에서 다운로드하고 설치합니다. Prism을 재시작하면 적용됩니다."],
+  ["Could not save update settings.", "업데이트 설정을 저장하지 못했습니다."],
+  ["Keychain authorization was canceled. Try the action again when ready.", "키체인 승인을 취소했습니다. 준비되면 다시 실행해 주세요."],
+  ["Keychain authorization is required.", "저장된 키에 접근하려면 macOS 승인이 필요합니다."],
+  ["Keychain access was denied. Try again and approve access in the macOS dialog.", "키체인 접근이 거부됐습니다. 다시 실행한 뒤 macOS 창에서 접근을 허용해 주세요."],
+  ["macOS could not show the Keychain authorization dialog. Unlock your session and try again.", "macOS 키체인 승인 창을 열지 못했습니다. 화면 잠금을 해제한 뒤 다시 실행해 주세요."],
+  ["Could not read the saved key (macOS error {0}).", "저장된 키를 읽지 못했습니다(macOS 오류 {0})."],
+  ["Quit Prism", "Prism 종료"],
+  ["Stop Prism and its background shortcuts", "Prism과 백그라운드 단축키를 완전히 종료합니다"],
+  ["Quit Prism is available in the desktop app", "Prism 종료는 데스크톱 앱에서 사용할 수 있습니다"],
+  ["Prism could not quit.", "Prism을 종료하지 못했습니다."],
   ["Local", "로컬"],
   ["Dictation enhancement", "받아쓰기 다듬기"],
   ["Automatically polish every dictation.", "받아쓸 때마다 자동으로 다듬습니다."],
@@ -753,8 +765,8 @@
     "변경"
   ],
   [
-    "Your saved key is preserved. If authorization is needed, choose Allow key use. Chat and dictation do not open password dialogs automatically.",
-    "저장된 키는 유지됩니다. 승인이 필요하면 ‘키 사용 허용’을 눌러 주세요. 채팅이나 받아쓰기가 비밀번호 창을 자동으로 열지 않습니다."
+    "Your saved key is preserved. Chat and dictation request macOS authorization when needed. Opening Settings does not show a password dialog.",
+    "저장된 키는 유지됩니다. 채팅이나 받아쓰기 실행 시 필요하면 macOS 승인을 요청합니다. 설정을 열 때는 비밀번호 창을 띄우지 않습니다."
   ],
   [
     "Checking saved key…",

@@ -68,7 +68,10 @@ beforeEach(() => {
       case "set_ai_workspace":
       case "set_shortcut_capture":
       case "set_window_blur":
+      case "dictation_set_ui_language":
       case "open_settings_window": return undefined;
+      case "quit_prism": return undefined;
+      case "get_update_status": return { currentVersion: "0.1.5", phase: "current", version: null, error: null, automaticInstall: false };
       default: throw new Error(`Unexpected native call in interaction test: ${command}`);
     }
   });
@@ -91,6 +94,27 @@ async function mount(settings = false) {
   await act(async () => { root.render(<App />); });
   await settle();
 }
+it("synchronizes the app language with native dictation before opening dictation settings", async () => {
+  await mount();
+  expect(native.invoke).toHaveBeenCalledWith("dictation_set_ui_language", { locale: "en" });
+  await act(async () => {
+    const saved = JSON.parse(localStorage.getItem("prism:preferences") || "{}");
+    localStorage.setItem("prism:preferences", JSON.stringify({ ...saved, language: "ko" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: "prism:preferences" }));
+  });
+  await settle();
+  expect(native.invoke).toHaveBeenCalledWith("dictation_set_ui_language", { locale: "ko" });
+  expect(native.invoke).not.toHaveBeenCalledWith("dictation_get_settings");
+});
+it("surfaces a background update in the launcher without opening settings", async () => {
+  await mount();
+  await act(async () => native.listeners.get("prism:update-status")?.({ payload: {
+    currentVersion: "0.1.5", phase: "available", version: "0.1.6", error: null, automaticInstall: false,
+  } }));
+  expect(container.textContent).toContain("A new version of Prism is available.");
+  expect(button("Download and install")).toBeDefined();
+  expect(native.invoke).not.toHaveBeenCalledWith("check_for_updates");
+});
 function input(): HTMLInputElement {
   const element = container.querySelector<HTMLInputElement>('[role="combobox"]');
   if (!element) throw new Error("Search input is missing");
@@ -123,6 +147,43 @@ async function key(key: string, init: KeyboardEventInit = {}, target: EventTarge
 function selectedId() { return input().getAttribute("aria-activedescendant"); }
 
 describe("mounted palette keyboard flows with mocked native IPC", () => {
+  it.each(["q", "w"])("Cmd+%s hides the launcher without quitting, including from AI Chat", async shortcut => {
+    await mount();
+    await type("AI Chat");
+    await key("Enter");
+    const event = await key(shortcut, { metaKey: true });
+    expect(event.defaultPrevented).toBe(true);
+    expect(native.hide).toHaveBeenCalledOnce();
+    expect(native.close).not.toHaveBeenCalled();
+    expect(native.invoke).not.toHaveBeenCalledWith("quit_prism");
+    await key(shortcut, { metaKey: true, repeat: true });
+    expect(native.hide).toHaveBeenCalledOnce();
+  });
+
+  it.each(["q", "w"])("Cmd+%s closes only the settings window", async shortcut => {
+    await mount(true);
+    await key(shortcut, { metaKey: true });
+    expect(native.close).toHaveBeenCalledOnce();
+    expect(native.hide).not.toHaveBeenCalled();
+    expect(native.invoke).not.toHaveBeenCalledWith("quit_prism");
+  });
+
+  it("quits explicitly from the command search", async () => {
+    await mount();
+    await type("Quit Prism");
+    expect(container.querySelector('[role="option"][aria-selected="true"]')?.textContent).toContain("Quit Prism");
+    await key("Enter");
+    expect(native.invoke).toHaveBeenCalledWith("quit_prism");
+    expect(native.hide).not.toHaveBeenCalled();
+  });
+
+  it("quits explicitly from General settings", async () => {
+    await mount(true);
+    await click(button("Quit Prism"));
+    expect(native.invoke).toHaveBeenCalledWith("quit_prism");
+    expect(native.close).not.toHaveBeenCalled();
+  });
+
   it("cycles repeated background window hotkeys without requesting a palette reveal", async () => {
     const original = native.invoke.getMockImplementation()!;
     native.invoke.mockImplementation((command, args) => command === "manage_window"

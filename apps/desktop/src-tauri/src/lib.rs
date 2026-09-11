@@ -46,6 +46,11 @@ use tauri::window::{Effect, EffectState, EffectsBuilder};
 use tauri::PhysicalPosition;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+#[tauri::command]
+fn quit_prism(app: AppHandle) {
+    app.exit(0);
+}
+
 fn validate_plain_text(text: &str) -> Result<(), String> {
     if text.is_empty() || text.len() > 128 * 1024 || text.contains('\0') {
         return Err("복사할 텍스트를 확인하세요. 최대 128 KB까지 사용할 수 있습니다.".into());
@@ -209,7 +214,7 @@ fn command_hotkey_needs_palette(command_id: &str) -> bool {
     !(command_id.starts_with("window:")
         || command_id.starts_with("native:")
         || command_id.starts_with("system:")
-        || matches!(command_id, "prism:preferences" | "prism:hide"))
+        || matches!(command_id, "prism:preferences" | "prism:hide" | "prism:quit"))
 }
 
 #[tauri::command]
@@ -476,6 +481,14 @@ pub fn run() {
         .manage(window_preferences::WindowPreferences::default())
         .manage(migration_journal::MigrationJournal::default())
         .on_window_event(|window, event| {
+            // Closing the launcher must keep it available to the global shortcut.
+            // Settings and other auxiliary windows can close normally.
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 let app = window.app_handle().clone();
                 tauri::async_runtime::spawn_blocking(move || { permissions::refresh(&app); });
@@ -583,8 +596,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            quit_prism,
             reveal_palette,
             updates::get_update_status,
+            updates::set_automatic_updates,
             updates::check_for_updates,
             updates::install_update,
             updates::restart_after_update,
@@ -595,6 +610,7 @@ pub fn run() {
             dictation::catalog::dictation_list_models,
             ai_usage::ai_usage_summary,
             dictation::dictation_get_settings,
+            dictation::dictation_set_ui_language,
             dictation::dictation_save_settings,
             dictation::dictation_key_status,
             dictation::dictation_key_info,
@@ -733,7 +749,7 @@ mod tests {
         for command in [
             "window:right-half", "window:left-half", "window:next-display",
             "native:example", "system:settings:sound", "system:lock-screen",
-            "system:restart", "prism:preferences", "prism:hide",
+            "system:restart", "prism:preferences", "prism:hide", "prism:quit",
         ] {
             assert!(!super::command_hotkey_needs_palette(command), "{command}");
         }

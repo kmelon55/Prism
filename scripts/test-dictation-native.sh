@@ -8,4 +8,4 @@ xcrun swiftc -parse-as-library -target "$native_arch-apple-macosx14.0" \
   "$repo_root"/apps/desktop/src-tauri/native/dictation/*.swift \
   "$repo_root/apps/desktop/src-tauri/native/tests/DictationTests.swift" \
   -o "$test_dir/dictation-tests"
-"$test_dir/dictation-tests"
+"$test_dir/dictation-tests" "$repo_root/apps/desktop/src/locales/messages.json"

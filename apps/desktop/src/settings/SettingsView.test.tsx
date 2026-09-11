@@ -17,7 +17,7 @@ beforeEach(() => {
   props = {
     preferences: { language: "en", theme: "system", reduceMotion: false, backgroundOpacity: 96,
       backgroundBlur: 20, showApplicationIcons: true, disabledCommandIds: [], commandAliases: {}, scriptDirectories: [] },
-    onChange: vi.fn(), onClose: vi.fn(), nativeRuntime: false, commandKey: true,
+    onChange: vi.fn(), onClose: vi.fn(), onQuit: vi.fn(), nativeRuntime: false, commandKey: true,
     shortcut: { accelerator: "Super+Space", defaultAccelerator: "Super+Space", registered: true, isDefault: true, issue: null },
     shortcutDraft: "", shortcutError: "", shortcutBusy: false, shortcutRecording: false,
     onShortcutRecordingChange: vi.fn(), onShortcutRecord: vi.fn(), onShortcutReset: vi.fn(),
@@ -48,6 +48,19 @@ async function clickSection(label: string) {
 }
 
 describe("Settings discovery", () => {
+  it("finds explicit quit in Korean and keeps it unavailable in browser previews", async () => {
+    await mount();
+    await search("종료");
+    expect(navigation()).toContain("General");
+    const quit = [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Quit Prism")!;
+    expect(quit.disabled).toBe(true);
+    props.nativeRuntime = true;
+    await mount();
+    await act(async () => quit.click());
+    expect(props.onQuit).toHaveBeenCalledOnce();
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
   it("discovers backup recovery in Korean and mounts only the backup section slot", async () => {
     props.backupDetails = <div data-backup-details>Review local backup</div>;
     await mount();
