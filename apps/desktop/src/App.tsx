@@ -718,7 +718,7 @@ export function App() {
   const keyboardNavigation = useRef(false);
   const nativeActionInFlight = useRef(false);
   const preferencesRef = useRef(preferences);
-  const executeCommandRef = useRef<(commandId: string) => void>(() => undefined);
+  const executeCommandRef = useRef<(commandId: string, background?: boolean) => void>(() => undefined);
 
   const selectedItem = items[selectedIndex];
   const answerOverview = items.filter((item) => item.answer?.kind === "currency").length > 1;
@@ -1553,7 +1553,14 @@ export function App() {
     }
   };
 
-  const executeAction = async (action: CommandAction, item = selectedItem) => {
+  const reportCommandError = async (message: string, background = false) => {
+    setToast(message);
+    if (message && background && nativeRuntime) {
+      await invoke("reveal_palette").catch(error => console.error("Prism could not show the command error", error));
+    }
+  };
+
+  const executeAction = async (action: CommandAction, item = selectedItem, background = false) => {
     if (!item) return;
     closeActions();
     if (document.hasFocus()) inputRef.current?.focus();
@@ -1618,7 +1625,7 @@ export function App() {
         const layout = action.id.slice("manage-window-".length) as WindowManagementAction;
         const result = await manageNativeWindow(layout);
         if (result.applied) await dismissPalette();
-        else setToast(result.message);
+        else await reportCommandError(result.message, background);
       }
       else if (action.id === calculatorActionIds.copyResult) {
         await navigator.clipboard.writeText(String(item.data?.result ?? item.title));
@@ -1647,7 +1654,7 @@ export function App() {
           String(item.data?.systemCommandId ?? item.id),
         );
         if (result.applied) await dismissPalette();
-        else setToast(result.message);
+        else await reportCommandError(result.message, background);
       }
       else if (action.id === webActionIds.openUrl || action.id === webActionIds.search) {
         await runWebAction(action.id, item.data);
@@ -1694,43 +1701,42 @@ export function App() {
         }
       }
     } catch (error) {
-      setToast(errorMessage(error, t("The action could not be completed.")));
+      await reportCommandError(errorMessage(error, t("The action could not be completed.")), background);
     }
   };
 
-  executeCommandRef.current = (commandId: string) => {
+  executeCommandRef.current = (commandId: string, background = false) => {
     if (preferences.disabledCommandIds.includes(commandId) || hiddenMaintenanceCommandIds.has(commandId)) return;
     if (commandId.startsWith("native:")) {
       const applicationId = commandId.slice("native:".length);
       void getNativeApplication(applicationId)
         .then((application) => {
           if (!application) {
-            setToast(t("The application is no longer available in the local index"));
-            return;
+            return reportCommandError(t("The application is no longer available in the local index"), background);
           }
-          return executeAction(nativeApplicationItem(application).actions[0], nativeApplicationItem(application));
+          return executeAction(nativeApplicationItem(application).actions[0], nativeApplicationItem(application), background);
         })
         .catch((error) => {
-          setToast(errorMessage(error, t("The application shortcut could not be resolved.")));
+          void reportCommandError(errorMessage(error, t("The application shortcut could not be resolved.")), background);
         });
       return;
     }
     const definition = prismCommandDefinitions.find((command) => command.id === commandId)
       ?? systemCommands.find((command) => command.id === commandId);
     if (!definition) {
-      setToast(t("Unknown command shortcut · {0}", {"0": commandId}));
+      void reportCommandError(t("Unknown command shortcut · {0}", {"0": commandId}), background);
       return;
     }
     const providerId = commandId.startsWith("system:") ? systemProvider.id : "prism";
-    void executeAction(definition.actions[0], { ...definition, providerId });
+    void executeAction(definition.actions[0], { ...definition, providerId }, background);
   };
 
   useEffect(() => {
     if (!nativeRuntime || settingsWindow) return;
     let active = true;
     let stopListening: (() => void) | undefined;
-    void onCommandHotkey(({ commandId }) => {
-      if (active) executeCommandRef.current(commandId);
+    void onCommandHotkey(({ commandId, background }) => {
+      if (active) executeCommandRef.current(commandId, background);
     }).then((unlisten) => {
       if (active) stopListening = unlisten;
       else unlisten();

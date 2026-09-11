@@ -427,6 +427,32 @@ fn close_bounds(a: Rect, b: Rect) -> bool {
         && (a.height - b.height).abs() <= 2.0
 }
 
+// Make room before expanding against a screen edge. Some apps acknowledge AX
+// writes but clamp a resize to the space available at the current position.
+fn apply_rect_with<E>(
+    target: Rect,
+    mut read: impl FnMut() -> Result<Rect, E>,
+    mut resize: impl FnMut(Rect) -> Result<(), E>,
+    mut position: impl FnMut(Rect) -> Result<(), E>,
+) -> Result<Rect, E> {
+    let mut actual = read()?;
+    for _ in 0..2 {
+        let staging = Rect {
+            x: if target.width > actual.width { actual.x.min(target.x) } else { actual.x },
+            y: if target.height > actual.height { actual.y.min(target.y) } else { actual.y },
+            ..actual
+        };
+        if staging.x != actual.x || staging.y != actual.y {
+            position(staging)?;
+        }
+        resize(target)?;
+        position(target)?;
+        actual = read()?;
+        if close_bounds(actual, target) { break; }
+    }
+    Ok(actual)
+}
+
 fn cycle_index(
     previous: Option<CycleStep>,
     identity: WindowIdentity,
@@ -998,7 +1024,9 @@ mod macos {
         } else {
             Some(previous_layouts.remember(identity, current))
         };
-        if let Err(error) = set_rect(window, target) {
+        let applied = match set_rect(window, target) {
+            Ok(bounds) => bounds,
+            Err(error) => {
             // A size failure may follow a position change. Restore geometry as well as history.
             if set_rect(window, current).is_ok() {
                 if let Some(previous) = replaced {
@@ -1007,7 +1035,8 @@ mod macos {
             }
             *cycle = None;
             return Err(error);
-        }
+            }
+        };
         *cycle = if options.cycle
             && matches!(action, WindowAction::LeftHalf | WindowAction::RightHalf)
         {
@@ -1015,7 +1044,7 @@ mod macos {
                 identity,
                 action,
                 index,
-                bounds: target,
+                bounds: applied,
             })
         } else {
             None
@@ -1023,21 +1052,16 @@ mod macos {
         Ok(())
     }
 
-    fn set_rect(window: AXUIElementRef, bounds: Rect) -> Result<(), WindowActionError> {
-        // Resize first so the old width does not constrain an edge-aligned move.
-        set_size(
-            window,
-            CGSize {
-                width: bounds.width,
-                height: bounds.height,
+    fn set_rect(window: AXUIElementRef, bounds: Rect) -> Result<Rect, WindowActionError> {
+        super::apply_rect_with(
+            bounds,
+            || {
+                let position = read_point(window)?;
+                let size = read_size(window)?;
+                Ok(Rect { x: position.x, y: position.y, width: size.width, height: size.height })
             },
-        )?;
-        set_point(
-            window,
-            CGPoint {
-                x: bounds.x,
-                y: bounds.y,
-            },
+            |rect| set_size(window, CGSize { width: rect.width, height: rect.height }),
+            |rect| set_point(window, CGPoint { x: rect.x, y: rect.y }),
         )
     }
 
@@ -1158,6 +1182,67 @@ mod macos {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn right_half_cycles_stay_on_the_right_when_the_app_clamps_growth_at_screen_edges() {
+        use std::cell::Cell;
+        for origin in [0.0, -1200.0] {
+            for reverse in [false, true] {
+                let work = Rect { x: origin, y: 30.0, width: 1200.0, height: 900.0 };
+                let identity = WindowIdentity { pid: 1, accessibility_hash: 1 };
+                let options = crate::window_preferences::WindowOptions {
+                    reverse_cycle: reverse, ..Default::default()
+                };
+                let frame = Cell::new(Rect { x: origin + 100.0, y: 80.0, width: 500.0, height: 500.0 });
+                let mut previous = None;
+                let widths = if reverse { [600.0, 800.0, 400.0] } else { [600.0, 400.0, 800.0] };
+                for step in 0..12 {
+                    let index = cycle_index(previous, identity, WindowAction::RightHalf, frame.get(), true);
+                    let target = configured_rect(WindowAction::RightHalf, work, frame.get(), &options, index);
+                    let actual = apply_rect_with::<()>(target,
+                        || Ok(frame.get()),
+                        |rect| {
+                            let current = frame.get();
+                            frame.set(Rect {
+                                width: rect.width.min(work.x + work.width - current.x),
+                                height: rect.height.min(work.y + work.height - current.y),
+                                ..current
+                            });
+                            Ok(())
+                        },
+                        |rect| {
+                            let current = frame.get();
+                            frame.set(Rect {
+                                x: rect.x.min(work.x + work.width - current.width),
+                                y: rect.y.min(work.y + work.height - current.height),
+                                ..current
+                            });
+                            Ok(())
+                        },
+                    ).unwrap();
+                    assert_eq!(actual.width, widths[step % 3], "step {step}, reverse {reverse}");
+                    assert_eq!(actual.x + actual.width, work.x + work.width);
+                    assert_eq!(actual.y, work.y);
+                    assert_eq!(actual.height, work.height);
+                    previous = Some(CycleStep { identity, action: WindowAction::RightHalf, index, bounds: actual });
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn frame_application_keeps_actual_app_constraints_and_bounds_retries() {
+        use std::cell::Cell;
+        let constrained = Rect { x: 0.0, y: 0.0, width: 600.0, height: 600.0 };
+        let writes = Cell::new(0);
+        let actual = apply_rect_with::<()>(Rect { width: 400.0, ..constrained },
+            || Ok(constrained),
+            |_| { writes.set(writes.get() + 1); Ok(()) },
+            |_| Ok(()),
+        ).unwrap();
+        assert_eq!(actual, constrained);
+        assert_eq!(writes.get(), 2);
+    }
 
     #[test]
     fn repeated_half_cycles_and_resets_for_other_windows_actions_and_manual_moves() {

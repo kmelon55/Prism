@@ -96,40 +96,26 @@ pub(crate) fn key_info(key: Option<&[u8]>) -> KeyInfo {
         }),
     }
 }
-// Attributes-only lookup: status/focus/render effects never request password bytes.
+// Reuse persistent macOS authorization without UI, then fall back to metadata.
 fn inspect_key(provider: Provider) -> Result<KeyInfo, String> {
-    let cache = key_sessions()
+    let mut cache = key_sessions()
         .lock()
         .map_err(|_| "AI 키 상태를 읽지 못했습니다.")?;
-    if let Some(key) = cache
-        .get(provider.account())
-        .and_then(|session| session.peek())
-    {
+    let session = cache.entry(provider.account()).or_default();
+    if let Some(key) = session.peek() {
         return Ok(key_info(Some(key)));
     }
     #[cfg(target_os = "macos")]
     {
-        use security_framework::item::{ItemClass, ItemSearchOptions};
-        let mut query = ItemSearchOptions::new();
-        query
-            .class(ItemClass::generic_password())
-            .service(SERVICE)
-            .account(provider.account())
-            .load_attributes(true)
-            .load_data(false)
-            .limit(1)
-            .skip_authenticated_items(true);
-        match query.search() {
-            Ok(items) => Ok(KeyInfo {
-                configured: !items.is_empty(),
-                masked_key: None,
-                unlocked: false,
-            }),
-            Err(e) if e.code() == -25300 => Ok(key_info(None)),
-            Err(_) => {
-                Err("키 저장 상태를 확인하지 못했습니다. 키체인 잠금 상태를 확인하세요.".into())
-            }
+        if let Ok(key) = session.load(|| read_key_storage(provider)) {
+            return Ok(key_info(key.as_ref().map(|key| key.as_slice())));
         }
+        Ok(KeyInfo {
+            configured: crate::keychain::exists(SERVICE, provider.account())
+                .map_err(|_| "키 저장 상태를 확인하지 못했습니다. 키체인 잠금 상태를 확인하세요.")?,
+            masked_key: None,
+            unlocked: false,
+        })
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -176,7 +162,7 @@ pub async fn ai_save_key(provider: Provider, key: String) -> Result<KeyInfo, Str
             let mut sessions = key_sessions()
                 .lock()
                 .map_err(|_| "AI 키 상태를 읽지 못했습니다.")?;
-            security_framework::passwords::set_generic_password(
+            crate::keychain::save(
                 SERVICE,
                 provider.account(),
                 key.as_bytes(),
@@ -209,7 +195,7 @@ pub async fn ai_delete_key(provider: Provider) -> Result<(), String> {
             let mut sessions = key_sessions()
                 .lock()
                 .map_err(|_| "AI 키 상태를 읽지 못했습니다.")?;
-            match security_framework::passwords::delete_generic_password(
+            match crate::keychain::delete(
                 SERVICE,
                 provider.account(),
             ) {

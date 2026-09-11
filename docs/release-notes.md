@@ -1,8 +1,9 @@
-Prism 0.1.3 fixes importing current Raycast exports and simplifies successful dictation delivery.
+Prism 0.1.4 improves window shortcuts and background launcher behavior.
 
-- Recognize Raycast X schema 3 (`RAYCFG3`) exports. Encrypted files now request the export password instead of incorrectly reporting an invalid file. Older export formats remain supported.
-- Import current Raycast window-management shortcuts and aliases, including halves, thirds, maximize, sixths, and movement between displays. Existing shortcut conflicts remain visible before applying changes.
-- Dismiss the dictation overlay after successful delivery. Refinement failures still show a warning; token and cost details remain available in Settings → AI.
+- Keep repeated Right Half layouts aligned to the right edge through the half, one-third, and two-thirds cycle. Make room before expanding windows whose apps constrain resizing at screen edges, and track the actual applied frame for subsequent shortcuts.
+- Run window, app-launch, and system shortcuts without briefly opening the command palette. Failed commands still show their error.
+- Keep Prism running when Cmd+Q is pressed. Use the explicit Quit Prism application-menu action to exit.
+- Suppress unsolicited login-Keychain password dialogs and silently reuse already-authorized AI and dictation keys after restart. Settings explain the Always Allow option. Local-signed updates can still require renewed Keychain approval; this release does not remove that macOS signing limitation.
 
 These downloads are for macOS; no Windows, Linux, or Android public release is included.
 

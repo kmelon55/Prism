@@ -1,5 +1,7 @@
 mod updates;
 #[cfg(target_os = "macos")]
+mod app_menu;
+#[cfg(target_os = "macos")]
 mod update_signature;
 mod ai;
 mod ai_history;
@@ -203,6 +205,19 @@ fn toggle_palette(app: &AppHandle) {
 }
 
 #[cfg(desktop)]
+fn command_hotkey_needs_palette(command_id: &str) -> bool {
+    !(command_id.starts_with("window:")
+        || command_id.starts_with("native:")
+        || command_id.starts_with("system:")
+        || matches!(command_id, "prism:preferences" | "prism:hide"))
+}
+
+#[tauri::command]
+fn reveal_palette(app: AppHandle) {
+    show_palette(&app);
+}
+
+#[cfg(desktop)]
 fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
     if command_id == "prism:dictation-prompt" {
         let _ = dictation::dictation_prompt_toggle(app.clone());
@@ -212,11 +227,24 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
         let _ = dictation::dictation_toggle(app.clone());
         return;
     }
-    show_palette(app);
+    let background = !command_hotkey_needs_palette(command_id);
+    if background {
+        // Capture the external target without showing or focusing Prism. When the
+        // palette is already focused, retain the target captured when it opened.
+        if !app
+            .get_webview_window("main")
+            .is_some_and(|window| window.is_focused().unwrap_or(false))
+        {
+            window_management::remember_frontmost_app(app);
+        }
+    } else {
+        show_palette(app);
+    }
     let _ = app.emit(
         "prism:command-hotkey",
         CommandHotkeyPayload {
             command_id: command_id.to_string(),
+            background,
         },
     );
 }
@@ -225,6 +253,7 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
 #[serde(rename_all = "camelCase")]
 struct CommandHotkeyPayload {
     command_id: String,
+    background: bool,
 }
 
 #[tauri::command]
@@ -497,6 +526,8 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app_menu::install(app.handle())?;
             updates::start(app.handle().clone());
             dictation::install(app.handle());
             #[cfg(target_os = "macos")]
@@ -552,6 +583,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            reveal_palette,
             updates::get_update_status,
             updates::check_for_updates,
             updates::install_update,
@@ -694,6 +726,24 @@ mod tests {
     use super::palette_position;
     #[cfg(target_os = "macos")]
     use super::palette_position_appkit;
+
+    #[cfg(desktop)]
+    #[test]
+    fn immediate_hotkeys_do_not_present_the_palette_but_interactive_commands_do() {
+        for command in [
+            "window:right-half", "window:left-half", "window:next-display",
+            "native:example", "system:settings:sound", "system:lock-screen",
+            "system:restart", "prism:preferences", "prism:hide",
+        ] {
+            assert!(!super::command_hotkey_needs_palette(command), "{command}");
+        }
+        for command in [
+            "clipboard:open-history", "prism:ai-chat", "prism:emoji",
+            "prism:snippets", "prism:files", "unknown",
+        ] {
+            assert!(super::command_hotkey_needs_palette(command), "{command}");
+        }
+    }
 
     #[test]
     fn palette_is_centered_at_one_third_of_the_work_area() {

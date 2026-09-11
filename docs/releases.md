@@ -120,7 +120,7 @@ Development builds cannot install updates.
 
 Chat and dictation read already-authorized keys without permitting a macOS password
 dialog. When authorization is required, their settings provide an explicit **Allow
-key use** action. Focus and status reads remain metadata-only. Successfully opened
+key use** action. Status reads silently reuse already-authorized keys and fall back to metadata when access is denied. Successfully opened
 keys stay in zeroizing process memory, and no credentials move to plaintext settings.
 
 ## Cleanup

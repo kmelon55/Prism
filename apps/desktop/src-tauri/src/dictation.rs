@@ -381,31 +381,19 @@ pub async fn dictation_key_info(provider: String) -> Result<crate::ai::KeyInfo, 
     tauri::async_runtime::spawn_blocking(move || {
         #[cfg(target_os = "macos")]
         {
-            let sessions = key_sessions()
+            let mut sessions = key_sessions()
                 .lock()
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?;
-            if let Some(key) = sessions.get(account).and_then(|session| session.peek()) {
-                return Ok(crate::ai::key_info(Some(key)));
+            let session = sessions.entry(account).or_default();
+            if let Ok(key) = session.load(|| crate::keychain::read(KEY_SERVICE, account, false)) {
+                return Ok(crate::ai::key_info(key.as_ref().map(|key| key.as_slice())));
             }
-            use security_framework::item::{ItemClass, ItemSearchOptions};
-            let mut query = ItemSearchOptions::new();
-            query
-                .class(ItemClass::generic_password())
-                .service(KEY_SERVICE)
-                .account(account)
-                .load_attributes(true)
-                .load_data(false)
-                .limit(1)
-                .skip_authenticated_items(true);
-            match query.search() {
-                Ok(items) => Ok(crate::ai::KeyInfo {
-                    configured: !items.is_empty(),
-                    masked_key: None,
-                    unlocked: false,
-                }),
-                Err(error) if error.code() == -25300 => Ok(crate::ai::key_info(None)),
-                Err(_) => Err("키 저장 상태를 확인하지 못했습니다.".into()),
-            }
+            Ok(crate::ai::KeyInfo {
+                configured: crate::keychain::exists(KEY_SERVICE, account)
+                    .map_err(|_| "키 저장 상태를 확인하지 못했습니다.")?,
+                masked_key: None,
+                unlocked: false,
+            })
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -457,7 +445,7 @@ pub async fn dictation_save_key(
             let mut sessions = key_sessions()
                 .lock()
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?;
-            security_framework::passwords::set_generic_password(
+            crate::keychain::save(
                 KEY_SERVICE,
                 account,
                 key.as_bytes(),
@@ -490,7 +478,7 @@ pub async fn dictation_delete_key(provider: String) -> Result<(), String> {
             let mut sessions = key_sessions()
                 .lock()
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?;
-            match security_framework::passwords::delete_generic_password(KEY_SERVICE, account) {
+            match crate::keychain::delete(KEY_SERVICE, account) {
                 Ok(()) => (),
                 Err(error) if error.code() == -25300 => (),
                 Err(_) => return Err("키를 삭제하지 못했습니다.".into()),

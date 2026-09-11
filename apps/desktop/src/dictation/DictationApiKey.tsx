@@ -94,6 +94,7 @@ export function DictationApiKey({ provider, nativeRuntime, disabled, onConfigure
       <button className="settings-toolbar-button" disabled={unavailable} onClick={() => { setEditing(true); setConfirmDelete(false); setNotice(""); }}>{t("변경")}</button>
       <button className="settings-toolbar-button" disabled={unavailable} onClick={() => { if (!confirmDelete) setConfirmDelete(true); else void update(true); }}>{confirmDelete ? t("삭제 확인") : t("키 삭제")}</button>
     </div>}
+    {info?.configured && !info.unlocked && <p className="dictation-notice">{t("In the macOS password dialog, choose Always Allow to remember access when restarting Prism. An update may require approval again.")}</p>}
     {(!info?.configured || editing || key.length > 0) && <form className="dictation-key-row" onSubmit={event => { event.preventDefault(); void update(); }}>
       <input type="password" autoComplete="off" spellCheck={false} maxLength={4096} aria-label={t("API key")} placeholder={info?.configured ? t("새 API 키") : t("API key")} disabled={unavailable} autoFocus={editing} value={key} onChange={event => setKey(event.target.value)} />
       <button type="submit" className="settings-toolbar-button" disabled={unavailable || !key.trim()}>{busy ? t("저장 중…") : t("Save key")}</button>

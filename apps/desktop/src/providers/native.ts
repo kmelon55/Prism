@@ -353,6 +353,7 @@ interface NativeCommandShortcut extends Omit<CommandShortcut, "accelerator"> {
 
 export interface CommandHotkeyPayload {
   commandId: string;
+  background?: boolean;
 }
 
 export function openNativeSettingsWindow(): Promise<void> {

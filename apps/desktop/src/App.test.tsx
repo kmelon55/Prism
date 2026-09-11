@@ -48,6 +48,7 @@ beforeEach(() => {
       case "get_clipboard_history_enabled": return true;
       case "get_clipboard_history_settings": return {enabled:true,retentionDays:30,entryCount:1,pinnedCount:0,capacity:1000,persistenceError:null};
       case "prepare_window_appearance":
+      case "reveal_palette":
       case "window_render_ready": return undefined;
       case "system_platform": return "macos";
       case "desktop_capabilities": return {windowManagement:true,paste:true,sleepDisplays:true,logOut:true,reason:null};
@@ -122,6 +123,86 @@ async function key(key: string, init: KeyboardEventInit = {}, target: EventTarge
 function selectedId() { return input().getAttribute("aria-activedescendant"); }
 
 describe("mounted palette keyboard flows with mocked native IPC", () => {
+  it("cycles repeated background window hotkeys without requesting a palette reveal", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => command === "manage_window"
+      ? Promise.resolve({ applied: true, supported: true, message: "Window moved" }) : original(command, args));
+    await mount();
+    for (let step = 0; step < 4; step++) {
+      await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "window:right-half", background: true } }); });
+      await settle();
+    }
+    expect(native.invoke.mock.calls.filter(([command]) => command === "manage_window")).toEqual(Array(4).fill(["manage_window", { action: "right-half" }]));
+    expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+    expect(native.hide).toHaveBeenCalledTimes(4);
+  });
+
+  it.each(["rejection", "unapplied"])("shows a background window failure only after native %s", async failure => {
+    const original = native.invoke.getMockImplementation()!;
+    let finish!: () => void;
+    native.invoke.mockImplementation((command, args) => command === "manage_window"
+      ? new Promise((resolve, reject) => { finish = () => failure === "rejection"
+        ? reject({ code: "accessibilityPermissionRequired", message: "Allow Accessibility to move windows." })
+        : resolve({ applied: false, message: "Allow Accessibility to move windows." }); }) : original(command, args));
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "window:left-half", background: true } }); });
+    expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+    await act(async () => { finish(); });
+    await settle();
+    expect(native.invoke).toHaveBeenCalledWith("reveal_palette");
+    expect(container.textContent).toContain("Allow Accessibility to move windows.");
+    expect(native.hide).not.toHaveBeenCalled();
+  });
+
+  it("opens Settings from a background hotkey without opening the main palette", async () => {
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "prism:preferences", background: true } }); });
+    await settle();
+    expect(native.invoke).toHaveBeenCalledWith("open_settings_window");
+    expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+  });
+
+  it.each([true, false])("handles background application availability (%s) without a success flash", async available => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => {
+      if (command === "get_application") return Promise.resolve(available ? { id: "fixture", name: "Fixture", path: "/Applications/Fixture.app", platform: "macos", rankingBoost: 0 } : null);
+      if (command === "launch_application") return Promise.resolve({ launched: true });
+      return original(command, args);
+    });
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "native:fixture", background: true } }); });
+    await settle();
+    if (available) {
+      expect(native.invoke).toHaveBeenCalledWith("launch_application", { applicationId: "fixture", target: "/Applications/Fixture.app" });
+      expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+    } else {
+      expect(native.invoke.mock.calls.some(([command]) => command === "launch_application")).toBe(false);
+      expect(native.invoke).toHaveBeenCalledWith("reveal_palette");
+      expect(container.textContent).toContain("The application is no longer available in the local index");
+    }
+  });
+
+  it("does not execute or reveal a disabled background window command", async () => {
+    localStorage.setItem("prism:preferences", JSON.stringify({ disabledCommandIds: ["window:right-half"] }));
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "window:right-half", background: true } }); });
+    await settle();
+    expect(native.invoke.mock.calls.some(([command]) => command === "manage_window")).toBe(false);
+    expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+  });
+
+  it("keeps cancelled background system confirmation silent", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => command === "run_system_action"
+      ? Promise.resolve({ applied: false, message: "" }) : original(command, args));
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "system:restart", background: true } }); });
+    await settle();
+    expect(native.invoke).toHaveBeenCalledWith("run_system_action", { commandId: "system:restart", locale: "en" });
+    expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+    expect(native.hide).not.toHaveBeenCalled();
+  });
+
   it("previews system actions in the browser without sending native IPC", async () => {
     const platform = Object.getOwnPropertyDescriptor(navigator, "platform");
     Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });

@@ -201,7 +201,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       </div>
       <div className="ai-key-heading"><span>{providerInfo.description}</span><button type="button" onClick={() => openUrl(providerInfo.keyUrl)}>{t("키 발급")}<ExternalLink size={12} /></button></div>
       {keyInfo?.configured && <div className="ai-saved-key"><Check size={15} /><strong>{t("키 저장됨")}</strong><code aria-label={t("저장된 API 키")}>{keyInfo.maskedKey || t("macOS 키체인에 보관됨")}</code>{keyInfo.unlocked === false && <button type="button" disabled={busy || checking} onClick={() => void unlockKey()}>{t("키 사용 허용")}</button>}<button type="button" disabled={busy || checking} onClick={() => { setEditing(true); setNotice(""); }}>{t("변경")}</button><button type="button" disabled={busy || checking} onClick={() => void updateKey(true)}>{t("삭제")}</button></div>}
-      {keyInfo?.configured && keyInfo.unlocked === false && <p className="ai-settings-note">{t("저장된 키는 유지됩니다. 승인이 필요하면 ‘키 사용 허용’을 눌러 주세요. 채팅이나 받아쓰기가 비밀번호 창을 자동으로 열지 않습니다.")}</p>}
+      {keyInfo?.configured && keyInfo.unlocked === false && <p className="ai-settings-note">{t("In the macOS password dialog, choose Always Allow to remember access when restarting Prism. An update may require approval again.")}</p>}
       {checking && <p className="ai-settings-note" role="status">{t("저장된 키 확인 중…")}</p>}
       {!checking && !keyInfo && nativeRuntime && keyError && <p className="ai-settings-note">{t("키 저장 상태를 확인하지 못했습니다.")}<button type="button" onClick={() => setKeyRevision((value) => value + 1)}>{t("다시 확인")}</button></p>}
       {(!keyInfo?.configured || editing) && <form className="ai-key-form" onSubmit={(event) => { event.preventDefault(); void updateKey(); }}>
