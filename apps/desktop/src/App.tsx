@@ -1467,7 +1467,7 @@ export function App() {
   const toggleCommand = async (commandId: string) => {
     if (!isDisableableCommandId(commandId)) return;
     const disabling = !preferencesRef.current.disabledCommandIds.includes(commandId);
-    if (disabling && nativeRuntime && commandId === prismCommandIds.dictation) {
+    if (disabling && nativeRuntime && (commandId === prismCommandIds.dictation || commandId === prismCommandIds.dictationPrompt)) {
       try { await invoke("dictation_action", { action: "cancel" }); }
       catch (error) { setCommandHotkeyError(errorMessage(error, t("받아쓰기를 중단하지 못했습니다."))); return; }
     }
@@ -1583,9 +1583,9 @@ export function App() {
       else if(action.id==="paste-clipboard-history-entry"){
         await invoke("paste_clipboard_history_entry",{id:Number(item.data?.historyId)});resetPaletteState();
       }
-      else if (action.id === prismActionIds.toggleDictation) {
+      else if (action.id === prismActionIds.toggleDictation || action.id === prismActionIds.toggleDictationPrompt) {
         if (!nativeRuntime) { setToast(t("받아쓰기는 macOS용 Prism 앱에서 사용할 수 있습니다.")); return; }
-        await invoke("dictation_toggle"); resetPaletteState();
+        await invoke(action.id === prismActionIds.toggleDictationPrompt ? "dictation_prompt_toggle" : "dictation_toggle"); resetPaletteState();
       }
       else if (action.id === prismActionIds.openAiChat) { closeActions(); setAiOpen(true); }
       else if (action.id === prismActionIds.openPreferences) await openPreferences();

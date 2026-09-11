@@ -1,3 +1,4 @@
+import { SettingsSelect } from "../settings/SettingsSelect";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useShortcutCaptureLease } from "../settings/shortcutCapture";
 import { t } from "../i18n";
@@ -22,15 +23,12 @@ export function DictationDeliverySettings({ settings, disabled, onChange, footer
     ["recordingPasteAndEnterShortcut","붙여넣고 Enter","붙여넣은 뒤 Enter까지 눌러 전송합니다."],
   ];
   return <div className="settings-group" role="group" aria-label={t("결과와 녹음 단축키")}>
-    <div className="settings-row"><div className="preference-copy"><strong>{t("기본 결과 동작")}</strong><span>{t("녹음 시작 단축키를 다시 눌렀을 때의 동작입니다.")}</span></div><select aria-label={t("기본 결과 동작")} disabled={disabled} value={settings.defaultDelivery??"paste"} onChange={event=>onChange({...settings,defaultDelivery:event.target.value as "copy"|"paste"})}><option value="copy">{t("클립보드에만 복사")}</option><option value="paste">{t("입력 위치에 붙여넣기")}</option></select></div>
+    <div className="settings-row"><div className="preference-copy"><strong>{t("기본 결과 동작")}</strong><span>{t("녹음 시작 단축키를 다시 눌렀을 때의 동작입니다.")}</span></div><SettingsSelect label={t("기본 결과 동작")} disabled={disabled} value={settings.defaultDelivery ?? "paste"} onChange={value => onChange({ ...settings, defaultDelivery: value as "copy" | "paste" })} options={[{value:"copy",label:t("클립보드에만 복사")},{value:"paste",label:t("입력 위치에 붙여넣기")}]} /></div>
     <p className="dictation-notice">{t("입력 위치를 찾지 못하면 클립보드에만 복사하며, Enter를 보내지 않습니다.")}</p>
     {rows.map(([action,title,description])=>{
       const binding=bindings[action];
       return <div className="settings-row" key={action}><div className="preference-copy"><strong>{t(title)}</strong><span>{t(description)}</span></div><div className="dictation-recording-controls">
-        <select aria-label={t("{0} 단축키 방식",{0:t(title)})} disabled={disabled||!!recording} value={binding.mode} onChange={event=>{setError("");onChange({...settings,[action]:{...binding,mode:event.target.value}});}}>
-          {action==="recordingPasteShortcut"&&<option value="sameAsPrimary">{t("녹음 시작과 동일 · 기본 동작")}</option>}
-          <option value="custom">{t("사용자 지정")}</option><option value="disabled">{t("지정 안 함")}</option>
-        </select>
+        <SettingsSelect label={t("{0} 단축키 방식",{0:t(title)})} disabled={disabled || !!recording} value={binding.mode} onChange={value => {setError("");onChange({...settings,[action]:{...binding,mode:value}});}} options={[...(action === "recordingPasteShortcut" ? [{value:"sameAsPrimary",label:t("녹음 시작과 동일 · 기본 동작")}] : []), {value:"custom",label:t("사용자 지정")},{value:"disabled",label:t("지정 안 함")}]} />
         {binding.mode==="custom"&&<button className="shortcut-recorder" disabled={disabled} aria-label={t("{0} 단축키 기록",{0:t(title)})} aria-pressed={recording===action} onClick={event=>{event.currentTarget.focus();setRecording(recording===action?undefined:action);candidate.current=undefined;setError("");}} onBlur={()=>{setRecording(undefined);candidate.current=undefined;}} onKeyDown={event=>{
           if(recording!==action || !captureLease.ready)return;event.preventDefault();event.stopPropagation();
           if(event.nativeEvent.isComposing || event.repeat)return;
@@ -48,6 +46,5 @@ export function DictationDeliverySettings({ settings, disabled, onChange, footer
     {error&&<p role="alert">{error}</p>}
     {captureLease.error&&<p role="alert">{t(captureLease.error)}</p>}
     {footer}
-    <p className="dictation-notice">{t("녹음 중에만 사용하는 단축키입니다. 조합 키 또는 보조 키 하나를 지정할 수 있습니다. 보조 키 단독 사용은 손쉬운 사용 권한이 필요합니다.")}</p>
   </div>;
 }

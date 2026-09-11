@@ -38,11 +38,9 @@ async function click(label: string) {
   await act(async () => button!.click());
 }
 async function retention(value: string) {
-  await act(async () => {
-    const select = container.querySelector("select")!;
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await act(async () => container.querySelector<HTMLButtonElement>('[role="combobox"]')!.click());
+  const index = ["1","7","30","90"].indexOf(value);
+  await act(async () => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index].click());
 }
 
 describe("durable clipboard settings", () => {

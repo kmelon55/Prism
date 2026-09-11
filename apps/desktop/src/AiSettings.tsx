@@ -1,3 +1,4 @@
+import { AiUsage } from "./AiUsage";
 import { t, useLocale } from "./i18n";
 import { AiToolSettings } from "./AiToolSettings";
 import { useEffect, useRef, useState } from "react";
@@ -209,6 +210,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       {(keyError || unlockError) && <p className="ai-settings-error" role="alert">{t(keyError || unlockError)}</p>}
     </section>
     <AiToolSettings nativeRuntime={nativeRuntime} />
+    <AiUsage nativeRuntime={nativeRuntime} />
     {error && <p className="ai-settings-error" role="alert">{t(error)}</p>}
     <p className="ai-settings-notice" role="status">{notice || t("모델을 클릭하면 저장됩니다. 메시지를 보낼 때 선택한 제공업체에 사용료가 청구됩니다.")}</p>
   </div>;

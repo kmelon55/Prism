@@ -228,6 +228,16 @@ impl GlobalShortcutManager {
         }
     }
 
+    pub(crate) fn prompt_shortcut_label(&self) -> Option<String> {
+        self.prompt_shortcut().map(|s| dictation_shortcut_display(&s))
+    }
+    fn prompt_shortcut(&self) -> Option<String> {
+        self.state.lock().ok()?.command_settings().into_iter().find(|s| s.command_id == "prism:dictation-prompt" && s.registered).map(|s| s.shortcut)
+    }
+    pub(crate) fn prompt_double_modifier(&self) -> Option<u32> {
+        let shortcut = self.prompt_shortcut()?;
+        modifier::NAMES.iter().position(|n| n.eq_ignore_ascii_case(&shortcut)).map(|k| k as u32)
+    }
     fn dictation_shortcut(&self) -> Option<String> {
         self.state
             .lock()

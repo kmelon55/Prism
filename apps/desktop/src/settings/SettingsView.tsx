@@ -1,3 +1,5 @@
+import { InterfaceMotion } from "./InterfaceMotion";
+import { SettingsSelect } from "./SettingsSelect";
 import { Updates } from "../Updates";
 import { useEffect, useLayoutEffect, useRef, useState, useId, type ComponentType, type ReactNode } from "react";
 import { ArrowLeft, Check, Clipboard, ExternalLink, FolderOpen, MoonStar, Plus, RefreshCw, Search, ShieldCheck, Sun, SunMoon, Terminal, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react";
@@ -348,6 +350,7 @@ export function SettingsView(props: SettingsViewProps) {
   };
 
   const renderCommandRow = (command: CommandDefinition) => {
+    const promptOnly = activeSection === "dictation" && command.id === prismCommandIds.dictationPrompt;
     const enabled = !preferences.disabledCommandIds.includes(command.id);
     const commandShortcut = commandShortcuts[command.id] ?? "";
     const recording = commandHotkeyRecording === command.id;
@@ -406,14 +409,14 @@ export function SettingsView(props: SettingsViewProps) {
               onClick={() => onCommandHotkeyRemove(command.id)}
             ><X size={13} /></button>
           ) : null}
-          <button
+          {(!promptOnly || !enabled) && <button
             className={`switch ${enabled ? "active" : ""}`}
             role="switch"
             aria-label={`${enabled ? t("Disable") : t("Enable")} ${t(command.title)}`}
             aria-checked={enabled}
             disabled={!command.management.canDisable}
             onClick={() => onToggleCommand(command.id)}
-          ><span /></button>
+          ><span /></button>}
         </div>
       </div>
     );
@@ -502,7 +505,7 @@ export function SettingsView(props: SettingsViewProps) {
   };
 
   return (
-    <section
+    <InterfaceMotion reducedMotion={preferences.reduceMotion}><section
       className="preferences-view preferences-v2"
       ref={settingsRef}
       role={standalone ? "region" : "dialog"}
@@ -579,16 +582,16 @@ export function SettingsView(props: SettingsViewProps) {
           {activeSection === "dictation" ? <DictationSettings nativeRuntime={nativeRuntime}
             shortcut={<>{prismCommandDefinitions.filter(command => command.id === prismCommandIds.dictation).map(renderCommandRow)}
               {commandHotkeyError ? <div className="preference-alert" role="alert"><TriangleAlert size={15} /><span>{t(commandHotkeyError)}</span></div> : null}</>}
+            promptShortcut={<>{prismCommandDefinitions.filter(command => command.id === prismCommandIds.dictationPrompt).map(renderCommandRow)}</>}
+            onAiSettings={() => { setSettingsQuery(""); setSection("ai"); stopRecorders(); }}
             onPermissions={() => { setSettingsQuery(""); setSection("permissions"); stopRecorders(); }} /> : null}
           {activeSection === "general" ? (
             <>
               <Updates />
               <div className="settings-group" role="group" aria-label={t("Language")}>
                 <div className="settings-row">
-                  <div className="preference-copy"><strong>{t("Language")}</strong><span>{t("Choose the language used throughout Prism.")}</span></div>
-                  <select className="language-select" aria-label={t("App language")} value={preferences.language} onChange={event=>onChange({...preferences,language:event.target.value as Language})}>
-                    <option value="system">{t("Follow system")}</option><option value="ko">한국어</option><option value="en">English</option>
-                  </select>
+                  <div className="preference-copy"><strong>{t("Language")}</strong></div>
+                  <SettingsSelect label={t("App language")} value={preferences.language} onChange={value => onChange({...preferences,language:value as Language})} options={[{value:"system",label:t("Follow system")},{value:"ko",label:"한국어"},{value:"en",label:"English"}]} />
                 </div>
               </div>
               <div className="settings-group" role="group" aria-label={t("Appearance")}>
@@ -810,6 +813,6 @@ export function SettingsView(props: SettingsViewProps) {
           ) : null}
         </div>
       </div>
-    </section>
+    </section></InterfaceMotion>
   );
 }

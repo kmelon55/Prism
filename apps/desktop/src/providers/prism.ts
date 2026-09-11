@@ -14,6 +14,7 @@ export const prismCommandIds = {
   emoji: "prism:emoji",
   aiChat: "prism:ai-chat",
   dictation: "prism:dictation",
+  dictationPrompt: "prism:dictation-prompt",
   preferences: "prism:preferences",
   theme: "prism:cycle-theme",
   hide: "prism:hide",
@@ -55,6 +56,7 @@ export const prismActionIds = {
   openEmoji: "open-emoji",
   openAiChat: "open-ai-chat",
   toggleDictation: "toggle-dictation",
+  toggleDictationPrompt: "toggle-dictation-prompt",
   openPreferences: "open-settings",
   cycleTheme: "cycle-theme",
   hide: "hide-prism",
@@ -104,6 +106,7 @@ const manageableBuiltInManagement: CommandManagement = {
 
 const commonDefinitions: readonly CommandDefinition[] = [
   { id: prismCommandIds.dictation, get title() { return t("음성 받아쓰기"); }, get subtitle() { return t("녹음 시작 · 다시 실행하면 전사 후 입력"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "whisp", "voice", "speech", "transcribe", "음성", "받아쓰기", "녹음", "전사"], icon: "mic", actions: [{ id: prismActionIds.toggleDictation, get title() { return t("받아쓰기 시작 / 종료"); } }], management: manageableBuiltInManagement },
+  { id: prismCommandIds.dictationPrompt, get title() { return t("Structure prompt"); }, get subtitle() { return t("Speak to create a clear prompt · Run again to insert"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "prompt", "프롬프트", "정리", "음성"], icon: "mic", actions: [{ id: prismActionIds.toggleDictationPrompt, get title() { return t("Structure prompt"); } }], management: manageableBuiltInManagement },
   {id:prismCommandIds.emoji,get title() { return t("이모지"); },get subtitle() { return t("이모지를 찾아 복사하거나 붙여넣으세요"); },get section() { return t("Productivity"); },kind:"command",keywords:["emoji","emojis","이모지","이모티콘","표정","symbols"],icon:"smile",actions:[{id:prismActionIds.openEmoji,get title() { return t("열기"); }}],management:manageableBuiltInManagement},
   {id:prismCommandIds.links,get title() { return t("Quicklinks"); },get subtitle() { return t("저장한 웹사이트와 파일 바로가기"); },get section() { return t("Productivity"); },kind:"command",keywords:["links","링크","바로가기"],icon:"globe",actions:[{id:prismActionIds.openLinks,get title() { return t("열기"); }}],management:manageableBuiltInManagement},
   {id:prismCommandIds.snippets,get title() { return t("Snippets"); },get subtitle() { return t("자주 쓰는 문구"); },get section() { return t("Productivity"); },kind:"command",keywords:["snippet","스니펫","문구"],icon:"clipboard",actions:[{id:prismActionIds.openSnippets,get title() { return t("열기"); }}],management:manageableBuiltInManagement},

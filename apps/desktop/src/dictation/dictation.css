@@ -46,3 +46,30 @@
 .dictation-saved-key > svg { color: var(--success, #579977); }
 .dictation-saved-key code { flex: 1; color: var(--text-secondary); white-space: nowrap; }
 .dictation-recording-controls .shortcut-recorder[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.dictation-processing { padding:8px 0; }
+.dictation-processing-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; font-size:13px; }
+.dictation-processing-heading > span { color:var(--text-muted); font-size:11px; }
+.dictation-processing-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.dictation-processing-option { min-width:0; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--surface); transition:border-color .16s, background .16s; }
+.dictation-processing-option.selected { border-color:color-mix(in srgb,var(--accent) 55%,var(--line)); background:color-mix(in srgb,var(--accent) 5%,var(--surface)); }
+.dictation-processing-toggle { display:flex; align-items:center; gap:9px; width:100%; padding:0; background:none; border:0; color:var(--text); font:inherit; text-align:left; font-size:13px; cursor:pointer; }
+.dictation-mode-indicator { margin-left:auto; display:grid; place-items:center; width:17px; height:17px; border:1px solid var(--line-strong); border-radius:50%; }
+.selected .dictation-mode-indicator { background:var(--accent); color:var(--shell); border-color:transparent; }
+.dictation-processing-option > p { margin:8px 0 14px; min-height:30px; color:var(--text-muted); font-size:11px; line-height:1.5; }
+.dictation-processing-model { margin-bottom:16px; }
+.dictation-processing .ai-model-trigger { display:flex; align-items:center; gap:7px; width:100%; max-width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--text-secondary); font:inherit; font-size:12px; }
+.dictation-processing .ai-model-trigger > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dictation-processing .ai-model-trigger > svg:last-child { margin-left:auto; }
+.dictation-processing .ai-model-popover { top:calc(100% + 8px); bottom:auto; left:0; max-height:310px; width:min(390px,calc(100vw - 100px)); z-index:45; }
+.dictation-processing-option:last-child .ai-model-popover { left:auto; right:0; }
+.dictation-processing-prompt { display:grid; gap:7px; color:var(--text-muted); font-size:11px; }
+.dictation-processing-prompt textarea { width:100%; box-sizing:border-box; resize:vertical; min-height:105px; padding:9px; border:1px solid var(--line); border-radius:7px; color:var(--text-secondary); background:var(--input-bg,transparent); font:inherit; font-size:11px; line-height:1.6; }
+.dictation-prompt-reset { border:0; background:none; color:var(--text-muted); font:inherit; font-size:10px; padding:8px 0 0; }
+.dictation-prompt-shortcut { margin-top:12px; padding:3px 0 10px; border-bottom:1px solid var(--line); }
+.dictation-prompt-shortcut p, .dictation-processing-note { margin:6px 0 0; color:var(--text-muted); font-size:11px; line-height:1.6; }
+.dictation-local-model > .settings-toolbar-button { margin:8px 16px; }
+.dictation-processing-missing { color:var(--danger)!important; min-height:0!important; margin-bottom:0!important; }
+@media (max-width:700px) { .dictation-processing-grid { grid-template-columns:1fr; } .dictation-processing-heading { align-items:start; flex-direction:column; } }
+
+.dictation-model-caption { display:flex; justify-content:space-between; gap:8px; margin-bottom:7px; color:var(--text-muted); font-size:11px; }
+.dictation-model-caption small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }

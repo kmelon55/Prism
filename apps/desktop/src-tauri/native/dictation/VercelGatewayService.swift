@@ -3,7 +3,8 @@ import Foundation
 
 struct VercelGatewayService {
     let session: URLSession
-    init(session: URLSession = TranscriptionHTTP.session) { self.session = session }
+    let onUsage: ((Data) async -> Void)?
+    init(session: URLSession = TranscriptionHTTP.session, onUsage: ((Data) async -> Void)? = nil) { self.session = session; self.onUsage = onUsage }
     func transcribe(
         audioURL: URL,
         apiKey: String,
@@ -46,6 +47,7 @@ struct VercelGatewayService {
         guard (200..<300).contains(http.statusCode) else {
             throw GatewayError.requestFailed(status: http.statusCode, message: "요청을 처리하지 못했습니다. API 키, 모델과 사용 한도를 확인하세요.")
         }
+        await onUsage?(data)
         guard let decoded = try? JSONDecoder().decode(GatewayTranscript.self, from: data) else {
             throw GatewayError.invalidResponse
         }

@@ -1,3 +1,4 @@
+import { AnimatedDetails } from "../settings/InterfaceMotion";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Check, Search } from "lucide-react";
@@ -72,11 +73,11 @@ export function DictationModelPicker(props: Props) {
         {model && !catalog.models.some(entry => entry.id === model && entry.batchCompatible) && <p className="dictation-notice">{t("선택한 모델은 현재 목록에서 파일 전사 지원을 확인하지 못했습니다.")}</p>}
       </>}
       {model && <p className="dictation-notice">{t("선택한 모델")}: <code>{model}</code></p>}
-      <details className="dictation-advanced"><summary>{t("모델 ID 직접 입력")}</summary>
+      <AnimatedDetails className="dictation-advanced"><summary>{t("모델 ID 직접 입력")}</summary>
         <p className="dictation-notice">{t("직접 입력한 ID의 지원 여부는 제공자 문서에서 확인하세요.")}</p>
         <label className="dictation-field">{t("STT 모델")}<input disabled={disabled} value={manualModel} onChange={event => setManualModel(event.target.value)} placeholder={t("파일 전사 모델 ID")} /></label>
         <button className="settings-toolbar-button" disabled={disabled || !manualModel.trim()} onClick={() => onSelect(manualModel.trim())}>{t("이 모델 사용")}</button>
-      </details>
+      </AnimatedDetails>
     </>}
   </div>;
 }

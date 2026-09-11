@@ -1,3 +1,4 @@
+import { SettingsSelect } from "../settings/SettingsSelect";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Clipboard, Trash2, TriangleAlert } from "lucide-react";
 import { t, useLocale } from "../i18n";
@@ -83,13 +84,11 @@ export function ClipboardSettings({ onChanged }: ClipboardSettingsProps) {
     </div>
     <div className="preference-section compact">
       <div className="preference-copy"><strong>{t("Keep history for")}</strong><span>{t("Pinned entries stay until deleted. Up to 1,000 entries and 128 MB total: text 128 KB, images 8 MB, and 64 file references per entry.")}</span></div>
-      <select aria-label={t("Keep history for")} value={settings?.retentionDays ?? 30} disabled={unavailable} onChange={(event) => {
-        const days = Number(event.target.value) as ClipboardRetentionDays;
+      <SettingsSelect label={t("Keep history for")} value={String(settings?.retentionDays ?? 30)} disabled={unavailable} onChange={value => {
+        const days = Number(value) as ClipboardRetentionDays;
         if (settings && days < settings.retentionDays) setConfirmation({ kind: "retention", days });
         else void execute({ kind: "retention", days });
-      }}>
-        <option value={1}>{t("1 day")}</option><option value={7}>{t("1 week")}</option><option value={30}>{t("1 month")}</option><option value={90}>{t("3 months")}</option>
-      </select>
+      }} options={[{value:"1",label:t("1 day")},{value:"7",label:t("1 week")},{value:"30",label:t("1 month")},{value:"90",label:t("3 months")}]} />
     </div>
     <div className="preference-section compact">
       <div className="preference-copy"><strong>{t("Clear stored history")}</strong><span>{t("Clear and disable both delete all saved entries, including pins. Your current system clipboard is unchanged.")}</span>

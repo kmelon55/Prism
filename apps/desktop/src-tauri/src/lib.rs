@@ -1,6 +1,7 @@
 mod updates;
 mod ai;
 mod ai_history;
+mod ai_usage;
 mod ai_key_session;
 mod ai_preferences;
 mod ai_stream;
@@ -196,6 +197,10 @@ fn toggle_palette(app: &AppHandle) {
 
 #[cfg(desktop)]
 fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
+    if command_id == "prism:dictation-prompt" {
+        let _ = dictation::dictation_prompt_toggle(app.clone());
+        return;
+    }
     if command_id == "prism:dictation" {
         let _ = dictation::dictation_toggle(app.clone());
         return;
@@ -547,6 +552,7 @@ pub fn run() {
             permissions::refresh_accessibility_permission,
             shortcut::modifier::set_shortcut_capture,
             dictation::catalog::dictation_list_models,
+            ai_usage::ai_usage_summary,
             dictation::dictation_get_settings,
             dictation::dictation_save_settings,
             dictation::dictation_key_status,
@@ -554,6 +560,7 @@ pub fn run() {
             dictation::dictation_save_key,
             dictation::dictation_delete_key,
             dictation::dictation_toggle,
+            dictation::dictation_prompt_toggle,
             dictation::dictation_action,
             dictation::dictation_pick_file,
             copy_plain_text,

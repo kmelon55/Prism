@@ -33,6 +33,17 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
     }
     func stop() -> URL? { stops += 1; guard running else { return nil }; running = false; return outputURL }
 }
+@MainActor private enum ProcessingFixture {
+    static weak var controller: DictationController?
+    static var calls: [[String: Any]] = []
+    static var hold = false
+    static var result = ProcessingResult(text: "refined fixture")
+    static func event(_ pointer: UnsafePointer<CChar>) {
+        guard let event = try? JSONSerialization.jsonObject(with: Data(String(cString: pointer).utf8)) as? [String: Any], event["action"] as? String == "process" else { return }
+        calls.append(event)
+        if !hold { controller?.processed(result, session: UInt64(event["session"] as! Int)) }
+    }
+}
 @main struct DictationTests {
     @MainActor static func main() async throws {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("prism-dictation-tests-\(UUID().uuidString)", isDirectory: true)
@@ -138,6 +149,68 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             controller.cancel()
         }
         print("PASS: default copy/paste and explicit paste/send route independently (local process + delivery spy; no external insertion)")
+        for (refine, prompt, failure, cancel) in [(false,false,false,false), (true,false,false,false), (false,true,false,false), (true,true,false,false), (true,false,true,false), (true,true,false,true)] {
+            let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
+            let recorder = FakeRecorder(); recorder.outputURL = audio
+            var delivered: [String] = []
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, _, _, _ in delivered.append(text); return .inserted })
+            ProcessingFixture.controller = controller; ProcessingFixture.calls = []; ProcessingFixture.hold = cancel
+            ProcessingFixture.result = failure ? ProcessingResult(error: "fixture timeout") : ProcessingResult(text: "refined fixture")
+            controller.callback = { pointer in MainActor.assumeIsolated { ProcessingFixture.event(pointer) } }
+            var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+            value["whisperPath"] = executable.path; value["refineText"] = refine
+            value["processingModel"] = ["provider":"vercel", "model":"fixture/model"]
+            controller.toggle(fallbackPID: 0, promptMode: prompt)
+            controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
+            try await Task.sleep(for: .milliseconds(30)); controller.stop()
+            for _ in 0..<100 { if !delivered.isEmpty || (cancel && controller.phase == "processing") { break }; try await Task.sleep(for: .milliseconds(20)) }
+            precondition(ProcessingFixture.calls.count == ((refine || prompt) ? 1 : 0))
+            if refine || prompt { precondition(ProcessingFixture.calls[0]["processingMode"] as? String == (prompt ? "prompt" : "cleanup")) }
+            if cancel {
+                precondition(controller.phase == "processing"); controller.cancel()
+                controller.processed(ProcessingResult(text: "late response must not paste"), session: 1)
+                try await Task.sleep(for: .milliseconds(30))
+                precondition(delivered.isEmpty && controller.phase == "idle")
+            } else {
+                precondition(delivered == [(!refine && !prompt) || failure ? "local fixture transcript" : "refined fixture"])
+                if failure { precondition(!controller.message.isEmpty) }
+                controller.cancel()
+            }
+        }
+        for (mode, startPrompt, finishPrompt, expectedMode) in [("off",false,false,"none"), ("cleanup",false,false,"cleanup"), ("prompt",false,false,"none"), ("prompt",false,true,"prompt"), ("prompt",true,false,"none"), ("prompt",true,true,"prompt")] {
+            let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
+            let recorder = FakeRecorder(); recorder.outputURL = audio
+            var delivered: [String] = []; var didPaste = false
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, paste, _, _ in delivered.append(text); didPaste = paste; return .inserted })
+            ProcessingFixture.controller = controller; ProcessingFixture.calls = []; ProcessingFixture.hold = false
+            ProcessingFixture.result = ProcessingResult(text: "edited")
+            controller.callback = { pointer in MainActor.assumeIsolated { ProcessingFixture.event(pointer) } }
+            var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+            value["whisperPath"] = executable.path; value["enhancementMode"] = mode; value["defaultDelivery"] = "copy"
+            value["processingModel"] = ["provider":"vercel", "model":"fixture/" + mode]
+            value["processingPrompt"] = "Custom instructions for " + mode
+            controller.toggle(fallbackPID: 0, promptMode: startPrompt)
+            controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
+            try await Task.sleep(for: .milliseconds(30))
+            controller.toggle(fallbackPID: 0, promptMode: finishPrompt)
+            for _ in 0..<100 { if !delivered.isEmpty { break }; try await Task.sleep(for: .milliseconds(20)) }
+            precondition(delivered == [expectedMode == "none" ? "local fixture transcript" : "edited"])
+            precondition(didPaste == finishPrompt, "Prompt shortcut must paste even when default is copy")
+            precondition(ProcessingFixture.calls.count == (expectedMode == "none" ? 0 : 1))
+            if expectedMode != "none" {
+                precondition(ProcessingFixture.calls[0]["processingMode"] as? String == expectedMode)
+                precondition(ProcessingFixture.calls[0]["processingPrompt"] as? String == "Custom instructions for " + mode)
+                precondition((ProcessingFixture.calls[0]["processingModel"] as? [String:Any])?["model"] as? String == "fixture/" + mode)
+            }
+            controller.cancel()
+        }
+        print("PASS: exclusive enhancement modes, optional prompt shortcut during ordinary recording, raw exit from prompt recording, per-profile instructions and explicit paste")
+        var receipt = UsageReceipt()
+        receipt.add(UsageMeasurement(inputTokens: 100, outputTokens: 20, costUsd: 0.00001, costKind: "estimated"))
+        receipt.add(UsageMeasurement(costKind: "unknown"))
+        precondition(receipt.label(AppLanguage(english: true)).contains("<$0.0001 + ?"))
+        precondition(receipt.label(AppLanguage(english: true)).contains("120 tokens"))
+        print("PASS: refinement switch, separate prompt mode, single processing call, original fallback, cancellation and stale response (no network)")
         let waitingExecutable = temp.appendingPathComponent("whisper-wait-fixture")
         try "#!/bin/sh\nexec /bin/sleep 10\n".write(to: waitingExecutable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: waitingExecutable.path)

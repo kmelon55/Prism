@@ -3,7 +3,8 @@ import Foundation
 
 struct RemoteTranscriptionService {
     let session: URLSession
-    init(session: URLSession = TranscriptionHTTP.session) { self.session = session }
+    let onUsage: ((Data) async -> Void)?
+    init(session: URLSession = TranscriptionHTTP.session, onUsage: ((Data) async -> Void)? = nil) { self.session = session; self.onUsage = onUsage }
     func transcribe(
         audioURL: URL,
         configuration: RemoteConfiguration,
@@ -13,7 +14,7 @@ struct RemoteTranscriptionService {
     ) async throws -> String {
         switch configuration.provider {
         case .vercel:
-            return try await VercelGatewayService(session: session).transcribe(
+            return try await VercelGatewayService(session: session, onUsage: onUsage).transcribe(
                 audioURL: audioURL,
                 apiKey: configuration.apiKey,
                 baseURL: configuration.baseURL,
@@ -95,6 +96,7 @@ struct RemoteTranscriptionService {
         guard (200..<300).contains(http.statusCode) else {
             throw RemoteAPIError.requestFailed(status: http.statusCode, message: "요청을 처리하지 못했습니다. API 키, 모델과 사용 한도를 확인하세요.")
         }
+        await onUsage?(data)
         guard let result = try? JSONDecoder().decode(RemoteTranscript.self, from: data) else {
             throw RemoteAPIError.invalidResponse
         }

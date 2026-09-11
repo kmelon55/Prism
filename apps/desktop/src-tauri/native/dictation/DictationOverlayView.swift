@@ -58,12 +58,12 @@ struct DictationOverlayView: View {
                         .padding(.horizontal, 24)
                         .frame(width: 164, height: 50)
                 }
-            case "transcribing":
+            case "transcribing", "processing":
                 if (appState.overlaySettings.showTranscriptionStatus ?? true) {
                     HStack(spacing: 12) {
                         WaveformView(amplitude: 0, phase: displayedPhase)
                             .frame(width: 72, height: 23)
-                        Text(appLanguage.text("문장으로 다듬는 중…", "Transcribing…"))
+                        Text(displayedPhase == "processing" ? (appState.processingMode == "prompt" ? appLanguage.text("프롬프트 정리 중…", "Structuring prompt…") : appLanguage.text("말 다듬는 중…", "Refining…")) : appLanguage.text("음성을 인식하는 중…", "Transcribing…"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }

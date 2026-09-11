@@ -35,7 +35,7 @@ fn cached_key(provider: Provider) -> Result<zeroize::Zeroizing<Vec<u8>>, String>
 }
 const SERVICE: &str = "dev.prism.desktop.ai";
 const MAX_BODY: usize = 1_048_576;
-#[derive(Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Provider {
     Openai,
@@ -43,7 +43,7 @@ pub enum Provider {
     Vercel,
 }
 impl Provider {
-    fn account(self) -> &'static str {
+    pub(crate) fn account(self) -> &'static str {
         match self {
             Self::Openai => "openai",
             Self::Openrouter => "openrouter",
@@ -261,7 +261,7 @@ fn request_body(provider: Provider, model: &str, messages: &[Message]) -> Value 
         }
     }
 }
-fn response_text(provider: Provider, value: &Value) -> Result<String, String> {
+pub(crate) fn response_text(provider: Provider, value: &Value) -> Result<String, String> {
     let text = match provider {
         Provider::Openai => {
             if value["status"] != "completed" {
@@ -427,6 +427,8 @@ fn http_error(
     error
 }
 async fn request_json(
+    app: &tauri::AppHandle,
+    feature: &str,
     provider: Provider,
     model: &str,
     body: &Value,
@@ -449,7 +451,9 @@ async fn request_json(
     let mut body = body.clone();
     if updates.is_some() {
         body["stream"] = json!(true);
+        if provider != Provider::Openai { body["stream_options"] = json!({"include_usage":true}); }
     }
+    let ticket = crate::ai_usage::Ticket::start(app, feature, provider.account(), model)?;
     let mut response = client
         .post(provider.endpoint())
         .header(reqwest::header::AUTHORIZATION, authorization)
@@ -505,7 +509,9 @@ async fn request_json(
         let _ = channel.send(StreamUpdate {
             text: stream.text.clone(),
         });
-        return stream.finish();
+        let value = stream.finish()?;
+        ticket.finish(&crate::ai_usage::measure(&value, cached_prices(provider, model)), "completed");
+        return Ok(value);
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = response
@@ -530,6 +536,7 @@ async fn request_json(
     }
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|_| "AI 응답 형식이 올바르지 않습니다.".to_string())?;
+    ticket.finish(&crate::ai_usage::measure(&value, cached_prices(provider, model)), "completed");
     Ok(value)
 }
 fn add_sources(mut text: String, value: &Value, provider: Provider) -> String {
@@ -640,10 +647,28 @@ async fn send(
             } else {
                 None
             };
-            async move { request_json(provider, &model, &body, updates).await }
+            let app = app.clone();
+            async move { request_json(&app, "chat", provider, &model, &body, updates).await }
         },
     )
     .await
+}
+pub(crate) fn cached_prices(provider: Provider, model: &str) -> Option<(f64, f64)> {
+    let cache = MODEL_CACHE.get()?.lock().ok()?;
+    let (when, models) = cache.get(provider.account())?;
+    if when.elapsed() >= Duration::from_secs(600) { return None; }
+    let entry = models.iter().find(|m| m.id == model)?;
+    Some((entry.input_price?, entry.output_price?))
+}
+pub(crate) async fn rewrite(app: &tauri::AppHandle, provider: Provider, model: &str, feature: &str, instruction: &str, text: &str) -> Result<(String, crate::ai_usage::Measurement), String> {
+    if cached_prices(provider, model).is_none() {
+        // Catalog discovery is free and bounded; missing prices never prevent processing.
+        let _ = tokio::time::timeout(Duration::from_secs(2), ai_list_models(provider)).await;
+    }
+    let messages = vec![Message { role: "system".into(), content: instruction.into() }, Message { role: "user".into(), content: text.into() }];
+    let value = request_json(app, feature, provider, model, &request_body(provider, model, &messages), None).await?;
+    if provider != Provider::Openai && value["choices"][0]["finish_reason"] != "stop" { return Err("Text processing was incomplete. Used the original text.".into()); }
+    Ok((response_text(provider, &value)?, crate::ai_usage::measure(&value, cached_prices(provider, model))))
 }
 async fn run_turn<F, Fut, C>(
     provider: Provider,

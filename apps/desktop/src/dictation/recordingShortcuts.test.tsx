@@ -23,7 +23,11 @@ it("keeps default copy separate from a user-recorded paste shortcut",async()=>{
   const element=document.createElement("div");document.body.append(element);const root=createRoot(element);const changes=vi.fn();
   function Host(){const [settings,setSettings]=useState(defaultSettings);return <DictationDeliverySettings settings={settings} disabled={false} onChange={next=>{changes(next);setSettings(next);}}/>;}
   await act(async()=>root.render(<Host/>));
-  async function select(label:string,value:string){const elementSelect=element.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value")!.set!.call(elementSelect,value);elementSelect.dispatchEvent(new Event("change",{bubbles:true}));});}
+  async function select(label:string,value:string){
+    await act(async()=>element.querySelector<HTMLButtonElement>(`[role="combobox"][aria-label="${label}"]`)!.click());
+    const text=t(value === "copy" ? "클립보드에만 복사" : "사용자 지정");
+    await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(option=>option.textContent === text)!.click());
+  }
   await select(t("기본 결과 동작"),"copy");
   await select(t("{0} 단축키 방식",{0:t("붙여넣기")}),"custom");
   const recorder=element.querySelector<HTMLButtonElement>(`button[aria-label="${t("{0} 단축키 기록",{0:t("붙여넣기")})}"]`)!;

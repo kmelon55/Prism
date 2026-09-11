@@ -195,6 +195,19 @@ impl Accumulator {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn final_usage_chunk_survives_after_the_content_finishes() {
+        let mut stream = super::Accumulator::new(super::Provider::Openrouter);
+        stream.event(r#"{"choices":[{"delta":{"content":"hello"},"finish_reason":"stop"}]}"#).unwrap();
+        stream.event(r#"{"choices":[],"usage":{"prompt_tokens":25,"completion_tokens":5,"cost":0.00003}}"#).unwrap();
+        stream.event("[DONE]").unwrap();
+        let value = stream.finish().unwrap();
+        let usage = crate::ai_usage::measure(&value, None);
+        assert_eq!(usage.input_tokens, Some(25));
+        assert_eq!(usage.output_tokens, Some(5));
+        assert_eq!(usage.cost_usd, Some(0.00003));
+    }
+
     use super::*;
     #[test]
     fn parses_utf8_and_crlf_at_every_byte_boundary() {

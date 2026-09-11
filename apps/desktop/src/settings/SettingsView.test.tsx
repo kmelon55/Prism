@@ -155,3 +155,14 @@ it("discovers dictation and exposes shared shortcut registration failures", asyn
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Shortcut registration conflict");
   expect(container.querySelector('[aria-label="Global shortcut for Dictation"]')).not.toBeNull();
 });
+
+it("shows both enhancement profiles without usage or an inactive prompt shortcut", async () => {
+  await mount();
+  await clickSection("Dictation");
+  const prompt = container.querySelector('[aria-label="Global shortcut for Structure prompt"]');
+  const ordinary = container.querySelector('[aria-label="Global shortcut for Dictation"]');
+  expect(prompt).toBeNull(); expect(ordinary).not.toBeNull();
+  expect(container.querySelector('[aria-label="Structure prompt"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Refine speech"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="AI usage"]')).toBeNull();
+});

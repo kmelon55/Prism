@@ -1,5 +1,6 @@
 //! Whisp-backed native dictation. Audio and transcripts are temporary; keys stay in Keychain.
 pub mod catalog;
+pub mod processing;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -67,6 +68,20 @@ fn default_delivery() -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DictationSettings {
+    #[serde(default)]
+    enhancement_mode: Option<String>,
+    #[serde(default)]
+    cleanup_model: Option<processing::Selection>,
+    #[serde(default)]
+    prompt_model: Option<processing::Selection>,
+    #[serde(default = "processing::cleanup_default")]
+    cleanup_instruction: String,
+    #[serde(default = "processing::prompt_default")]
+    prompt_instruction: String,
+    #[serde(default)]
+    refine_text: bool,
+    #[serde(default)]
+    processing_model: Option<processing::Selection>,
     provider: String,
     model: String,
     #[serde(rename = "baseURL")]
@@ -98,6 +113,13 @@ fn default_true() -> bool {
 impl Default for DictationSettings {
     fn default() -> Self {
         Self {
+            enhancement_mode: Some("off".into()),
+            cleanup_model: None,
+            prompt_model: None,
+            cleanup_instruction: processing::cleanup_default(),
+            prompt_instruction: processing::prompt_default(),
+            refine_text: false,
+            processing_model: None,
             provider: "local".into(),
             model: "".into(),
             base_url: "".into(),
@@ -123,7 +145,19 @@ impl Default for DictationSettings {
     }
 }
 impl DictationSettings {
+    fn upgrade(&mut self) {
+        if self.enhancement_mode.is_none() {
+            self.enhancement_mode = Some(if self.refine_text { "cleanup" } else if self.processing_model.is_some() { "prompt" } else { "off" }.into());
+            self.cleanup_model = self.processing_model.clone();
+            self.prompt_model = self.processing_model.clone();
+        }
+        self.refine_text = self.enhancement_mode.as_deref() == Some("cleanup");
+    }
     fn validate(&self) -> Result<(), String> {
+        if let Some(mode) = &self.enhancement_mode { if !["off", "cleanup", "prompt"].contains(&mode.as_str()) { return Err("Choose a dictation enhancement.".into()); } }
+        for model in [&self.processing_model, &self.cleanup_model, &self.prompt_model].into_iter().flatten() { model.validate()?; }
+        processing::instruction("cleanup", Some(&self.cleanup_instruction))?;
+        processing::instruction("prompt", Some(&self.prompt_instruction))?;
         if !["copy", "paste"].contains(&self.default_delivery.as_str()) {
             return Err("기본 결과 동작을 선택하세요.".into());
         }
@@ -266,9 +300,10 @@ fn read_settings(path: &Path) -> Result<DictationSettings, String> {
         Ok(meta) if meta.len() <= 65_536 => (),
         _ => return Err("받아쓰기 설정을 읽지 못했습니다.".into()),
     }
-    let settings: DictationSettings =
+    let mut settings: DictationSettings =
         serde_json::from_slice(&fs::read(path).map_err(|_| "설정을 읽지 못했습니다.")?)
             .map_err(|_| "받아쓰기 설정 형식이 올바르지 않습니다.")?;
+    settings.upgrade();
     settings.validate()?;
     Ok(settings)
 }
@@ -280,14 +315,14 @@ pub fn dictation_get_settings(app: tauri::AppHandle) -> Result<DictationSettings
 #[tauri::command]
 pub fn dictation_save_settings(
     app: tauri::AppHandle,
-    settings: DictationSettings,
+    mut settings: DictationSettings,
 ) -> Result<DictationSettings, String> {
     let _lock = SETTINGS_LOCK.lock().map_err(|_| "설정이 사용 중입니다.")?;
+    settings.upgrade();
     settings.validate()?;
-    if let Some(primary) = app
-        .try_state::<crate::shortcut::GlobalShortcutManager>()
-        .and_then(|manager| manager.dictation_shortcut_label())
-    {
+    let primary_shortcuts = app.try_state::<crate::shortcut::GlobalShortcutManager>()
+        .map(|manager| [manager.dictation_shortcut_label(), manager.prompt_shortcut_label()]).unwrap_or_default();
+    for primary in primary_shortcuts.into_iter().flatten() {
         let compact = |label: &str| label.replace(' ', "").to_lowercase();
         if [
             &settings.recording_cancel_shortcut,
@@ -497,12 +532,25 @@ fn overlay_configuration(
         .unwrap_or(Value::Null);
     Ok(value)
 }
-fn configuration(app: &tauri::AppHandle) -> Result<zeroize::Zeroizing<String>, String> {
+fn configuration(app: &tauri::AppHandle, prompt_mode: bool) -> Result<zeroize::Zeroizing<String>, String> {
     let settings = dictation_get_settings(app.clone())?;
     settings.preflight()?;
+    if prompt_mode && settings.enhancement_mode.as_deref() != Some("prompt") { return Err("Enable prompt structuring first.".into()); }
+    let (processing_model, processing_prompt) = if settings.enhancement_mode.as_deref() == Some("prompt") { (settings.prompt_model.clone(), settings.prompt_instruction.clone()) } else { (settings.cleanup_model.clone(), settings.cleanup_instruction.clone()) };
+    if prompt_mode && processing_model.is_none() { return Err("Choose a text processing model.".into()); }
     let key = read_provider_key(&settings.provider)?;
     // This JSON crosses an in-process FFI boundary only, never IPC or disk.
     let mut value = overlay_configuration(app, settings)?;
+    value["processingModel"] = serde_json::to_value(processing_model).map_err(|_| "Invalid processing model.")?;
+    value["processingPrompt"] = Value::String(processing_prompt);
+    if prompt_mode {
+        value["primaryShortcutLabel"] = app.try_state::<crate::shortcut::GlobalShortcutManager>().and_then(|m| m.prompt_shortcut_label()).map(Value::String).unwrap_or(Value::Null);
+        value["primaryDoubleModifier"] = app.try_state::<crate::shortcut::GlobalShortcutManager>().and_then(|m| m.prompt_double_modifier()).map(Value::from).unwrap_or(Value::Null);
+    }
+    if value["enhancementMode"].as_str() == Some("prompt") {
+        let modifiers = app.try_state::<crate::shortcut::GlobalShortcutManager>().map(|m| [m.dictation_double_modifier(), m.prompt_double_modifier()].into_iter().flatten().collect::<Vec<_>>()).unwrap_or_default();
+        value["additionalDoubleModifiers"] = serde_json::json!(modifiers);
+    }
     value["apiKey"] = Value::String(
         String::from_utf8(key.to_vec()).map_err(|_| "API 키 형식이 올바르지 않습니다.")?,
     );
@@ -517,6 +565,7 @@ fn configuration(app: &tauri::AppHandle) -> Result<zeroize::Zeroizing<String>, S
 extern "C" {
     fn prism_dictation_init(callback: extern "C" fn(*const std::ffi::c_char));
     fn prism_dictation_toggle(pid: i32);
+    fn prism_dictation_prompt_toggle(pid: i32);
     fn prism_dictation_action(action: i32);
     fn prism_dictation_preview(json: *const std::ffi::c_char);
     fn prism_dictation_configure(json: *const std::ffi::c_char, session: u64, failed: bool);
@@ -534,15 +583,20 @@ extern "C" fn native_event(pointer: *const std::ffi::c_char) {
     let Some(app) = APP.get() else {
         return;
     };
+    // Internal events may contain dictated text. Never broadcast or cache them in frontend status.
+    if event["action"] == "process" { processing::start(app.clone(), event); return; }
+    if event["action"] == "usage-start" || event["action"] == "usage-finish" { processing::transcription(app, &event); return; }
+    if event["phase"] == "idle" || event["phase"] == "error" { processing::cancel(); }
     if let Ok(mut state) = STATUS.get_or_init(|| Mutex::new(json!({}))).lock() {
         *state = event.clone();
     }
     let _ = app.emit("prism:dictation-state", &event);
     if event["action"] == "configure" {
         let session = event["session"].as_u64().unwrap_or_default();
+        let prompt_mode = event["processingMode"] == "prompt";
         let app = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let (text, failed) = match configuration(&app) {
+            let (text, failed) = match configuration(&app, prompt_mode) {
                 Ok(value) => (value, false),
                 Err(message) => (zeroize::Zeroizing::new(message), true),
             };
@@ -572,6 +626,13 @@ pub fn install(app: &tauri::AppHandle) {
 }
 #[tauri::command]
 pub fn dictation_toggle(app: tauri::AppHandle) -> Result<(), String> {
+    toggle_mode(app, false)
+}
+#[tauri::command]
+pub fn dictation_prompt_toggle(app: tauri::AppHandle) -> Result<(), String> {
+    toggle_mode(app, true)
+}
+fn toggle_mode(app: tauri::AppHandle, prompt_mode: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let host = app.clone();
@@ -587,7 +648,7 @@ pub fn dictation_toggle(app: tauri::AppHandle) -> Result<(), String> {
                 0
             };
             unsafe {
-                prism_dictation_toggle(pid);
+                if prompt_mode { prism_dictation_prompt_toggle(pid); } else { prism_dictation_toggle(pid); }
             }
             // Capture AX before hiding Prism, and keep the panel nonactivating.
             if let Some(window) = host.get_webview_window("main") {
@@ -620,6 +681,7 @@ pub async fn dictation_action(
                 "cancel" => 0,
                 "preview" => 1,
                 "copy" => 2,
+                "copyOriginal" => 5,
                 "status" => 3,
                 "microphoneRequest" => 4,
                 _ => return Err("알 수 없는 받아쓰기 동작입니다.".into()),
@@ -677,6 +739,42 @@ pub async fn dictation_pick_file(kind: String) -> Result<Option<String>, String>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn migrates_shared_model_once_and_retains_independent_profiles_when_off() {
+        let mut value = serde_json::to_value(super::DictationSettings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("enhancementMode");
+        value["refineText"] = serde_json::json!(true);
+        value["processingModel"] = serde_json::json!({"provider":"vercel","model":"legacy/model"});
+        let mut settings: super::DictationSettings = serde_json::from_value(value).unwrap();
+        settings.upgrade();
+        assert_eq!(settings.enhancement_mode.as_deref(), Some("cleanup"));
+        assert_eq!(settings.cleanup_model.as_ref().unwrap().model, "legacy/model");
+        assert_eq!(settings.prompt_model.as_ref().unwrap().model, "legacy/model");
+        settings.enhancement_mode = Some("off".into());
+        settings.prompt_model.as_mut().unwrap().model = "new/model".into();
+        settings.prompt_instruction = "Keep short paragraphs".into();
+        settings.upgrade();
+        assert!(!settings.refine_text);
+        assert_eq!(settings.prompt_model.as_ref().unwrap().model, "new/model");
+        assert_eq!(settings.prompt_instruction, "Keep short paragraphs");
+        assert!(settings.validate().is_ok());
+    }
+    #[test]
+    fn older_settings_keep_refinement_off_and_processing_selection_is_validated() {
+        let mut value = serde_json::to_value(super::DictationSettings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("refineText");
+        value.as_object_mut().unwrap().remove("processingModel");
+        let settings: super::DictationSettings = serde_json::from_value(value.clone()).unwrap();
+        assert!(!settings.refine_text);
+        assert!(settings.processing_model.is_none());
+        value["processingModel"] = serde_json::json!({"provider":"vercel","model":"fixture/model","modelName":"Fixture"});
+        let settings: super::DictationSettings = serde_json::from_value(value.clone()).unwrap();
+        assert!(settings.validate().is_ok());
+        value["processingModel"]["model"] = serde_json::json!("bad model");
+        let settings: super::DictationSettings = serde_json::from_value(value).unwrap();
+        assert!(settings.validate().is_err());
+    }
+
     use super::*;
     fn remote(provider: &str, base: &str) -> DictationSettings {
         DictationSettings {

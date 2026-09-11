@@ -7,6 +7,7 @@ struct OverlaySettings: Decodable {
     var showTranscriptionStatus: Bool? = true
     var primaryShortcutLabel: String? = nil
     var primaryDoubleModifier: UInt32? = nil
+    var additionalDoubleModifiers: [UInt32]? = nil
     var uiLanguage: String? = "ko"
     var defaultDelivery: String? = "paste"
     var recordingCopyShortcut: RecordingShortcutSetting?
@@ -90,7 +91,7 @@ struct OverlaySettings: Decodable {
         }
         modifierShortcuts.blockRecordingModifiers(Set(recordingModifierActions.keys.compactMap { kind in
             switch kind { case .singleControl: return UInt32(0); case .singleOption: return UInt32(1); case .singleShift: return UInt32(2); case .singleCommand: return UInt32(3); case .keyCombination: return nil }
-        }), allowingPrimary: recording ? settings.primaryDoubleModifier : nil)
+        }), allowingPrimary: recording ? settings.primaryDoubleModifier : nil, allowingAdditional: recording ? Set(settings.additionalDoubleModifiers ?? []) : [])
         installRecordingModifierMonitorsIfNeeded()
     }
     func remove() {
@@ -179,8 +180,8 @@ struct OverlaySettings: Decodable {
 
         // Match Whisp: give the primary double tap (0.42 s) priority over a
         // single release of the same modifier. A second press cancels this task.
-        guard let primary = settings.primaryDoubleModifier, primary < 4,
-              Self.modifierFlag(for: kind) == PrismModifierShortcuts.flags[Int(primary)] else {
+        let allowed = (settings.additionalDoubleModifiers ?? []) + (settings.primaryDoubleModifier.map { [$0] } ?? [])
+        guard allowed.contains(where: { $0 < 4 && Self.modifierFlag(for: kind) == PrismModifierShortcuts.flags[Int($0)] }) else {
             handleHotKey(identifier)
             return
         }

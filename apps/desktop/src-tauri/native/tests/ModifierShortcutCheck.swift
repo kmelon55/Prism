@@ -81,6 +81,29 @@ import AppKit
             }
             precondition(fired == 1); monitor.unregister(kind)
         }
+        precondition(monitor.register(0) == 0)
+        precondition(monitor.register(1) == 0)
+        var kinds: [UInt32] = []
+        monitor.onTrigger = { kinds.append($0) }
+        let dual = RecordingControls(modifierShortcuts: monitor, isTrusted: { true }, modifierFlags: { [] })
+        dual.settings.primaryDoubleModifier = 0
+        dual.settings.additionalDoubleModifiers = [0,1]
+        dual.settings.recordingCancelShortcut = RecordingShortcutSetting(mode: .disabled, keyCode: 53, modifiers: 0, label: "")
+        dual.settings.recordingCopyShortcut = RecordingShortcutSetting(mode: .custom, kind: .singleOption, keyCode: 0, modifiers: 0, label: "⌥")
+        dual.settings.recordingPasteAndEnterShortcut = RecordingShortcutSetting(mode: .custom, kind: .singleControl, keyCode: 0, modifiers: 0, label: "⌃")
+        var singles = 0
+        dual.onCopy = { singles += 1 }; dual.onSend = { singles += 1 }
+        dual.install(recording: true)
+        for kind: UInt32 in 0..<2 {
+            for (down, time) in [(true, 20.0), (false, 20.1), (true, 20.2)] {
+                let e = NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: down ? PrismModifierShortcuts.flags[Int(kind)] : [], timestamp: time + Double(kind), windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: kind == 0 ? 59 : 58)!
+                dual.handleRecordingModifier(e); monitor.handle(e)
+            }
+        }
+        precondition(kinds == [0,1], "Both ordinary and prompt double modifiers must remain available")
+        dual.remove(); try await Task.sleep(for: .seconds(0.46))
+        precondition(singles == 0, "Double modifiers must cancel both pending single actions")
+        print("PASS: ordinary and prompt double shortcuts coexist with single recording actions")
         print("PASS: synthetic Control double-start / delayed single-send / double-paste in both monitor orders; opening release, chord interruption, cooldown, capture suppression, timeout, all modifiers, duplicate/permission rejection and teardown. AX trust injected for fixture; no physical keys or STT.")
     }
 }

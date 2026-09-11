@@ -839,10 +839,10 @@ it("uses plain Tab from root search to expand AI with a draft and restores query
 
 it("changes the entire settings UI from its language selector and restores that choice", async()=>{
  await mount(true);
- const select=container.querySelector<HTMLSelectElement>('[aria-label="App language"]')!;
- await act(async()=>{select.value="ko";select.dispatchEvent(new Event("change",{bubbles:true}));});await settle();
+ await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="App language"]')!.click());
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(option=>option.textContent === "한국어")!.click());await settle();
  expect(button("일반").getAttribute("aria-current")).toBe("page");
- expect(container.textContent).toContain("Prism 전체 화면에 사용할 언어를 선택하세요.");
+ expect(container.textContent).not.toContain("Prism 전체 화면에 사용할 언어를 선택하세요.");
  expect(container.querySelector('[aria-label="앱 언어"]')).not.toBeNull();
  await click(button("창 관리"));expect(container.textContent).toContain("왼쪽 절반");
  await act(async()=>root.unmount());root=createRoot(container);await mount(true);
