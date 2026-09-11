@@ -20,6 +20,7 @@ struct DictationConfiguration: Decodable {
     let modelPath: String
     let uiLanguage: String
     let apiKey: String
+    var saveToClipboardHistory: Bool?
     var refineText: Bool?
     var processingModel: ProcessingSelection?
     var enhancementMode: String?
@@ -83,7 +84,7 @@ final class DictationController: ObservableObject {
     }
     private let recorder: any DictationRecording
     private let presentsOverlay: Bool
-    private let deliver: (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult
+    private let deliver: (String, Bool, Bool, TextInsertionTarget?, Bool) async -> TextDeliveryResult
     private var target: TextInsertionTarget?
     private var transcriptionAudio: URL?
     private let recovery: DictationRecoveryStore?
@@ -102,7 +103,7 @@ final class DictationController: ObservableObject {
     private var receipt = UsageReceipt()
 
 
-    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult = { text, paste, enter, target in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target) }) {
+    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?, Bool) async -> TextDeliveryResult = { text, paste, enter, target, saveHistory in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target, copyText: { TextInjector.copy($0, saveToHistory: saveHistory) }) }) {
         let recorder = suppliedRecorder ?? AudioRecorder()
         self.recorder = recorder; self.presentsOverlay = presentsOverlay; self.deliver = deliver
         self.recovery = recovery
@@ -266,12 +267,13 @@ final class DictationController: ObservableObject {
                     try recovery.save(text, named: "result.txt", in: entry)
                     try recovery.finish(entry)
                 }
-                sendInternal(["action":"save-history", "transcript":text])
+                let saveHistory = config.saveToClipboardHistory ?? true
+                if saveHistory { sendInternal(["action":"save-history", "transcript":text]) }
                 // Dismiss before publishing inserting: the live overlay would otherwise
                 // switch from transcription status to its default waveform during delivery.
                 if presentsOverlay { overlay.hide() }
                 phase = "inserting"; emit()
-                let result = await deliver(text, shouldPaste, pressEnter, target)
+                let result = await deliver(text, shouldPaste, pressEnter, target, saveHistory)
                 try Task.checkCancellation()
                 guard generation == session else { return }
                 timer?.cancel(); configuration = nil; target = nil; removeCancel()
@@ -374,13 +376,13 @@ final class DictationController: ObservableObject {
             }
         } catch { fail(error.localizedDescription) }
     }
-    func copyOriginal() {
+    func copyOriginal(saveToHistory: Bool = true) {
         guard !originalTranscript.isEmpty else { return }
-        if !TextInjector.copy(originalTranscript) { fail(language.text("클립보드에 복사하지 못했습니다.", "Could not copy to the clipboard.")) }
+        if !TextInjector.copy(originalTranscript, saveToHistory: saveToHistory) { fail(language.text("클립보드에 복사하지 못했습니다.", "Could not copy to the clipboard.")) }
     }
-    func copyLast() {
+    func copyLast(saveToHistory: Bool = true) {
         guard !lastTranscript.isEmpty else { return }
-        if !TextInjector.copy(lastTranscript) { fail(language.text("클립보드에 복사하지 못했습니다.", "Could not copy to the clipboard.")) }
+        if !TextInjector.copy(lastTranscript, saveToHistory: saveToHistory) { fail(language.text("클립보드에 복사하지 못했습니다.", "Could not copy to the clipboard.")) }
     }
     private func installCancel() {
         guard presentsOverlay else { return }
@@ -420,6 +422,12 @@ final class DictationController: ObservableObject {
     MainActor.assumeIsolated { DictationController.shared.setUILanguage(text) }
 }
 @_cdecl("prism_dictation_toggle") func prismDictationToggle(_ pid: Int32) { MainActor.assumeIsolated { DictationController.shared.toggle(fallbackPID: pid) } }
+@_cdecl("prism_dictation_copy") func prismDictationCopy(_ original: Bool, _ saveToHistory: Bool) {
+    MainActor.assumeIsolated {
+        if original { DictationController.shared.copyOriginal(saveToHistory: saveToHistory) }
+        else { DictationController.shared.copyLast(saveToHistory: saveToHistory) }
+    }
+}
 @_cdecl("prism_dictation_action") func prismDictationAction(_ action: Int32) {
     MainActor.assumeIsolated {
         let controller = DictationController.shared

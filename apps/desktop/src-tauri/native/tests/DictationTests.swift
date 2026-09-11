@@ -33,6 +33,13 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
     }
     func stop() -> URL? { stops += 1; guard running else { return nil }; running = false; return outputURL }
 }
+@MainActor private enum HistoryFixture {
+    static var saved: [String] = []
+    static func event(_ pointer: UnsafePointer<CChar>) {
+        guard let event = try? JSONSerialization.jsonObject(with: Data(String(cString: pointer).utf8)) as? [String: Any], event["action"] as? String == "save-history", let text = event["transcript"] as? String else { return }
+        saved.append(text)
+    }
+}
 @MainActor private enum ProcessingFixture {
     static weak var controller: DictationController?
     static var calls: [[String: Any]] = []
@@ -144,6 +151,11 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         defer { isolatedClipboard.releaseGlobally() }
         precondition(TextInjector.copy("복구할 받아쓰기 👋", to: isolatedClipboard))
         precondition(isolatedClipboard.string(forType: .string) == "복구할 받아쓰기 👋")
+        precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) != true)
+        precondition(TextInjector.copy("비공개 받아쓰기 👋", to: isolatedClipboard, saveToHistory: false))
+        precondition(isolatedClipboard.string(forType: .string) == "비공개 받아쓰기 👋")
+        precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) == true)
+        precondition(TextInjector.copy("기록 다시 켜기", to: isolatedClipboard))
         precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) != true)
         print("PASS: native clipboard write/readback without history exclusion (isolated pasteboard; user clipboard unchanged)")
         let app = NSRunningApplication.current
@@ -257,9 +269,10 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             let failedStore = DictationRecoveryStore(directory: temp.appendingPathComponent(UUID().uuidString))
             if !backupAvailable { try Data([0]).write(to: failedStore.directory) }
             let failedController = DictationController(recorder: failedRecorder, presentsOverlay: false, recovery: failedStore,
-                deliver: { _, _, _, _ in preconditionFailure("Failed transcription must not deliver") })
+                deliver: { _, _, _, _, _ in preconditionFailure("Failed transcription must not deliver") })
             var failureConfig = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
             failureConfig["whisperPath"] = failedExecutable.path
+            failureConfig["saveToClipboardHistory"] = false
             failedController.toggle(fallbackPID: 0)
             failedController.configure(String(data: try JSONSerialization.data(withJSONObject: failureConfig), encoding: .utf8)!, session: 1)
             try await Task.sleep(for: .milliseconds(30)); failedController.stop()
@@ -275,23 +288,32 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         }
         print("PASS: real local subprocess failure retains audio; unavailable recovery storage preserves the source and blocks transcription")
 
-        for (mode, overridePaste, enter, expectedPaste) in [("copy", Optional<Bool>.none, false, false), ("paste", nil, false, true), ("copy", true, false, true), ("copy", true, true, true)] {
-            let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
-            let recorder = FakeRecorder(); recorder.outputURL = audio
-            var deliveries: [(Bool, Bool)] = []
-            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { _, paste, enter, _ in
-                deliveries.append((paste, enter)); return paste ? .inserted : .copied
-            })
-            var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
-            value["whisperPath"] = executable.path; value["defaultDelivery"] = mode
-            controller.toggle(fallbackPID: 0)
-            controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
-            try await Task.sleep(for: .milliseconds(30))
-            controller.stop(pressEnter: enter, paste: overridePaste)
-            for _ in 0..<100 { if !deliveries.isEmpty { break }; try await Task.sleep(for: .milliseconds(20)) }
-            precondition(deliveries.count == 1 && deliveries[0].0 == expectedPaste && deliveries[0].1 == enter)
-            precondition(controller.phase == "idle" && controller.message.isEmpty, "Successful delivery must dismiss without a completion message")
-            controller.cancel()
+        for saveHistory in [true, false] {
+            for (mode, overridePaste, enter, expectedPaste) in [("copy", Optional<Bool>.none, false, false), ("paste", nil, false, true), ("copy", true, false, true), ("copy", true, true, true)] {
+                let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
+                let recorder = FakeRecorder(); recorder.outputURL = audio
+                var deliveries: [(Bool, Bool)] = []
+                let store = DictationRecoveryStore(directory: temp.appendingPathComponent(UUID().uuidString))
+                HistoryFixture.saved = []
+                let controller = DictationController(recorder: recorder, presentsOverlay: false, recovery: store, deliver: { _, paste, enter, _, history in
+                    precondition(history == saveHistory)
+                    precondition(store.latest()?.result == "local fixture transcript")
+                    precondition(HistoryFixture.saved == (saveHistory ? ["local fixture transcript"] : []))
+                    deliveries.append((paste, enter)); return paste ? .inserted : .copied
+                })
+                var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+                value["whisperPath"] = executable.path; value["defaultDelivery"] = mode
+                value["saveToClipboardHistory"] = saveHistory
+                controller.callback = { pointer in MainActor.assumeIsolated { HistoryFixture.event(pointer) } }
+                controller.toggle(fallbackPID: 0)
+                controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
+                try await Task.sleep(for: .milliseconds(30))
+                controller.stop(pressEnter: enter, paste: overridePaste)
+                for _ in 0..<100 { if !deliveries.isEmpty { break }; try await Task.sleep(for: .milliseconds(20)) }
+                precondition(deliveries.count == 1 && deliveries[0].0 == expectedPaste && deliveries[0].1 == enter)
+                precondition(controller.phase == "idle" && controller.message.isEmpty, "Successful delivery must dismiss without a completion message")
+                controller.cancel()
+            }
         }
         print("PASS: default copy/paste and explicit paste/send route independently (local process + delivery spy; no external insertion)")
         for outcome in [TextDeliveryResult.pasteSent, .copied, .permissionRequired, .copyFailed, .unverified, .sendFailed] {
@@ -299,7 +321,7 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             let recorder = FakeRecorder(); recorder.outputURL = audio
             var deliveries = 0
             let outcomeRecovery = DictationRecoveryStore(directory: temp.appendingPathComponent(UUID().uuidString))
-            let controller = DictationController(recorder: recorder, presentsOverlay: false, recovery: outcomeRecovery, deliver: { _, _, _, _ in
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, recovery: outcomeRecovery, deliver: { _, _, _, _, _ in
                 precondition(outcomeRecovery.latest()?.result == "local fixture transcript", "Save the result before attempting delivery")
                 deliveries += 1; return outcome
             })
@@ -320,7 +342,7 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio
             var delivered: [String] = []
-            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, _, _, _ in delivered.append(text); return .inserted })
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, _, _, _, _ in delivered.append(text); return .inserted })
             ProcessingFixture.controller = controller; ProcessingFixture.calls = []; ProcessingFixture.hold = cancel
             ProcessingFixture.result = failure ? ProcessingResult(error: "fixture timeout") : ProcessingResult(text: "refined fixture")
             controller.callback = { pointer in MainActor.assumeIsolated { ProcessingFixture.event(pointer) } }
@@ -348,7 +370,7 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio
             var delivered: [String] = []; var didPaste = false
-            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, paste, _, _ in delivered.append(text); didPaste = paste; return .inserted })
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { text, paste, _, _, _ in delivered.append(text); didPaste = paste; return .inserted })
             ProcessingFixture.controller = controller; ProcessingFixture.calls = []; ProcessingFixture.hold = false
             ProcessingFixture.result = ProcessingResult(text: "edited")
             controller.callback = { pointer in MainActor.assumeIsolated { ProcessingFixture.event(pointer) } }

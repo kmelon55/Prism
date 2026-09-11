@@ -173,3 +173,23 @@ it("opens durable recovery without starting another transcription", async () => 
   expect(invoke.mock.calls.some(([command]) => command === "dictation_toggle")).toBe(false);
   await mount(false); expect(button("Open recovery folder").disabled).toBe(true);
 });
+
+it("persists the dictation history switch independently and restores it on reopening", async () => {
+  const original = invoke.getMockImplementation()!;
+  invoke.mockImplementation(async (command, args) => {
+    if (command === "dictation_save_settings") { settings = args.settings; return settings; }
+    return original(command, args);
+  });
+  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Save dictation results to clipboard history"]')!;
+  await mount();
+  expect(toggle().getAttribute("aria-checked")).toBe("true");
+  await act(async () => toggle().click());
+  expect(settings.saveToClipboardHistory).toBe(false);
+  expect(settings.defaultDelivery).toBe("paste");
+  await act(async () => root.render(null));
+  await mount();
+  expect(toggle().getAttribute("aria-checked")).toBe("false");
+  await act(async () => toggle().click());
+  expect(settings.saveToClipboardHistory).toBe(true);
+  expect(invoke.mock.calls.some(([command]) => command === "dictation_toggle")).toBe(false);
+});

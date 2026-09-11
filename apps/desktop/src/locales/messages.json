@@ -1,4 +1,6 @@
 [
+  ["Save dictation results to clipboard history", "받아쓰기 결과를 클립보드 기록에 저장"],
+  ["Save when clipboard history is enabled. Failed recordings and text remain recoverable when off.", "클립보드 기록이 켜져 있을 때 저장합니다. 꺼도 실패한 녹음과 텍스트는 복구할 수 있습니다."],
   ["Update Prism", "Prism 업데이트"],
   ["Restart Prism to update", "재시작하여 업데이트 적용"],
   ["Retry Prism update", "Prism 업데이트 다시 시도"],

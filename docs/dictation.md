@@ -135,3 +135,5 @@ Delivery now uses the target application's paste handler without requiring an AX
 
 
 Validation for this fix: 577 frontend tests and TypeScript checks passed; 22 Rust clipboard-history tests passed. The native mock suite passed, including keyboard delivery without AX focus, focus and clipboard races, Unicode recovery across store reopen, persistence before delivery, failed subprocess audio retention, unavailable backup storage and microphone interruption. These checks do not exercise real microphone capture or insertion into the installed Orca/Zen apps.
+
+Dictation settings include **Save dictation results to clipboard history**, enabled by default, including for older settings files. Global clipboard history must also be enabled. Turning it off excludes copy, paste, send, and the settings actions for copying the original or last result from history. It does not delete existing history or disable local Dictation Recovery files. Successful delivery still dismisses silently.

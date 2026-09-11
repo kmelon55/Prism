@@ -12,6 +12,7 @@ export interface DictationSettings {
   promptInstruction: string;
   refineText: boolean;
   processingModel: AiSelection | null;
+  saveToClipboardHistory: boolean;
   defaultDelivery: "copy" | "paste";
   recordingCancelShortcut: RecordingBinding;
   recordingCopyShortcut: RecordingBinding;
@@ -36,7 +37,7 @@ export const providers: { id: DictationProvider; name: string; baseURL: string }
   { id: "xai", name: "xAI", baseURL: "https://api.x.ai/v1" },
   { id: "custom", name: "OpenAI-compatible", baseURL: "" },
 ];
-export const defaultSettings: DictationSettings = { ...recordingDefaults, enhancementMode: "off", cleanupModel: null, promptModel: null, cleanupInstruction, promptInstruction, refineText: false, processingModel: null, defaultDelivery: "paste", provider: "local", model: "", baseURL: "", language: "auto", prompt: "", vocabulary: [], whisperPath: "/opt/homebrew/bin/whisper-cli", modelPath: "", uiLanguage: "ko", showRecordingShortcutHints: true, showTranscriptionStatus: true };
+export const defaultSettings: DictationSettings = { ...recordingDefaults, enhancementMode: "off", cleanupModel: null, promptModel: null, cleanupInstruction, promptInstruction, refineText: false, processingModel: null, saveToClipboardHistory: true, defaultDelivery: "paste", provider: "local", model: "", baseURL: "", language: "auto", prompt: "", vocabulary: [], whisperPath: "/opt/homebrew/bin/whisper-cli", modelPath: "", uiLanguage: "ko", showRecordingShortcutHints: true, showTranscriptionStatus: true };
 export function changeProvider(settings: DictationSettings, provider: DictationProvider): DictationSettings {
   const entry = providers.find(entry => entry.id === provider)!;
   return { ...settings, provider, model: provider === "xai" ? "grok-stt" : "", baseURL: entry.baseURL };

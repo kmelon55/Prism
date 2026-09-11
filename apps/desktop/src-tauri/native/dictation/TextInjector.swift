@@ -90,15 +90,23 @@ enum TextInjector {
 
     @discardableResult
     static func copy(_ text: String) -> Bool {
-        copy(text, to: .general)
+        copy(text, saveToHistory: true)
     }
 
     @discardableResult
-    static func copy(_ text: String, to pasteboard: NSPasteboard) -> Bool {
+    static func copy(_ text: String, saveToHistory: Bool) -> Bool {
+        copy(text, to: .general, saveToHistory: saveToHistory)
+    }
+
+    @discardableResult
+    static func copy(_ text: String, to pasteboard: NSPasteboard, saveToHistory: Bool = true) -> Bool {
         let item = NSPasteboardItem()
         guard item.setString(text, forType: .string) else { return false }
+        // Attach the exclusion before publishing so the history monitor cannot race it.
+        if !saveToHistory {
+            guard item.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) else { return false }
+        }
         pasteboard.clearContents()
-        // Normal text participates in the user's opt-in clipboard history.
         return pasteboard.writeObjects([item]) && pasteboard.string(forType: .string) == text
     }
 

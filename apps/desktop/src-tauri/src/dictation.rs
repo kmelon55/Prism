@@ -98,6 +98,8 @@ pub struct DictationSettings {
     show_transcription_status: bool,
     #[serde(default = "default_delivery")]
     default_delivery: String,
+    #[serde(default = "default_true")]
+    save_to_clipboard_history: bool,
     #[serde(default = "RecordingBinding::cancel")]
     recording_cancel_shortcut: RecordingBinding,
     #[serde(default = "RecordingBinding::copy")]
@@ -137,6 +139,7 @@ impl Default for DictationSettings {
             show_recording_shortcut_hints: true,
             show_transcription_status: true,
             default_delivery: default_delivery(),
+            save_to_clipboard_history: true,
             recording_cancel_shortcut: RecordingBinding::cancel(),
             recording_copy_shortcut: RecordingBinding::copy(),
             recording_paste_shortcut: RecordingBinding::paste(),
@@ -572,6 +575,7 @@ extern "C" {
     fn prism_dictation_toggle(pid: i32);
     fn prism_dictation_prompt_toggle(pid: i32);
     fn prism_dictation_action(action: i32);
+    fn prism_dictation_copy(original: bool, save_to_history: bool);
     fn prism_dictation_preview(json: *const std::ffi::c_char);
     fn prism_dictation_configure(json: *const std::ffi::c_char, session: u64, failed: bool);
 }
@@ -718,6 +722,9 @@ pub async fn dictation_action(
                 "microphoneRequest" => 4,
                 _ => return Err("알 수 없는 받아쓰기 동작입니다.".into()),
             };
+            let save_to_history = if code == 2 || code == 5 {
+                dictation_get_settings(app.clone())?.save_to_clipboard_history
+            } else { true };
             let preview = if code == 1 {
                 let settings = preview_settings.unwrap_or(dictation_get_settings(app.clone())?);
                 Some(
@@ -732,6 +739,8 @@ pub async fn dictation_action(
                 unsafe {
                     if let Some(preview) = preview {
                         prism_dictation_preview(preview.as_ptr());
+                    } else if code == 2 || code == 5 {
+                        prism_dictation_copy(code == 5, save_to_history);
                     } else {
                         prism_dictation_action(code);
                     }
@@ -840,6 +849,7 @@ mod tests {
         let mut value = serde_json::to_value(&settings).unwrap();
         for key in [
             "defaultDelivery",
+            "saveToClipboardHistory",
             "recordingCancelShortcut",
             "recordingCopyShortcut",
             "recordingPasteShortcut",
@@ -849,6 +859,11 @@ mod tests {
         }
         let migrated: DictationSettings = serde_json::from_value(value).unwrap();
         assert_eq!(migrated.default_delivery, "paste");
+        assert!(migrated.save_to_clipboard_history);
+        let mut disabled = migrated.clone();
+        disabled.save_to_clipboard_history = false;
+        let restored: DictationSettings = serde_json::from_slice(&serde_json::to_vec(&disabled).unwrap()).unwrap();
+        assert!(!restored.save_to_clipboard_history);
         assert_eq!(migrated.recording_copy_shortcut.mode, "disabled");
         assert!(migrated.validate().is_ok());
         let mut changed = migrated;

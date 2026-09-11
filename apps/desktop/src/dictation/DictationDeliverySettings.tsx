@@ -25,6 +25,7 @@ export function DictationDeliverySettings({ settings, disabled, onChange, footer
   return <div className="settings-group" role="group" aria-label={t("결과와 녹음 단축키")}>
     <div className="settings-row"><div className="preference-copy"><strong>{t("기본 결과 동작")}</strong><span>{t("녹음 시작 단축키를 다시 눌렀을 때의 동작입니다.")}</span></div><SettingsSelect label={t("기본 결과 동작")} disabled={disabled} value={settings.defaultDelivery ?? "paste"} onChange={value => onChange({ ...settings, defaultDelivery: value as "copy" | "paste" })} options={[{value:"copy",label:t("클립보드에만 복사")},{value:"paste",label:t("입력 위치에 붙여넣기")}]} /></div>
     <p className="dictation-notice">{t("입력 위치를 찾지 못하면 클립보드에만 복사하며, Enter를 보내지 않습니다.")}</p>
+    <div className="settings-row"><div className="preference-copy"><strong>{t("받아쓰기 결과를 클립보드 기록에 저장")}</strong><span>{t("클립보드 기록이 켜져 있을 때 저장합니다. 꺼도 실패한 녹음과 텍스트는 복구할 수 있습니다.")}</span></div><button className={`switch ${(settings.saveToClipboardHistory ?? true) ? "active" : ""}`} role="switch" aria-label={t("받아쓰기 결과를 클립보드 기록에 저장")} aria-checked={settings.saveToClipboardHistory ?? true} disabled={disabled} onClick={() => onChange({ ...settings, saveToClipboardHistory: !(settings.saveToClipboardHistory ?? true) })}><span /></button></div>
     {rows.map(([action,title,description])=>{
       const binding=bindings[action];
       return <div className="settings-row" key={action}><div className="preference-copy"><strong>{t(title)}</strong><span>{t(description)}</span></div><div className="dictation-recording-controls">
