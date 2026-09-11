@@ -40,7 +40,9 @@ export function rankPaletteResults(items: CommandItem[], query: string, aliases:
   return rankCommands(items, query, aliases)
     .map((item, index) => ({ item, index, score: scoreCommand(item, query, Object.hasOwn(aliases, item.id) ? aliases[item.id] : undefined)! }))
     .sort((a, b) => {
-      return Number(a.item.kind === "file" || a.item.providerId === "files") - Number(b.item.kind === "file" || b.item.providerId === "files")
+      const updatePriority = !query.trim()
+        ? Number(b.item.providerId === "prism-update") - Number(a.item.providerId === "prism-update") : 0;
+      return updatePriority || Number(a.item.kind === "file" || a.item.providerId === "files") - Number(b.item.kind === "file" || b.item.providerId === "files")
         || b.score - a.score || a.index - b.index;
     })
     .filter(({ item, score }) => item.kind !== "file" || !query.trim() || score >= 6_000_000 || ++supplementalFiles <= 8 || item.id === selectedId)

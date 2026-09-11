@@ -166,3 +166,10 @@ it("does not replace a working remote provider while browsing an incomplete loca
   expect(container.querySelector('[role="dialog"] input[aria-label="Local model file"]')).not.toBeNull();
   expect(invoke).toHaveBeenLastCalledWith("dictation_save_settings",{settings:expect.objectContaining({provider:"openai",model:settings.model})});
 });
+
+it("opens durable recovery without starting another transcription", async () => {
+  await mount(); await click("Open recovery folder");
+  expect(invoke).toHaveBeenCalledWith("dictation_action", { action: "openRecovery" });
+  expect(invoke.mock.calls.some(([command]) => command === "dictation_toggle")).toBe(false);
+  await mount(false); expect(button("Open recovery folder").disabled).toBe(true);
+});

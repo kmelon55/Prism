@@ -1,4 +1,12 @@
 [
+  ["Update Prism", "Prism 업데이트"],
+  ["Restart Prism to update", "재시작하여 업데이트 적용"],
+  ["Retry Prism update", "Prism 업데이트 다시 시도"],
+  ["Installing Prism update…", "Prism 업데이트 설치 중…"],
+  ["Installing…", "설치 중…"],
+  ["Dictation Recovery", "받아쓰기 복구"],
+  ["Open recovery folder", "복구 폴더 열기"],
+  ["Original and processed text are saved on this Mac. Failed recordings are kept so your speech is not lost. Open the folder to recover or delete them.", "원문과 처리 결과를 이 Mac에 저장합니다. 실패한 녹음도 보관하므로 다시 말할 필요가 없습니다. 폴더에서 복구하거나 삭제할 수 있습니다."],
   ["Install updates automatically", "업데이트 자동 설치"],
   ["Download and install new versions in the background. Changes take effect when you restart Prism.", "새 버전을 백그라운드에서 다운로드하고 설치합니다. Prism을 재시작하면 적용됩니다."],
   ["Could not save update settings.", "업데이트 설정을 저장하지 못했습니다."],

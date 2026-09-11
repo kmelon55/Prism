@@ -18,7 +18,7 @@ import { startScriptSession } from "./scripts/runStore";
 import { LibraryRunDialog, needsLibraryRun, type LibraryRunAction } from "./library/LibraryRunDialog";
 import { SettingsView, type SettingsPreferences as Preferences, type ThemePreference } from "./settings/SettingsView";
 import { t, useLocale, localizeCommand, bilingual, notifyLanguageChanged, type Language } from "./i18n";
-import { Updates } from "./Updates";
+import { usePaletteUpdate } from "./usePaletteUpdate";
 import { LibraryPanel } from "./LibraryPanel";
 import { fileIcons } from "./fileIcons";
 import { resultSubtitle } from "./resultPresentation";
@@ -607,6 +607,8 @@ export function App() {
   const locale = useLocale();
   const nativeRuntime = isTauriRuntime();
   const settingsWindow = new URLSearchParams(window.location.search).get("window") === "settings";
+  const paletteUpdate = usePaletteUpdate(nativeRuntime && !settingsWindow);
+  const updateItem = paletteUpdate.item;
   const commandKey = /Mac|iPhone|iPad/.test(navigator.userAgent);
   const defaultAccelerator = commandKey ? "shift+super+Space" : "shift+control+Space";
   const [preferencesLoad, setPreferencesLoad] = useState(readPreferences);
@@ -1122,6 +1124,7 @@ export function App() {
     }
     const aliases = searchAliases;
     const sources = nativeRuntime ? [...providers, libraryProvider(libraryData, paletteCommandDefinitions.map(item=>({...item,providerId:"prism"}))), fileProvider] : providers;
+    if (updateItem) sources.push({ id: "prism-update", label: "Prism", search: async () => [updateItem] });
     const activeProviders = nativeRuntime && query.trim()
       ? [...sources, createApplicationAliasProvider(aliases)] : sources;
     void searchProviders(activeProviders, query, controller.signal, aliases, {
@@ -1145,7 +1148,7 @@ export function App() {
     return () => {
       controller.abort();
     };
-  }, [locale, libraryData, catalogRevision, clipboardEnabled, clipboardType, nativeRuntime, paletteView, searchAliases, preferences.disabledCommandIds, query, searchGeneration, settingsWindow]);
+  }, [locale, updateItem, libraryData, catalogRevision, clipboardEnabled, clipboardType, nativeRuntime, paletteView, searchAliases, preferences.disabledCommandIds, query, searchGeneration, settingsWindow]);
 
   useEffect(() => {
     if (!keyboardNavigation.current) return;
@@ -1581,11 +1584,12 @@ export function App() {
   };
 
   const executeAction = async (action: CommandAction, item = selectedItem, background = false) => {
-    if (!item) return;
+    if (!item || item.data?.disabled === true) return;
     closeActions();
     if (document.hasFocus()) inputRef.current?.focus();
     try {
-      if (action.id === prismActionIds.openEmoji) { setEmojiOpen(true); }
+      if (action.id === "prism-update:run") { await paletteUpdate.run(); }
+      else if (action.id === prismActionIds.openEmoji) { setEmojiOpen(true); }
       else if (action.id === "files-search-broader") { setLibraryTab("files"); setFileEntryQuery(String(item.data?.query ?? query)); setFileEntrySystem(true); setLibraryEntry(undefined); setLibraryOpen(true); }
       else if([prismActionIds.openLibrary,prismActionIds.openLinks,prismActionIds.openSnippets,prismActionIds.openFiles].includes(action.id as never)){setLibraryTab(action.id===prismActionIds.openSnippets?"snippets":action.id===prismActionIds.openFiles?"files":"links");setFileEntryQuery("");setFileEntrySystem(false);setLibraryEntry(undefined);setLibraryOpen(true);}
       else if(action.id==="toggle-favorite"){
@@ -1970,6 +1974,7 @@ export function App() {
                         className={`result-row ${index === selectedIndex ? "selected" : ""}${item.answer ? " instant-answer" : ""}`}
                         role="option"
                         aria-selected={index === selectedIndex}
+                        aria-disabled={item.data?.disabled === true || undefined}
                         aria-label={item.answer ? `${item.title}. ${item.subtitle ?? ""}` : undefined}
                         onPointerMove={(event) => {
                           if (event.movementX === 0 && event.movementY === 0) return;
@@ -2050,7 +2055,6 @@ export function App() {
         />
       ) : null}
       <div className={`toast ${toast ? "visible" : ""}`} role="status" aria-live="polite">{t(toast)}</div>
-      {!preferencesOpen && !settingsWindow && <Updates compact />}
     </main>
   );
 }

@@ -7,6 +7,15 @@ const items = ["first", "clipboard", "third"].map((id): CommandItem => ({
 }));
 
 describe("palette navigation", () => {
+  it("places an available update above favorites and retains a user-selected command during background refresh", () => {
+    const favorite = { ...items[0], favoriteOrder: 0, rankingBoost: 72 };
+    const update = { ...items[1], id: "prism:update", providerId: "prism-update", title: "Update Prism" };
+    expect(rankPaletteResults([favorite, update], "")[0].id).toBe(update.id);
+    let state = navigate(initialNavigation([favorite]), { type: "select", index: 0 });
+    state = navigate(state, { type: "results", generation: 0, items: [favorite, update], pendingProviderIds: [] });
+    expect(state.items[0].id).toBe(update.id);
+    expect(state.items[state.selectedIndex].id).toBe(favorite.id);
+  });
   it("keeps applications and commands above even exact filename matches", () => {
     const file: CommandItem = { ...items[0], id: "file", title: "clip", kind: "file", providerId: "files" };
     const command = { ...items[1], title: "Clipboard History" };

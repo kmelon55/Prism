@@ -6,7 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { t, useLocale } from "./i18n";
 import { isTauriRuntime } from "./providers/native";
 
-type UpdateStatus = {
+export type UpdateStatus = {
   currentVersion: string;
   phase: "idle" | "development" | "checking" | "current" | "available" | "installing" | "installed" | "error";
   version: string | null;

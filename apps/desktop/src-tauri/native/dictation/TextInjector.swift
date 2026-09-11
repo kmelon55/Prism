@@ -31,6 +31,7 @@ struct TextInsertionExpectation {
 enum TextDeliveryResult: Equatable {
     case inserted
     case pasted
+    case pasteSent
     case copied
     case permissionRequired
     case copyFailed
@@ -76,6 +77,17 @@ enum TextInjector {
         category: "text-delivery"
     )
 
+    struct Environment {
+        var running: @MainActor (NSRunningApplication) -> Bool = { !$0.isTerminated }
+        var permission: @MainActor () -> Bool = { TextInjector.hasAccessibilityPermission }
+        var frontmostPID: @MainActor () -> pid_t? = { NSWorkspace.shared.frontmostApplication?.processIdentifier }
+        var activate: @MainActor (NSRunningApplication) -> Void = { $0.activate() }
+        var focused: @MainActor (pid_t) -> AXUIElement? = { TextInjector.focusedElement(for: $0) }
+        var paste: @MainActor (pid_t) -> Bool = { TextInjector.postPasteShortcut(to: $0) }
+        var enter: @MainActor (pid_t) -> Bool = { TextInjector.postEnterKey(to: $0) }
+        var revision: @MainActor () -> Int = { NSPasteboard.general.changeCount }
+    }
+
     @discardableResult
     static func copy(_ text: String) -> Bool {
         copy(text, to: .general)
@@ -84,10 +96,9 @@ enum TextInjector {
     @discardableResult
     static func copy(_ text: String, to pasteboard: NSPasteboard) -> Bool {
         let item = NSPasteboardItem()
-        guard item.setString(text, forType: .string),
-              item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) else { return false }
+        guard item.setString(text, forType: .string) else { return false }
         pasteboard.clearContents()
-        // Respect Prism's transient clipboard filter; do not persist dictated text in history.
+        // Normal text participates in the user's opt-in clipboard history.
         return pasteboard.writeObjects([item]) && pasteboard.string(forType: .string) == text
     }
 
@@ -120,7 +131,8 @@ enum TextInjector {
         paste: Bool,
         pressEnterAfterPaste: Bool,
         target: TextInsertionTarget?,
-        copyText: @MainActor (String) -> Bool = TextInjector.copy
+        copyText: @MainActor (String) -> Bool = TextInjector.copy,
+        environment: Environment = Environment()
     ) async -> TextDeliveryResult {
         guard !Task.isCancelled else { return .copied }
         // Preserve every result before trying AX or keyboard delivery. An app can
@@ -131,39 +143,22 @@ enum TextInjector {
             return .copied
         }
 
-        guard hasAccessibilityPermission else {
+        guard environment.permission() else {
             logger.error("Delivery copied: accessibility permission unavailable")
             return .permissionRequired
         }
 
-        guard let target, !target.application.isTerminated else {
+        guard let target, environment.running(target.application) else {
             logger.error("Delivery copied: recording target missing")
             return .copied
         }
 
-        // Orca's terminal exposes a hidden textarea through AX. Setting its value
-        // reports success but does not emit terminal input; use its paste handler.
-        let usePasteShortcut = target.application.bundleIdentifier == "com.stablyai.orca"
-        // Use the current insertion point; a captured element may no longer be focused.
-        if !usePasteShortcut, let element = focusedElement(for: target.processIdentifier),
-           let result = insertDirectly(text, into: element) {
-            logger.notice("Delivery wrote to current AX element; confirmed=\(result.enteredInTargetApp, privacy: .public)")
-            return await finishDelivery(
-                result,
-                pressEnter: pressEnterAfterPaste,
-                processIdentifier: target.processIdentifier
-            )
-        }
+        let application = target.application
 
-        guard let application = NSRunningApplication(processIdentifier: target.processIdentifier) else {
-            logger.error("Delivery copied: target pid=\(target.processIdentifier, privacy: .public) is not running")
-            return .copied
-        }
-
-        let targetWasFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let targetWasFrontmost = environment.frontmostPID()
             == target.processIdentifier
         if !targetWasFrontmost {
-            application.activate()
+            environment.activate(application)
         }
 
         // 브라우저와 Electron 앱은 활성화 직후 AX 포커스를 늦게 복원할 수 있습니다.
@@ -172,44 +167,45 @@ enum TextInjector {
         for delay in retryDelays {
             try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return .copied }
-            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
-                application.activate()
+            guard environment.frontmostPID() == target.processIdentifier else {
+                environment.activate(application)
                 continue
             }
-            guard let element = focusedElement(for: target.processIdentifier) else {
-                logger.error("Delivery copied: no focused element")
-                return .copied
-            }
-            if !usePasteShortcut, let result = insertDirectly(text, into: element) {
-                logger.notice("Delivery wrote after target activation; confirmed=\(result.enteredInTargetApp, privacy: .public)")
-                return await finishDelivery(
-                    result,
-                    pressEnter: pressEnterAfterPaste,
-                    processIdentifier: target.processIdentifier
-                )
-            }
-
+            let element = environment.focused(target.processIdentifier)
             // Whisp fallback: Electron/WebView inputs need not expose an AX text role.
             // The saved target must still be frontmost before posting Command-V.
             guard copyText(text) else { return .copyFailed }
-            let expectation = insertionExpectation(text, in: element)
-            let revision = NSPasteboard.general.changeCount
+            // AX absence does not mean keyboard focus is absent. In particular,
+            // terminals expose hidden textareas whose values do not track pasted input.
+            let expectation = target.application.bundleIdentifier == "com.stablyai.orca"
+                ? nil : element.flatMap { insertionExpectation(text, in: $0) }
+            let revision = environment.revision()
             try? await Task.sleep(for: .milliseconds(35))
             guard !Task.isCancelled else { return .copied }
-            guard NSPasteboard.general.changeCount == revision,
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-                  postPasteShortcut(to: target.processIdentifier) else {
+            guard environment.revision() == revision,
+                  environment.frontmostPID() == target.processIdentifier,
+                  environment.paste(target.processIdentifier) else {
                 logger.error("Delivery copied: could not create paste events")
                 return copyText(text) ? .copied : .copyFailed
             }
             logger.notice("Delivery sent Command-V to pid=\(target.processIdentifier, privacy: .public)")
-            try? await Task.sleep(for: .milliseconds(80))
-            guard !Task.isCancelled else { return .copied }
-            let confirmed = expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) ?? false
+            var confirmed = false
+            if let expectation, let element {
+                for delay in [50, 100, 150, 250, 350] {
+                    try? await Task.sleep(for: .milliseconds(delay))
+                    guard !Task.isCancelled else { return .copied }
+                    if expectation.confirms(attribute(kAXValueAttribute, from: element) as? String) {
+                        confirmed = true
+                        break
+                    }
+                }
+            }
+            logger.notice("Paste observation: observable=\(expectation != nil, privacy: .public), confirmed=\(confirmed, privacy: .public)")
             return await finishDelivery(
-                confirmed ? .pasted : .unverified,
+                pasteResult(observable: expectation != nil, confirmed: confirmed),
                 pressEnter: pressEnterAfterPaste,
-                processIdentifier: target.processIdentifier
+                processIdentifier: target.processIdentifier,
+                environment: environment
             )
         }
 
@@ -220,15 +216,16 @@ enum TextInjector {
     private static func finishDelivery(
         _ result: TextDeliveryResult,
         pressEnter: Bool,
-        processIdentifier: pid_t
+        processIdentifier: pid_t,
+        environment: Environment
     ) async -> TextDeliveryResult {
-        guard pressEnter else { return result }
+        guard pressEnter, result.enteredInTargetApp || result == .pasteSent else { return result }
 
         // 붙여넣기를 처리할 짧은 여유를 준 뒤 Enter를 보냅니다.
         try? await Task.sleep(for: .milliseconds(80))
         guard !Task.isCancelled else { return result }
-        if NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier,
-           postEnterKey(to: processIdentifier) {
+        if environment.frontmostPID() == processIdentifier,
+           environment.enter(processIdentifier) {
             logger.notice("Delivery sent Enter to pid=\(processIdentifier, privacy: .public)")
         } else {
             logger.error("Delivery could not create Enter events")
@@ -275,19 +272,8 @@ enum TextInjector {
         belongsToProcess(element, ProcessInfo.processInfo.processIdentifier)
     }
 
-    private static func insertDirectly(_ text: String, into element: AXUIElement) -> TextDeliveryResult? {
-        let expectation = insertionExpectation(text, in: element)
-        if isAttributeSettable(kAXSelectedTextAttribute, on: element),
-           AXUIElementSetAttributeValue(
-               element,
-               kAXSelectedTextAttribute as CFString,
-               text as CFString
-           ) == .success {
-            return expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) == true ? .inserted : .unverified
-        }
-
-        guard replaceValueAtSelectedRange(text, in: element) else { return nil }
-        return expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) == true ? .inserted : .unverified
+    static func pasteResult(observable: Bool, confirmed: Bool) -> TextDeliveryResult {
+        confirmed ? .pasted : (observable ? .unverified : .pasteSent)
     }
 
     private static func insertionExpectation(_ text: String, in element: AXUIElement) -> TextInsertionExpectation? {
@@ -301,62 +287,12 @@ enum TextInjector {
         return TextInsertionExpectation(value: value, range: range, text: text)
     }
 
-    private static func replaceValueAtSelectedRange(_ text: String, in element: AXUIElement) -> Bool {
-        guard isAttributeSettable(kAXValueAttribute, on: element),
-              let currentValue = attribute(kAXValueAttribute, from: element) as? String,
-              let rangeReference = attribute(kAXSelectedTextRangeAttribute, from: element),
-              CFGetTypeID(rangeReference) == AXValueGetTypeID()
-        else { return false }
-
-        let rangeValue = unsafeBitCast(rangeReference, to: AXValue.self)
-        var selectedRange = CFRange()
-        guard AXValueGetType(rangeValue) == .cfRange,
-              AXValueGetValue(rangeValue, .cfRange, &selectedRange)
-        else { return false }
-
-        let value = currentValue as NSString
-        guard selectedRange.location >= 0,
-              selectedRange.length >= 0,
-              selectedRange.location + selectedRange.length <= value.length
-        else { return false }
-
-        let updatedValue = value.mutableCopy() as! NSMutableString
-        updatedValue.replaceCharacters(
-            in: NSRange(location: selectedRange.location, length: selectedRange.length),
-            with: text
-        )
-        guard AXUIElementSetAttributeValue(
-            element,
-            kAXValueAttribute as CFString,
-            updatedValue as CFString
-        ) == .success else { return false }
-
-        var caretRange = CFRange(
-            location: selectedRange.location + (text as NSString).length,
-            length: 0
-        )
-        if let caretValue = AXValueCreate(.cfRange, &caretRange) {
-            AXUIElementSetAttributeValue(
-                element,
-                kAXSelectedTextRangeAttribute as CFString,
-                caretValue
-            )
-        }
-        return true
-    }
-
     private static func attribute(_ attribute: String, from element: AXUIElement) -> CFTypeRef? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
             return nil
         }
         return value
-    }
-
-    private static func isAttributeSettable(_ attribute: String, on element: AXUIElement) -> Bool {
-        var settable = DarwinBoolean(false)
-        return AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) == .success
-            && settable.boolValue
     }
 
     private static func postPasteShortcut(to processIdentifier: pid_t) -> Bool {

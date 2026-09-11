@@ -53,7 +53,7 @@ typealias DictationCallback = @convention(c) (UnsafePointer<CChar>) -> Void
 
 @MainActor
 final class DictationController: ObservableObject {
-    static let shared = DictationController()
+    static let shared = DictationController(recovery: .local)
     @Published var phase = "idle"
     @Published var amplitude = 0.0
     @Published var message = ""
@@ -86,6 +86,9 @@ final class DictationController: ObservableObject {
     private let deliver: (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult
     private var target: TextInsertionTarget?
     private var transcriptionAudio: URL?
+    private let recovery: DictationRecoveryStore?
+    private var recoveryEntry: URL?
+    private var recoveryWarning = ""
     private var configuration: DictationConfiguration?
     private var work: Task<Void, Never>?
     private var timer: Task<Void, Never>?
@@ -100,9 +103,11 @@ final class DictationController: ObservableObject {
     private var refinementWarning = ""
 
 
-    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult = { text, paste, enter, target in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target) }) {
+    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult = { text, paste, enter, target in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target) }) {
         let recorder = suppliedRecorder ?? AudioRecorder()
         self.recorder = recorder; self.presentsOverlay = presentsOverlay; self.deliver = deliver
+        self.recovery = recovery
+        if let saved = recovery?.latest() { lastTranscript = saved.result; originalTranscript = saved.original }
         recorder.onLevel = { [weak self] level in self?.amplitude = level }
         recorder.onFailure = { [weak self] message in self?.fail(message) }
     }
@@ -135,7 +140,7 @@ final class DictationController: ObservableObject {
         default: permission = "restricted"
         }
         var value: [String: Any] = ["phase": phase, "message": message, "microphone": permission,
-            "accessibility": AXIsProcessTrusted(), "hasTranscript": !lastTranscript.isEmpty, "hasOriginal": !originalTranscript.isEmpty, "processingMode": processingMode, "session": generation, "shortcutWarning": controls.failedIDs.isEmpty ? "" : language.text("녹음 단축키를 등록하지 못했습니다. 다른 앱의 단축키 또는 손쉬운 사용 권한을 확인하세요.", "A recording shortcut could not be registered. Check other apps’ shortcuts or Accessibility permission.")]
+            "recoveryWarning": recoveryWarning, "accessibility": AXIsProcessTrusted(), "hasTranscript": !lastTranscript.isEmpty, "hasOriginal": !originalTranscript.isEmpty, "processingMode": processingMode, "session": generation, "shortcutWarning": controls.failedIDs.isEmpty ? "" : language.text("녹음 단축키를 등록하지 못했습니다. 다른 앱의 단축키 또는 손쉬운 사용 권한을 확인하세요.", "A recording shortcut could not be registered. Check other apps’ shortcuts or Accessibility permission.")]
         if let action { value["action"] = action }
         guard let data = try? JSONSerialization.data(withJSONObject: value), let string = String(data: data, encoding: .utf8) else { return }
         string.withCString { callback?($0) }
@@ -145,6 +150,7 @@ final class DictationController: ObservableObject {
         guard !busy else { return }
         clear()
         generation &+= 1
+        recoveryEntry = nil; recoveryWarning = ""
         processingMode = promptMode ? "prompt" : "none"; receipt = UsageReceipt(); refinementWarning = ""
         target = TextInjector.captureTarget(fallbackPID: fallbackPID)
         phase = "preparing"; message = ""
@@ -194,6 +200,13 @@ final class DictationController: ObservableObject {
         guard let audio = recorder.stop() else { fail("녹음 파일을 만들지 못했습니다."); return }
         let session = generation
         transcriptionAudio = audio
+        do { recoveryEntry = try recovery?.preserve(audio) }
+        catch {
+            // Keep the source too if the recovery disk is unavailable.
+            transcriptionAudio = nil
+            fail(language.text("녹음 백업에 실패했습니다. 원본 위치: ", "Could not back up the recording. Original location: ") + audio.path)
+            return
+        }
         if presentsOverlay { controls.install(recording: false) }
         phase = "transcribing"; amplitude = 0; show(); emit()
         work = Task {
@@ -220,6 +233,9 @@ final class DictationController: ObservableObject {
                 var text = TextPostProcessor.clean(raw, vocabulary: config.vocabulary)
                 guard !text.isEmpty, text.utf8.count <= 1_048_576 else { throw DictationFailure(language.text("음성을 인식하지 못했습니다. 다시 말해 주세요.", "No speech was recognized. Please try again.")) }
                 originalTranscript = text; lastTranscript = text
+                if let recovery, let entry = recoveryEntry {
+                    try recovery.save(text, named: "original.txt", in: entry)
+                }
                 if processingMode != "none" {
                     timer?.cancel()
                     phase = "processing"; show(); emit()
@@ -248,6 +264,11 @@ final class DictationController: ObservableObject {
                 }
                 timer?.cancel()
                 lastTranscript = text
+                if let recovery, let entry = recoveryEntry {
+                    try recovery.save(text, named: "result.txt", in: entry)
+                    try recovery.finish(entry)
+                }
+                sendInternal(["action":"save-history", "transcript":text])
                 // Dismiss before publishing inserting: the live overlay would otherwise
                 // switch from transcription status to its default waveform during delivery.
                 if presentsOverlay { overlay.hide() }
@@ -256,8 +277,9 @@ final class DictationController: ObservableObject {
                 try Task.checkCancellation()
                 guard generation == session else { return }
                 timer?.cancel(); configuration = nil; target = nil; removeCancel()
-                if result.enteredInTargetApp || (!shouldPaste && result == .copied) {
-                    phase = "idle"; message = refinementWarning
+                if result.enteredInTargetApp || result == .pasteSent || (!shouldPaste && result == .copied) {
+                    phase = "idle"; message = result == .pasteSent
+                        ? language.text("붙여넣기 요청을 보냈어요. 결과는 받아쓰기 복구 폴더에 보관됩니다.", "Paste requested. The result is saved in Dictation Recovery.") : refinementWarning
                     if presentsOverlay {
                         if message.isEmpty { overlay.hide() } else { overlay.showToast(message); dismissLater(after: 2.2, session: session) }
                     }
@@ -287,6 +309,17 @@ final class DictationController: ObservableObject {
         configuration = nil; target = nil; removeCancel(); overlayPreviewPhase = nil; if presentsOverlay { overlay.hide() }
     }
     func fail(_ text: String) {
+        // Microphone interruption and duration limits must preserve the stopped audio.
+        if let audio = recorder.stop() {
+            do {
+                if let recovery {
+                    recoveryEntry = try recovery.preserve(audio)
+                    try? FileManager.default.removeItem(at: audio)
+                }
+            } catch {
+                recoveryWarning = language.text("녹음 원본 위치: ", "Recording location: ") + audio.path
+            }
+        }
         clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: 3, session: generation)
     }
     private func dismissLater(after seconds: Double, session: UInt64) {
@@ -336,6 +369,15 @@ final class DictationController: ObservableObject {
     }
     func receivedUsage(_ usage: UsageMeasurement, session: UInt64) {
         guard generation == session else { return }; receipt.add(usage)
+    }
+    func openRecovery() {
+        guard let recovery else { return }
+        do {
+            try recovery.prepare()
+            if !NSWorkspace.shared.open(recovery.directory) {
+                throw DictationFailure(language.text("복구 폴더를 열지 못했습니다.", "Could not open the recovery folder."))
+            }
+        } catch { fail(error.localizedDescription) }
     }
     func copyOriginal() {
         guard !originalTranscript.isEmpty else { return }
@@ -392,6 +434,7 @@ final class DictationController: ObservableObject {
         case 2: controller.copyLast()
         case 4: controller.requestMicrophonePermission()
         case 5: controller.copyOriginal()
+        case 6: controller.openRecovery()
         default: controller.refreshPermissions()
         }
     }

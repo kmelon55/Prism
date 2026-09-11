@@ -115,7 +115,7 @@ Settings → General provides a manual check. Checks and installs are serialized
 across windows. Tauri verifies the download signature, then Prism verifies the
 extracted app's code signature and mutual compatibility with the installed app.
 An ad-hoc or different signer is rejected before replacement. Available updates
-appear in a launcher notice without opening Settings or manually checking.
+appear as the first command-palette result when the search is empty, above favorites, without opening Settings or manually checking. Enter or clicking that row installs the update. The same row shows installation progress and then Restart Prism; restarting remains explicit. Failed installations keep a retry row. Unrelated searches and clipboard history retain their normal results.
 Installation is manual by default. Settings → General → Install updates
 automatically opts into background download and verified installation, including
 an already-discovered update. This preference persists across restarts. Restarting
@@ -134,3 +134,10 @@ keys stay in zeroizing process memory, and no credentials move to plaintext sett
 Build artifacts are disposable; application data and signing keys are not.
 Remove release staging folders only when no build is using them. Never remove
 Application Support, WebKit storage, Keychain items, or user scripts as build cleanup.
+
+
+### Palette update row verification (2026-09-12)
+
+117 focused App, update controls, navigation and localization tests passed, including first-row selection, Enter installation, duplicate-install suppression, explicit restart, retry/search/clipboard behavior and preserving an existing user selection during background arrival. TypeScript and signed macOS app packaging passed. An Orca embedded-browser static preview used real App components with mocked updater IPC to verify first-row display, click-to-install, the restart row and Enter-to-restart. This is renderer verification, not an actual update download or installation.
+
+Release 0.1.7 checks: 616 frontend/core tests, 235 Rust tests (5 opt-in tests ignored), the native dictation mock suite, 5 signing/updater tests, TypeScript, and the production frontend build passed. Universal packaging verifies both macOS architectures, the existing installed signing identity, the updater archive signature, and artifact checksums.

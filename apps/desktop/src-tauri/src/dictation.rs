@@ -1,4 +1,4 @@
-//! Whisp-backed native dictation. Audio and transcripts are temporary; keys stay in Keychain.
+//! Whisp-backed native dictation with local recovery; keys stay in Keychain.
 pub mod catalog;
 pub mod processing;
 use serde::{Deserialize, Serialize};
@@ -588,6 +588,12 @@ extern "C" fn native_event(pointer: *const std::ffi::c_char) {
     let Some(app) = APP.get() else {
         return;
     };
+    if event["action"] == "save-history" {
+        if let Some(text) = event["transcript"].as_str() {
+            app.state::<crate::clipboard_history::ClipboardHistory>().record_dictation(text);
+        }
+        return;
+    }
     // Internal events may contain dictated text. Never broadcast or cache them in frontend status.
     if event["action"] == "process" { processing::start(app.clone(), event); return; }
     if event["action"] == "usage-start" || event["action"] == "usage-finish" { processing::transcription(app, &event); return; }
@@ -707,6 +713,7 @@ pub async fn dictation_action(
                 "preview" => 1,
                 "copy" => 2,
                 "copyOriginal" => 5,
+                "openRecovery" => 6,
                 "status" => 3,
                 "microphoneRequest" => 4,
                 _ => return Err("알 수 없는 받아쓰기 동작입니다.".into()),

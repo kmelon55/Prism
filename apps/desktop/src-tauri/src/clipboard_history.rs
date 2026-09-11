@@ -668,6 +668,17 @@ pub struct ClipboardHistory {
     store: Arc<Mutex<HistoryStore>>,
 }
 impl ClipboardHistory {
+    /// Capture a completed dictation before another clipboard write can replace it.
+    /// Keep the existing opt-in, filtering, retention and storage limits.
+    pub(crate) fn record_dictation(&self, text: &str) {
+        if !should_capture(text) { return; }
+        if let Ok(mut store) = self.store.lock() {
+            if let Err(error) = store.record_payload(ClipboardPayload::Text(text.to_owned()), now_ms()) {
+                store.capture_notice = Some(error);
+            }
+        }
+    }
+
     pub fn initialize(&self, path: PathBuf) -> Result<(), String> {
         let mut store = self.store.lock().map_err(|_| UNAVAILABLE.to_string())?;
         match HistoryStore::open(path) {
@@ -1374,6 +1385,21 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_file(&self.0);
         }
+    }
+
+    #[test]
+    fn dictation_capture_survives_restart_and_respects_opt_out() {
+        let file = TestDatabase::new();
+        let history = ClipboardHistory::default();
+        history.initialize(file.0.clone()).unwrap();
+        history.store.lock().unwrap().set_enabled(true).unwrap();
+        let text = "Long dictation survives another clipboard write";
+        history.record_dictation(text);
+        let mut reopened = HistoryStore::open(file.0.clone()).unwrap();
+        assert_eq!(reopened.settings().entry_count, 1);
+        history.store.lock().unwrap().set_enabled(false).unwrap();
+        history.record_dictation("Disabled history must stay empty");
+        assert_eq!(history.store.lock().unwrap().settings().entry_count, 0);
     }
 
     #[test]

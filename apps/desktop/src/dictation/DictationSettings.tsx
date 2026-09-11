@@ -127,12 +127,14 @@ export function DictationSettings({ nativeRuntime, shortcut, promptShortcut, onA
     <div className="settings-group"><div className="settings-row"><div className="preference-copy"><strong>{t("Permissions")}</strong><span>{t("녹음에는 마이크 권한, 자동 입력에는 손쉬운 사용 권한이 필요합니다.")}</span></div><button className="settings-toolbar-button" onClick={onPermissions}>{t("Open Permissions")}</button></div>
       <div className="settings-row"><span>{t("Microphone")} · {status?.microphone === "granted" ? t("Allowed") : t("Needs access")}<br />{t("Accessibility")} · {status?.accessibility ? t("Allowed") : t("Needs access")}</span><button className="settings-toolbar-button" disabled={!nativeRuntime || busy} aria-label={t("Check Again")} onClick={() => void perform(async () => setStatus(await dictationAction("status")))}><RefreshCw size={15} /></button></div>
     </div>
+    <div className="settings-group"><div className="settings-row"><div className="preference-copy"><strong>{t("Dictation Recovery")}</strong><span>{t("Original and processed text are saved on this Mac. Failed recordings are kept so your speech is not lost. Open the folder to recover or delete them.")}</span></div><button className="settings-toolbar-button" disabled={!nativeRuntime || busy} onClick={() => void perform(async () => { await dictationAction("openRecovery"); })}>{t("Open recovery folder")}</button></div></div>
     <div className="dictation-actions">
 
       {active && <button className="settings-toolbar-button" onClick={() => void perform(async () => setStatus(await dictationAction("cancel")))}><X size={14} />{t("Cancel")}</button>}
       {status?.hasOriginal && <button className="settings-toolbar-button" disabled={busy} onClick={() => void perform(async () => { await dictationAction("copyOriginal"); }, t("복사했습니다."))}>{t("Copy original text")}</button>}
       {status?.hasTranscript && <button className="settings-toolbar-button" disabled={busy} onClick={() => void perform(async () => { await dictationAction("copy"); }, t("복사했습니다."))}>{t("마지막 결과 복사")}</button>}
     </div>
+    {status?.recoveryWarning && <p role="alert">{status.recoveryWarning}</p>}
     {status?.shortcutWarning && <p role="alert">{status.shortcutWarning}</p>}
     {status?.message && <p role="status">{t(status.message, {}, locale)}</p>}
     {notice && <p role="status">{notice}</p>}

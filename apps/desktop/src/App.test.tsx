@@ -111,9 +111,54 @@ it("surfaces a background update in the launcher without opening settings", asyn
   await act(async () => native.listeners.get("prism:update-status")?.({ payload: {
     currentVersion: "0.1.5", phase: "available", version: "0.1.6", error: null, automaticInstall: false,
   } }));
-  expect(container.textContent).toContain("A new version of Prism is available.");
-  expect(button("Download and install")).toBeDefined();
+  await settle();
+  const first = container.querySelector('[role="option"]')!;
+  expect(first.textContent).toContain("Update Prism");
+  expect(first.getAttribute("aria-selected")).toBe("true");
+  expect(container.querySelector(".prism-update-notice")).toBeNull();
   expect(native.invoke).not.toHaveBeenCalledWith("check_for_updates");
+});
+it("installs from the first row with Enter and changes it to restart without restarting automatically", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let complete!: (value: unknown) => void;
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "install_update") return new Promise(resolve => { complete = resolve; });
+    if (command === "restart_after_update") return null;
+    return original(command, args);
+  });
+  await mount();
+  await act(async () => native.listeners.get("prism:update-status")?.({ payload: {
+    currentVersion: "0.1.5", phase: "available", version: "0.1.6", error: null, automaticInstall: false,
+  } }));
+  await settle();
+  await key("Enter", {}, input()); await settle();
+  expect(native.invoke.mock.calls.filter(([name]) => name === "install_update")).toHaveLength(1);
+  expect(container.querySelector('[role="option"]')?.textContent).toContain("Installing Prism update");
+  await key("Enter", {}, input());
+  expect(native.invoke.mock.calls.filter(([name]) => name === "install_update")).toHaveLength(1);
+  await act(async () => complete({ currentVersion: "0.1.5", phase: "installed", version: "0.1.6", error: null, automaticInstall: false }));
+  await settle();
+  expect(container.querySelector('[role="option"]')?.textContent).toContain("Restart Prism to update");
+  expect(native.invoke).not.toHaveBeenCalledWith("restart_after_update");
+  expect(native.hide).not.toHaveBeenCalled();
+  await key("Enter", {}, input());
+  expect(native.invoke).toHaveBeenCalledWith("restart_after_update");
+});
+it("keeps the update out of unrelated searches and clipboard history, then restores it at the top", async () => {
+  await mount();
+  await act(async () => native.listeners.get("prism:update-status")?.({ payload: {
+    currentVersion: "0.1.5", phase: "error", version: "0.1.6", error: "offline", automaticInstall: false,
+  } }));
+  await settle();
+  await type("업데이트");
+  expect(container.querySelector('[role="option"]')?.textContent).toContain("Retry Prism update");
+  await type("clipboard history");
+  expect(container.querySelector('[id="result-prism:update"]')).toBeNull();
+  await key("Enter", {}, input()); await settle();
+  expect(container.querySelector('[id="result-prism:update"]')).toBeNull();
+  await key("Escape", {}, input()); await settle();
+  await key("Escape", {}, input()); await settle();
+  expect(container.querySelector('[role="option"]')?.textContent).toContain("Retry Prism update");
 });
 function input(): HTMLInputElement {
   const element = container.querySelector<HTMLInputElement>('[role="combobox"]');

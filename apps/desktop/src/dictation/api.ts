@@ -24,6 +24,7 @@ export interface DictationStatus {
   phase: "idle" | "preparing" | "recording" | "transcribing" | "processing" | "inserting" | "success" | "error" | "preview";
   shortcutWarning?: string;
   hasOriginal?: boolean;
+  recoveryWarning?: string;
   message: string; microphone: "granted" | "notDetermined" | "denied" | "restricted";
   accessibility: boolean; hasTranscript: boolean;
 }
@@ -42,6 +43,6 @@ export function changeProvider(settings: DictationSettings, provider: DictationP
 }
 export const getDictationSettings = () => invoke<DictationSettings>("dictation_get_settings");
 export const saveDictationSettings = (settings: DictationSettings) => invoke<DictationSettings>("dictation_save_settings", { settings });
-export const dictationAction = (action: "status" | "cancel" | "preview" | "copy" | "copyOriginal" | "microphoneSettings" | "microphoneRequest", previewSettings?: DictationSettings) => invoke<DictationStatus>("dictation_action", { action, ...(previewSettings ? { previewSettings } : {}) });
+export const dictationAction = (action: "status" | "cancel" | "preview" | "copy" | "copyOriginal" | "openRecovery" | "microphoneSettings" | "microphoneRequest", previewSettings?: DictationSettings) => invoke<DictationStatus>("dictation_action", { action, ...(previewSettings ? { previewSettings } : {}) });
 export const toggleDictation = () => invoke<void>("dictation_toggle");
 export const watchDictation = (callback: (status: DictationStatus) => void) => listen<DictationStatus>("prism:dictation-state", event => callback(event.payload));

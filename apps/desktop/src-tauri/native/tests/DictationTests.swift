@@ -69,6 +69,36 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         defer { try? FileManager.default.removeItem(at: temp) }
         let wav = temp.appendingPathComponent("fixture.wav")
         try Data([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]).write(to: wav)
+        let recovery = DictationRecoveryStore(directory: temp.appendingPathComponent("recovery"))
+        let first = try recovery.preserve(wav)
+        let savedAudio = try Data(contentsOf: first.appendingPathComponent("recording.wav"))
+        precondition(savedAudio == (try? Data(contentsOf: wav)))
+        let longText = String(repeating: "1분 넘게 말한 한국어 👋\n", count: 500)
+        try recovery.save(longText, named: "original.txt", in: first)
+        precondition(recovery.latest()?.result == longText, "Original remains recoverable if processing crashes")
+        try recovery.save("processed " + longText, named: "result.txt", in: first)
+        try recovery.finish(first)
+        precondition(!FileManager.default.fileExists(atPath: first.appendingPathComponent("recording.wav").path))
+        let second = try recovery.preserve(wav)
+        precondition(first != second && FileManager.default.fileExists(atPath: second.appendingPathComponent("recording.wav").path))
+        let reopened = DictationRecoveryStore(directory: recovery.directory)
+        precondition(reopened.latest()?.original == longText && reopened.latest()?.result == "processed " + longText,
+            "A later failed recording and process restart must not erase previous text")
+        for (url, mode) in [(recovery.directory, 0o700), (first, 0o700), (first.appendingPathComponent("original.txt"), 0o600), (second.appendingPathComponent("recording.wav"), 0o600)] {
+            let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+            precondition(permissions?.intValue == mode)
+        }
+        let interruptedAudio = temp.appendingPathComponent("interrupted.wav")
+        try Data([1,2,3]).write(to: interruptedAudio)
+        let interruptedRecorder = FakeRecorder(); interruptedRecorder.running = true; interruptedRecorder.outputURL = interruptedAudio
+        let interruptedStore = DictationRecoveryStore(directory: temp.appendingPathComponent("interrupted"))
+        let interruptedController = DictationController(recorder: interruptedRecorder, presentsOverlay: false, recovery: interruptedStore)
+        interruptedController.fail("microphone disconnected")
+        let interruptedEntries = try FileManager.default.contentsOfDirectory(at: interruptedStore.directory, includingPropertiesForKeys: nil)
+        precondition(interruptedEntries.count == 1 && FileManager.default.fileExists(atPath: interruptedEntries[0].appendingPathComponent("recording.wav").path))
+        interruptedController.cancel()
+        precondition(FileManager.default.fileExists(atPath: interruptedEntries[0].appendingPathComponent("recording.wav").path))
+        print("PASS: long Unicode text, processing interruption, later failed recording, restart recovery, private file modes and microphone failure audio")
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockProtocol.self]
         let session = URLSession(configuration: configuration)
@@ -114,8 +144,36 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         defer { isolatedClipboard.releaseGlobally() }
         precondition(TextInjector.copy("복구할 받아쓰기 👋", to: isolatedClipboard))
         precondition(isolatedClipboard.string(forType: .string) == "복구할 받아쓰기 👋")
-        precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) == true)
-        print("PASS: native clipboard write/readback and transient history marker (isolated pasteboard; user clipboard unchanged)")
+        precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) != true)
+        print("PASS: native clipboard write/readback without history exclusion (isolated pasteboard; user clipboard unchanged)")
+        let app = NSRunningApplication.current
+        let target = TextInsertionTarget(processIdentifier: ProcessInfo.processInfo.processIdentifier, focusedElement: nil, application: app)
+        var posted: [String] = []
+        var foreground: pid_t? = target.processIdentifier
+        var pasteboardRevision = 1
+        let environment = TextInjector.Environment(running: { _ in true }, permission: { true }, frontmostPID: { foreground },
+            activate: { _ in }, focused: { _ in nil },
+            paste: { _ in posted.append("paste"); return true },
+            enter: { _ in posted.append("enter"); return true }, revision: { pasteboardRevision })
+        let opaqueResult = await TextInjector.deliver("long transcript", paste: true, pressEnterAfterPaste: true,
+            target: target, copyText: { _ in true }, environment: environment)
+        precondition(opaqueResult == .pasteSent && posted == ["paste", "enter"], "Missing AX focus must not block keyboard delivery: \(opaqueResult), \(posted)")
+        posted = []; foreground = -1
+        let lostFocus = await TextInjector.deliver("long transcript", paste: true, pressEnterAfterPaste: true,
+            target: target, copyText: { _ in true }, environment: environment)
+        precondition(lostFocus == .copied && posted.isEmpty, "Do not paste into a different foreground application")
+        foreground = target.processIdentifier
+        let changeClipboard = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(30)); pasteboardRevision += 1
+        }
+        let racedResult = await TextInjector.deliver("long transcript", paste: true, pressEnterAfterPaste: true,
+            target: target, copyText: { _ in true }, environment: environment)
+        await changeClipboard.value
+        precondition(racedResult == .copied && posted.isEmpty, "Do not paste a clipboard replaced during delivery")
+        precondition(TextInjector.pasteResult(observable: true, confirmed: false) == .unverified)
+        precondition(TextInjector.pasteResult(observable: true, confirmed: true) == .pasted)
+        precondition(!TextDeliveryResult.pasteSent.enteredInTargetApp, "Posted events are not proof of insertion")
+        print("PASS: complete keyboard delivery without AX, explicit send, focus loss and clipboard races (event spies; no external input)")
         var clipboardWrites: [String] = []
         let noTargetResult = await TextInjector.deliver("recoverable transcript", paste: true, pressEnterAfterPaste: false, target: nil, copyText: {
             clipboardWrites.append($0); return true
@@ -189,6 +247,34 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         precondition(local == "local fixture transcript")
         precondition(!FileManager.default.fileExists(atPath: wav.deletingPathExtension().appendingPathExtension("transcript.txt").path))
         print("PASS: local process result and temporary transcript cleanup (fixture executable)")
+        let failedExecutable = temp.appendingPathComponent("whisper-failure")
+        try "#!/bin/sh\nexit 1\n".write(to: failedExecutable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: failedExecutable.path)
+        for backupAvailable in [true, false] {
+            let failedAudio = temp.appendingPathComponent(UUID().uuidString + ".wav")
+            try Data([1,2,3]).write(to: failedAudio)
+            let failedRecorder = FakeRecorder(); failedRecorder.outputURL = failedAudio
+            let failedStore = DictationRecoveryStore(directory: temp.appendingPathComponent(UUID().uuidString))
+            if !backupAvailable { try Data([0]).write(to: failedStore.directory) }
+            let failedController = DictationController(recorder: failedRecorder, presentsOverlay: false, recovery: failedStore,
+                deliver: { _, _, _, _ in preconditionFailure("Failed transcription must not deliver") })
+            var failureConfig = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+            failureConfig["whisperPath"] = failedExecutable.path
+            failedController.toggle(fallbackPID: 0)
+            failedController.configure(String(data: try JSONSerialization.data(withJSONObject: failureConfig), encoding: .utf8)!, session: 1)
+            try await Task.sleep(for: .milliseconds(30)); failedController.stop()
+            for _ in 0..<100 { if failedController.phase == "error" { break }; try await Task.sleep(for: .milliseconds(20)) }
+            precondition(failedController.phase == "error")
+            failedController.cancel()
+            if backupAvailable {
+                let entries = try FileManager.default.contentsOfDirectory(at: failedStore.directory, includingPropertiesForKeys: nil)
+                precondition(entries.count == 1 && FileManager.default.fileExists(atPath: entries[0].appendingPathComponent("recording.wav").path))
+            } else {
+                precondition(FileManager.default.fileExists(atPath: failedAudio.path), "Backup failure must leave the source recording intact")
+            }
+        }
+        print("PASS: real local subprocess failure retains audio; unavailable recovery storage preserves the source and blocks transcription")
+
         for (mode, overridePaste, enter, expectedPaste) in [("copy", Optional<Bool>.none, false, false), ("paste", nil, false, true), ("copy", true, false, true), ("copy", true, true, true)] {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio
@@ -208,11 +294,13 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             controller.cancel()
         }
         print("PASS: default copy/paste and explicit paste/send route independently (local process + delivery spy; no external insertion)")
-        for outcome in [TextDeliveryResult.copied, .permissionRequired, .copyFailed, .unverified, .sendFailed] {
+        for outcome in [TextDeliveryResult.pasteSent, .copied, .permissionRequired, .copyFailed, .unverified, .sendFailed] {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio
             var deliveries = 0
-            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { _, _, _, _ in
+            let outcomeRecovery = DictationRecoveryStore(directory: temp.appendingPathComponent(UUID().uuidString))
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, recovery: outcomeRecovery, deliver: { _, _, _, _ in
+                precondition(outcomeRecovery.latest()?.result == "local fixture transcript", "Save the result before attempting delivery")
                 deliveries += 1; return outcome
             })
             var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
@@ -221,8 +309,8 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
             try await Task.sleep(for: .milliseconds(30)); controller.stop()
             for _ in 0..<100 { if deliveries > 0 { break }; try await Task.sleep(for: .milliseconds(20)) }
-            precondition(deliveries == 1 && controller.phase == "error")
-            precondition(controller.message == outcome.fallbackMessage(controller.language) && !controller.message.isEmpty)
+            precondition(deliveries == 1 && controller.phase == (outcome == .pasteSent ? "idle" : "error"))
+            if outcome != .pasteSent { precondition(controller.message == outcome.fallbackMessage(controller.language) && !controller.message.isEmpty) }
             controller.cancel()
         }
         print("PASS: missing target, denied permission, clipboard failure, unconfirmed insertion and send failure retain explicit error messages")

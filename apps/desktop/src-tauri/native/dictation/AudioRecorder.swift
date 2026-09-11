@@ -46,6 +46,8 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Di
             throw AudioRecorderError.couldNotStart
         }
 
+        do { try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
+        catch { recorder.stop(); throw error }
         started = true
         self.recorder = recorder
         outputURL = url
