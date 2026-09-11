@@ -43,12 +43,14 @@ beforeEach(() => {
         accelerator: "shift+control+Space", defaultAccelerator: "shift+control+Space",
         isDefault: true, registered: true, issue: null,
       };
+      case "set_global_shortcut": return { accelerator: (args as { accelerator: string }).accelerator, defaultAccelerator: "shift+control+Space", isDefault: false, registered: true, issue: null };
       case "get_accessibility_permission_status": return { supported: true, granted: false, canRequest: true, message: "Permission required" };
       case "get_clipboard_history_enabled": return true;
       case "get_clipboard_history_settings": return {enabled:true,retentionDays:30,entryCount:1,pinnedCount:0,capacity:1000,persistenceError:null};
       case "prepare_window_appearance":
       case "window_render_ready": return undefined;
       case "system_platform": return "macos";
+      case "desktop_capabilities": return {windowManagement:true,paste:true,sleepDisplays:true,logOut:true,reason:null};
       case "load_system_icon": return null;
       case "clear_application_icon_cache": return undefined;
       case "get_command_shortcuts":
@@ -120,6 +122,61 @@ async function key(key: string, init: KeyboardEventInit = {}, target: EventTarge
 function selectedId() { return input().getAttribute("aria-activedescendant"); }
 
 describe("mounted palette keyboard flows with mocked native IPC", () => {
+  it("previews system actions in the browser without sending native IPC", async () => {
+    const platform = Object.getOwnPropertyDescriptor(navigator, "platform");
+    Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: undefined });
+    try {
+      await mount();
+      await type("restart");
+      expect(selectedId()).toBe("result-system:restart");
+      await key("Enter");
+      expect(container.textContent).toContain("System commands are available in the Prism desktop app");
+      expect(native.invoke.mock.calls.some(([command]) => command === "run_system_action")).toBe(false);
+    } finally {
+      Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
+      if (platform) Object.defineProperty(navigator, "platform", platform);
+      else Reflect.deleteProperty(navigator, "platform");
+    }
+  });
+
+  it("routes a searched Restart to native confirmation and keeps the palette on cancellation", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => command === "run_system_action"
+      ? Promise.resolve({ commandId: "system:restart", platform: "macos", applied: false, message: "" }) : original(command, args));
+    await mount();
+    await type("restart");
+    expect(selectedId()).toBe("result-system:restart");
+    await key("Enter");
+    expect(native.invoke).toHaveBeenCalledWith("run_system_action", { commandId: "system:restart", locale: "en" });
+    expect(native.hide).not.toHaveBeenCalled();
+    expect(input().value).toBe("restart");
+  });
+
+  it("routes a power hotkey through the same native command and dismisses only after acceptance", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => command === "run_system_action"
+      ? Promise.resolve({ commandId: "system:sleep", platform: "macos", applied: true, message: "" }) : original(command, args));
+    await mount();
+    await act(async () => { native.listeners.get("prism:command-hotkey")!({ payload: { commandId: "system:sleep" } }); });
+    await settle();
+    expect(native.invoke).toHaveBeenCalledWith("run_system_action", { commandId: "system:sleep", locale: "en" });
+    expect(native.hide).toHaveBeenCalledOnce();
+  });
+
+  it("finds an imported power alias and reports native refusal without dismissing", async () => {
+    localStorage.setItem("prism:preferences", JSON.stringify({ commandAliases: { "system:shutdown": "poweroff" } }));
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((command, args) => command === "run_system_action"
+      ? Promise.reject({ code: "actionFailed", message: "macOS declined the session request." }) : original(command, args));
+    await mount();
+    await type("poweroff");
+    expect(selectedId()).toBe("result-system:shutdown");
+    await key("Enter");
+    expect(native.hide).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("macOS declined the session request.");
+  });
+
   it("queries cached files promptly and keeps Enter on Clipboard History when files arrive", async () => {
     const original = native.invoke.getMockImplementation()!;
     let releaseFiles!: (value: unknown) => void;
@@ -537,7 +594,8 @@ describe("mounted palette keyboard flows with mocked native IPC", () => {
     await key("p", { code: "KeyP", metaKey: true, shiftKey: true });
     expect(recorder.getAttribute("aria-pressed")).toBe("false");
     expect(recorder.textContent).toContain("P");
-    expect(button("Save").disabled).toBe(false);
+    expect(native.invoke).toHaveBeenCalledWith("set_global_shortcut", { accelerator: "Super+Shift+KeyP" });
+    expect([...container.querySelectorAll("button")].some(button => button.textContent === "Save")).toBe(false);
     expect(document.activeElement).toBe(recorder);
     expect(native.close).not.toHaveBeenCalled();
   });
@@ -877,6 +935,28 @@ it("applies language notifications from the separate native settings window with
  expect(input().value).toBe("settings");expect(input().placeholder).toBe("앱, 명령, 파일 검색…");
  expect(container.querySelector('#result-prism\\:preferences')?.textContent).toContain("설정");
  expect(JSON.parse(localStorage.getItem("prism:preferences")!).commandAliases).toEqual({"prism:preferences":"prefs"});
+});
+
+it("keeps Prism highlights opt-in and persists them independently of motion settings", async () => {
+  await mount(true);
+  const highlights = () => container.querySelector<HTMLButtonElement>('[aria-label="Prism highlights"]')!;
+  const settings = () => container.querySelector<HTMLElement>('.preferences-v2')!;
+  expect(highlights().getAttribute("aria-checked")).toBe("false");
+  expect(settings().dataset.prismHighlights).toBe("false");
+  await act(async () => highlights().click());
+  expect(settings().dataset.prismHighlights).toBe("true");
+  const saved = JSON.parse(localStorage.getItem("prism:preferences")!);
+  expect(saved.prismHighlights).toBe(true);
+  expect(saved.reduceMotion).toBe(false);
+  expect(saved.reflectionHighlight).toBe(40);
+  await act(async () => { root.unmount(); });
+  root = createRoot(container);
+  await mount(true);
+  expect(highlights().getAttribute("aria-checked")).toBe("true");
+  expect(settings().dataset.prismHighlights).toBe("true");
+  await act(async () => highlights().click());
+  expect(settings().dataset.prismHighlights).toBe("false");
+  expect(JSON.parse(localStorage.getItem("prism:preferences")!).prismHighlights).toBe(false);
 });
 
 it("persists white edge brightness independently and restores its rendered value", async () => {

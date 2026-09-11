@@ -65,10 +65,10 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-private val Ink = Color(0xFF15131C)
-private val Paper = Color(0xFFF4F0FA)
-private val Muted = Color(0xFFB8B1C6)
-private val Lilac = Color(0xFFD0C1FF)
+internal val Ink = Color(0xFF111312)
+internal val Paper = Color(0xFFF1F0EA)
+internal val Muted = Color(0xFFA8ADA8)
+private val Lilac = Color(0xFFD8E0D1)
 internal object AppIcons { val cache = LruCache<String, Bitmap>(100) }
 
 @Composable
@@ -84,9 +84,12 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     var widgetPicker by rememberSaveable { mutableStateOf(false) }
     var editingHome by rememberSaveable { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
+    var browseSection by remember { mutableStateOf<String?>(null) }
+    var railDragging by remember { mutableStateOf(false) }
+    val railSections = remember(state.apps) { alphabetSections(state.apps.map { it.label }) }
 
     fun home() {
-        screen = "home"; query = ""; searchFocused = false
+        screen = "home"; query = ""; searchFocused = false; browseSection = null
         selectedId = null; aliasId = null; widgetPicker = false; editingHome = false
         keyboard?.hide()
     }
@@ -103,18 +106,18 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Lilac, onPrimary = Ink, background = Ink, surface = Ink,
         onSurface = Paper, onBackground = Paper, onSurfaceVariant = Muted,
-        surfaceContainer = Color(0xFF23202E), outline = Color(0xFF655F72),
+        surfaceContainer = Color(0xFF202420), outline = Color(0xFF646C64),
     )) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, contentColor = Paper) {
         Box(Modifier.fillMaxSize().background(
-            if (screen == "home") Brush.verticalGradient(listOf(Color(0xB51A1525), Color(0xD9101018)))
+            if (screen == "home") Brush.verticalGradient(listOf(Color(0xD9111312), Color(0xF2111312)))
             else Brush.verticalGradient(listOf(Ink, Ink)),
         )) {
             when (screen) {
                 "home" -> HomeScreen(
                     state, activity.widgets, editingHome, launch,
-                    onSearch = { searchFocused = true; screen = "apps" },
-                    onAllApps = { searchFocused = false; screen = "apps" },
+                    onSearch = { browseSection = null; searchFocused = true; screen = "apps" },
+                    onAllApps = { browseSection = null; searchFocused = false; screen = "apps" },
                     onSettings = { screen = "settings" },
                     onSelect = { selectedId = it.id },
                     onMove = model::moveFavorite,
@@ -122,9 +125,25 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                     onLock = activity::lockScreen,
                     defaultHome = defaultHome, onChooseHome = activity::chooseHome,
                 )
-                "apps" -> AppsScreen(state, query, { query = it }, searchFocused, launch,
+                "apps" -> if (searchFocused) AppsScreen(state, query, { query = it }, true, launch,
                     onSelect = { selectedId = it.id }, onBack = ::home, onRetry = model::refresh)
-                "settings" -> SettingsScreen(activity, onBack = ::home, onAddWidget = { widgetPicker = true })
+                else AlphabetApps(state, browseSection, launch,
+                    onSelect = { selectedId = it.id }, onBack = ::home,
+                    onSearch = { searchFocused = true }, onSettings = { screen = "settings" }, onRetry = model::refresh)
+                "settings" -> SettingsScreen(activity, onBack = ::home, onAddWidget = { widgetPicker = true },
+                    onEditHome = { home(); editingHome = true })
+            }
+            // Keep this node mounted across home/browse transitions so a held pointer is never lost.
+            if ((screen == "home" || screen == "apps") && !searchFocused && !editingHome) {
+                AlphabetRail(railSections, browseSection, railDragging,
+                    modifier = Modifier.align(Alignment.CenterEnd).safeDrawingPadding(),
+                    onDragging = { railDragging = it },
+                    onSection = { section ->
+                        keyboard?.hide()
+                        if (section == "★") home() else {
+                            browseSection = section; query = ""; searchFocused = false; screen = "apps"
+                        }
+                    })
             }
         }
         }
@@ -173,131 +192,7 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
 }
 
 @Composable
-private fun HomeScreen(
-    state: LauncherState, widgets: WidgetController, editing: Boolean,
-    onLaunch: (LauncherApp) -> Unit, onSearch: () -> Unit, onAllApps: () -> Unit,
-    onSettings: () -> Unit, onSelect: (LauncherApp) -> Unit,
-    onMove: (String, Int) -> Unit, onEdit: () -> Unit, onLock: () -> Unit,
-    defaultHome: Boolean, onChooseHome: () -> Unit,
-) {
-    val favoriteApps = remember(state.apps, state.favorites) {
-        val byId = state.apps.associateBy(LauncherApp::id)
-        state.favorites.mapNotNull(byId::get)
-    }
-    val threshold = with(LocalDensity.current) { 64.dp.toPx() }
-    val latestSearch by rememberUpdatedState(onSearch)
-    val latestLock by rememberUpdatedState(onLock)
-    val searchScroll = remember(threshold) {
-        object : NestedScrollConnection {
-            var distance = 0f
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput) {
-                    if (available.y < 0) distance += available.y else distance = 0f
-                    if (distance < -threshold) { distance = 0f; latestSearch() }
-                }
-                return Offset.Zero
-            }
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                distance = 0f
-                return Velocity.Zero
-            }
-        }
-    }
-    Column(Modifier.fillMaxSize().safeDrawingPadding().nestedScroll(searchScroll)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("PRISM", fontSize = 11.sp, letterSpacing = 3.sp, color = Muted, modifier = Modifier.weight(1f))
-            if (favoriteApps.isNotEmpty()) IconButton(onClick = onEdit) {
-                Icon(if (editing) Icons.Rounded.Check else Icons.Rounded.Edit,
-                    stringResource(if (editing) R.string.done else R.string.edit_home), tint = Muted, modifier = Modifier.size(19.dp))
-            }
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Rounded.Tune, stringResource(R.string.settings), tint = Muted, modifier = Modifier.size(21.dp))
-            }
-        }
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            if (!defaultHome) item("default-home") {
-                TextButton(onClick = onChooseHome) { Text(stringResource(R.string.choose_home)) }
-            }
-            item("clock") {
-                Box(Modifier.fillMaxWidth().pointerInput(threshold) {
-                    var distance = 0f
-                    detectVerticalDragGestures(onDragStart = { distance = 0f },
-                        onDragEnd = { if (distance < -threshold) latestSearch() },
-                        onVerticalDrag = { change, amount -> change.consume(); distance += amount })
-                }.pointerInput(Unit) { detectTapGestures(onDoubleTap = { latestLock() }) }) { HomeClock() }
-            }
-            item("widget") { HomeWidget(widgets) }
-            if (state.loading && favoriteApps.isEmpty()) item { Text(stringResource(R.string.loading), color = Muted) }
-            if (!state.loading && favoriteApps.isEmpty()) item {
-                Column(Modifier.fillMaxWidth().padding(top = 40.dp, bottom = 56.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.empty_home), style = MaterialTheme.typography.headlineSmall, color = Paper)
-                    Text(stringResource(R.string.empty_home_hint), color = Muted, style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = onAllApps) { Text(stringResource(R.string.all_apps)) }
-                }
-            }
-            items(favoriteApps, key = LauncherApp::id) { app ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AppRow(app, state.aliases[app.id], Modifier.weight(1f), large = true,
-                        onClick = { if (editing) onSelect(app) else onLaunch(app) }, onLongClick = { onSelect(app) })
-                    if (editing) {
-                        val index = state.favorites.indexOf(app.id)
-                        IconButton(onClick = { onMove(app.id, -1) }, enabled = index > 0) {
-                            Icon(Icons.Rounded.KeyboardArrowUp, stringResource(R.string.move_up))
-                        }
-                        IconButton(onClick = { onMove(app.id, 1) }, enabled = index < state.favorites.lastIndex) {
-                            Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.move_down))
-                        }
-                    }
-                }
-            }
-        }
-        Column(
-            Modifier.fillMaxWidth().pointerInput(threshold) {
-                var distance = 0f
-                detectVerticalDragGestures(onDragStart = { distance = 0f },
-                    onDragEnd = { if (distance < -threshold) latestSearch() },
-                    onVerticalDrag = { change, amount -> change.consume(); distance += amount })
-            }.pointerInput(Unit) { detectTapGestures(onDoubleTap = { latestLock() }) }.padding(horizontal = 28.dp, vertical = 16.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onSearch) {
-                    Icon(Icons.Rounded.Search, null); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.search_apps))
-                }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onAllApps) { Icon(Icons.Rounded.Apps, stringResource(R.string.all_apps), tint = Muted) }
-            }
-            Text(stringResource(R.string.swipe_hint), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
-        }
-    }
-}
-
-@Composable
-private fun HomeClock() {
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                now = LocalDateTime.now()
-                delay(60_000L - System.currentTimeMillis() % 60_000L)
-            }
-        }
-    }
-    val context = LocalContext.current
-    val pattern = if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
-    val locale = LocalConfiguration.current.locales[0]
-    Column(Modifier.padding(top = 28.dp, bottom = 30.dp)) {
-        Text(now.format(DateTimeFormatter.ofPattern(pattern)), fontSize = 64.sp, fontWeight = FontWeight.Light, letterSpacing = (-2).sp, color = Paper)
-        val datePattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMEd")
-        Text(now.format(DateTimeFormatter.ofPattern(datePattern, locale)), color = Muted, fontSize = 15.sp)
-    }
-}
-
-@Composable
-private fun AppRow(app: LauncherApp, alias: String?, modifier: Modifier = Modifier, large: Boolean = false,
+internal fun AppRow(app: LauncherApp, alias: String?, modifier: Modifier = Modifier, large: Boolean = false,
     onClick: () -> Unit, onLongClick: () -> Unit) {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).combinedClickable(
         onClick = onClick, onLongClick = onLongClick, onLongClickLabel = stringResource(R.string.app_info),
@@ -354,7 +249,7 @@ private fun AppsScreen(state: LauncherState, query: String, onQuery: (String) ->
         Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
             Text(stringResource(R.string.all_apps), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            Text(apps.size.toString(), color = Muted, style = MaterialTheme.typography.labelMedium)
+
         }
         OutlinedTextField(
             value = query, onValueChange = onQuery, singleLine = true,
@@ -389,26 +284,13 @@ private fun AppsScreen(state: LauncherState, query: String, onQuery: (String) ->
                     AppRow(app, state.aliases[app.id], onClick = { onLaunch(app) }, onLongClick = { onSelect(app) })
                 }
             }
-            if (query.isBlank()) {
-                val sections = remember(apps) { apps.map { AppSearch.section(it.label) }.distinct() }
-                Column(Modifier.width(48.dp).fillMaxHeight().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-                    sections.forEach { section ->
-                        TextButton(onClick = {
-                            keyboard?.hide()
-                            val index = apps.indexOfFirst { AppSearch.section(it.label) == section }
-                            if (index >= 0) scope.launch { listState.scrollToItem(index) }
-                        }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp), contentPadding = PaddingValues(0.dp)) {
-                            Text(section, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
+
         }
     }
 }
 
 @Composable
-private fun HomeWidget(widgets: WidgetController) {
+internal fun HomeWidget(widgets: WidgetController) {
     val id by widgets.activeId.collectAsStateWithLifecycle()
     val height by widgets.height.collectAsStateWithLifecycle()
     if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
@@ -430,7 +312,7 @@ private fun HomeWidget(widgets: WidgetController) {
 }
 
 @Composable
-private fun SettingsScreen(activity: MainActivity, onBack: () -> Unit, onAddWidget: () -> Unit) {
+private fun SettingsScreen(activity: MainActivity, onBack: () -> Unit, onAddWidget: () -> Unit, onEditHome: () -> Unit) {
     val isHome by activity.defaultHome.collectAsStateWithLifecycle()
     val widgetId by activity.widgets.activeId.collectAsStateWithLifecycle()
     val lockRequested by activity.lockRequested.collectAsStateWithLifecycle()
@@ -458,6 +340,7 @@ private fun SettingsScreen(activity: MainActivity, onBack: () -> Unit, onAddWidg
                 }
             }
             SettingsDivider()
+            TextButton(onClick = onEditHome) { Text(stringResource(R.string.edit_home)) }
             SettingsLabel(R.string.appearance, R.string.wallpaper_hint)
             FilledTonalButton(onClick = activity::chooseWallpaper) { Text(stringResource(R.string.choose_wallpaper)) }
             SettingsDivider()

@@ -171,6 +171,8 @@ it("keeps a canceled Keychain approval explicit instead of retrying on window fo
 
 it("opens the selector from the current model and closes only the popup on Escape",async()=>{
   await mount();
+  expect(container.querySelector('[role="dialog"]:not([inert])')).toBeNull();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(container.querySelector('.ai-current-model [aria-label="기본 모델 변경"]')).not.toBeNull();
   await click("기본 모델 변경");
@@ -179,9 +181,13 @@ it("opens the selector from the current model and closes only the popup on Escap
   await act(async()=>search.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true,cancelable:true})));
   expect(document.activeElement).toBe(button("Fast Chat 선택"));
   await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
+  expect(container.querySelector('[role="dialog"]:not([inert])')).toBeNull();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(document.activeElement).toBe(button("기본 모델 변경"));
   await click("기본 모델 변경");await click("Fast Chat 선택");
+  expect(container.querySelector('[role="dialog"]:not([inert])')).toBeNull();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(container.querySelector('.ai-current-model-copy')?.textContent).toContain("Fast Chat");
 });

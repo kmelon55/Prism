@@ -1,13 +1,14 @@
-Prism 0.1.1 adds clearer dictation controls and AI usage reporting.
+Prism 0.1.2 includes the complete pending workspace changes and makes dictation enhancements independent.
 
-- Choose speech cleanup, prompt formatting, or plain dictation. Configure a separate model and processing prompt for each enhancement.
-- Assign an optional shortcut to format and paste a prompt while keeping ordinary dictation available.
-- Review AI usage, tokens, and reported or estimated costs in the AI settings tab, with daily charts and feature, provider, and model breakdowns.
-- Use consistent model and settings selectors on macOS, including local speech models in the provider picker.
-- Verify the app signing identity before installing future updates, in addition to verifying the updater download signature.
+- Enable speech cleanup and prompt formatting together, separately, or neither. The ordinary shortcut follows cleanup settings; the prompt shortcut formats and pastes using its own model and instructions. Prompt formatting makes one AI request directly from the transcript.
+- Import compatible Raycast shortcuts, aliases, snippets, and quicklinks from settings, with encrypted export support, conflict review, and recovery/undo. Unsupported Raycast items are reported in the preview.
+- Configure window layout cycling, window and screen-edge gaps, sizing, restore, and display movement.
+- Toggle Prism highlights, use the updated sliders and restrained settings styling, and keep appearance preferences across launches.
+- Use explicit key authorization controls for AI and dictation without password prompts during ordinary key-status checks.
+- Keep the AI usage charts and per-feature, provider, and model accounting introduced in 0.1.1.
 
-Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can check for updates in Settings → General, install, and restart when ready.
+This source release also includes the pending Windows/Linux adapters, installer CI configurations, and Android home/alphabet navigation changes. The downloads below are macOS builds; no Android or Windows/Linux public release is included here.
 
-This release uses the persistent Prism Local Signing certificate and is not Apple notarized. First installation may require System Settings → Privacy & Security → Open Anyway. Earlier ad-hoc installations may need a one-time permission approval when moving to this certificate. Updates from an installation already using the same certificate retain the signing identity.
+Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can use Settings → General → Check for updates, then install and restart when ready.
 
-Provider keys, preferences, and local history are preserved by app updates.
+The macOS app uses the same persistent Prism Local Signing certificate and updater key. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway. App updates preserve provider keys, preferences, and local history.

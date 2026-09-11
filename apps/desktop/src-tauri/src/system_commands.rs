@@ -120,6 +120,16 @@ pub fn system_platform() -> &'static str {
 }
 
 #[tauri::command]
+pub fn desktop_capabilities() -> prism_desktop_platform::Capabilities {
+    #[cfg(target_os = "macos")]
+    return prism_desktop_platform::Capabilities {
+        window_management: true, paste: true, sleep_displays: true, log_out: true, reason: None,
+    };
+    #[cfg(not(target_os = "macos"))]
+    prism_desktop_platform::capabilities()
+}
+
+#[tauri::command]
 pub fn open_system_setting(command_id: String) -> Result<SystemCommandResult, SystemCommandError> {
     let setting = SystemSetting::parse(&command_id)?;
     open_setting(setting)?;
@@ -140,6 +150,75 @@ pub fn lock_screen() -> Result<SystemCommandResult, SystemCommandError> {
         applied: true,
         message: "Lock Screen requested.".to_string(),
     })
+}
+
+#[tauri::command]
+pub async fn run_system_action(
+    command_id: String,
+    locale: Option<String>,
+) -> Result<SystemCommandResult, SystemCommandError> {
+    use crate::system_power::{self, SystemAction};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static BUSY: AtomicBool = AtomicBool::new(false);
+
+    let action = SystemAction::parse(&command_id)
+        .map_err(|message| SystemCommandError::new("unknownCommand", message))?;
+    let capabilities = desktop_capabilities();
+    if (action == SystemAction::SleepDisplays && !capabilities.sleep_displays)
+        || (action == SystemAction::LogOut && !capabilities.log_out) {
+        return Err(SystemCommandError::new(
+            "unsupportedPlatform",
+            "This action is unavailable in the current desktop session.",
+        ));
+    }
+    if BUSY.swap(true, Ordering::AcqRel) {
+        return Err(SystemCommandError::new(
+            "actionBusy",
+            "A system action is already pending.",
+        ));
+    }
+    struct PendingAction;
+    impl Drop for PendingAction {
+        fn drop(&mut self) {
+            BUSY.store(false, Ordering::Release);
+        }
+    }
+    let pending = PendingAction;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _pending = pending;
+        let korean = locale.as_deref() == Some("ko");
+        let applied = system_power::run_with(
+            action,
+            |action| {
+                let title = action.title(korean);
+                let result = rfd::MessageDialog::new()
+                    .set_title(format!("Prism · {title}"))
+                    .set_description(if korean {
+                        "열려 있는 앱이 닫힙니다. 계속하시겠습니까?"
+                    } else {
+                        "Open apps will close. Continue?"
+                    })
+                    .set_level(rfd::MessageLevel::Warning)
+                    .set_buttons(rfd::MessageButtons::OkCancelCustom(
+                        title.into(),
+                        if korean { "취소" } else { "Cancel" }.into(),
+                    ))
+                    .show();
+                result == rfd::MessageDialogResult::Custom(title.into())
+            },
+            system_power::execute,
+        )
+        .map_err(|message| SystemCommandError::new("actionFailed", message))?;
+        Ok(SystemCommandResult {
+            command_id,
+            platform: platform_name().into(),
+            applied,
+            // Cancellation is intentionally silent and leaves the palette open.
+            message: String::new(),
+        })
+    })
+    .await
+    .map_err(|error| SystemCommandError::new("actionFailed", error.to_string()))?
 }
 
 fn platform_name() -> &'static str {

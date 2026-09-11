@@ -1,3 +1,4 @@
+import { getDesktopCapabilities } from "./system";
 import { t, localizeCommand, bilingual } from "../i18n";
 import {
   createCatalogProvider,
@@ -340,6 +341,20 @@ const windowLayouts = [
   { id: prismCommandIds.windowMaximize, action: prismActionIds.windowMaximize, get title() { return t("Maximize"); }, keywords: ["maximize", "fill", "screen"], icon: "maximize" },
   { id: prismCommandIds.windowAlmostMaximize, action: prismActionIds.windowAlmostMaximize, get title() { return t("Almost Maximize"); }, keywords: ["almost", "maximize", "margin"], icon: "maximize" },
   { id: prismCommandIds.windowCenter, action: prismActionIds.windowCenter, get title() { return t("Center"); }, keywords: ["center", "position"], icon: "scan" },
+  { id: "window:maximize-width", action: "manage-window-maximize-width", get title() { return t("Maximize Width"); }, keywords: ["maximize", "width"], icon: "scan" },
+  { id: "window:maximize-height", action: "manage-window-maximize-height", get title() { return t("Maximize Height"); }, keywords: ["maximize", "height"], icon: "scan" },
+  { id: "window:reasonable-size", action: "manage-window-reasonable-size", get title() { return t("Reasonable Size"); }, keywords: ["reasonable", "size"], icon: "scan" },
+  { id: "window:first-fourth", action: "manage-window-first-fourth", get title() { return t("First Fourth"); }, keywords: ["first", "fourth"], icon: "scan" },
+  { id: "window:second-fourth", action: "manage-window-second-fourth", get title() { return t("Second Fourth"); }, keywords: ["second", "fourth"], icon: "scan" },
+  { id: "window:third-fourth", action: "manage-window-third-fourth", get title() { return t("Third Fourth"); }, keywords: ["third", "fourth"], icon: "scan" },
+  { id: "window:last-fourth", action: "manage-window-last-fourth", get title() { return t("Last Fourth"); }, keywords: ["last", "fourth"], icon: "scan" },
+  { id: "window:move-left", action: "manage-window-move-left", get title() { return t("Move Left"); }, keywords: ["move", "left"], icon: "scan" },
+  { id: "window:move-right", action: "manage-window-move-right", get title() { return t("Move Right"); }, keywords: ["move", "right"], icon: "scan" },
+  { id: "window:move-up", action: "manage-window-move-up", get title() { return t("Move Up"); }, keywords: ["move", "up"], icon: "scan" },
+  { id: "window:move-down", action: "manage-window-move-down", get title() { return t("Move Down"); }, keywords: ["move", "down"], icon: "scan" },
+  { id: "window:next-display", action: "manage-window-next-display", get title() { return t("Next Display"); }, keywords: ["next", "display"], icon: "scan" },
+  { id: "window:previous-display", action: "manage-window-previous-display", get title() { return t("Previous Display"); }, keywords: ["previous", "display"], icon: "scan" },
+
   { id: prismCommandIds.windowRestorePrevious, action: prismActionIds.windowRestorePrevious, get title() { return t("Restore Previous Layout"); }, keywords: ["restore", "previous", "undo"], icon: "history" },
 ] as const;
 
@@ -376,7 +391,8 @@ export function createPrismProvider(): CommandProvider {
   return {
     ...provider,
     async search(query, signal) {
-      const items = (await provider.search(query, signal)).map(localizeCommand);
+      const capabilities = await getDesktopCapabilities();
+      const items = (await provider.search(query, signal)).filter(item => !item.id.startsWith("window:") || capabilities?.windowManagement !== false).map(localizeCommand);
       return query.trim() ? items : items.filter((item) => topLevelIds.has(item.id));
     },
   };

@@ -1,6 +1,6 @@
 [package]
 name = "prism-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "Prism desktop command palette"
 authors = ["Prism contributors"]
 edition = "2021"
@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+prism-desktop-platform = { path = "../../../packages/desktop-platform" }
 zeroize = "1"
 rfd = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
@@ -34,6 +35,14 @@ tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gio = "0.18"
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+arboard = { version = "3.6", default-features = false, features = ["image-data", "wayland-data-control"] }
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tiff"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 flate2 = "1"

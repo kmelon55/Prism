@@ -128,8 +128,38 @@ pub(crate) async fn paste_prepared_payload(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, payload);
-        Err("붙여넣기는 현재 macOS에서 지원합니다. 복사를 사용하세요.".into())
+        use prism_desktop_platform as platform;
+        if !platform::capabilities().paste {
+            return Err("Automatic paste is unavailable in this desktop session. Use Copy.".into());
+        }
+        let target = app.state::<crate::window_management::WindowManager>().target();
+        platform::bounds(target)?;
+        let expected = payload.clone();
+        let revision = tauri::async_runtime::spawn_blocking(move || crate::clipboard_history::write_prepared_clipboard_payload(payload))
+            .await.map_err(|_| "Could not prepare clipboard content.")??;
+        if let Some(window) = app.get_webview_window("main") { window.hide().map_err(|e| e.to_string())?; }
+        let result = async {
+            platform::activate(target)?;
+            for _ in 0..12 {
+                tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+                if platform::foreground().ok() == Some(target) && !platform::modifiers_down() { break; }
+            }
+            let host = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if host.state::<crate::window_management::WindowManager>().target() != target
+                    || platform::foreground().ok() != Some(target) {
+                    return Err("The target window changed. The item remains copied.".into());
+                }
+                if revision.is_none() || revision != platform::clipboard_revision() || !crate::clipboard_history::clipboard_matches(&expected) {
+                    return Err("The clipboard changed. Select the item again.".into());
+                }
+                platform::paste(target)
+            }).await.map_err(|_| "Paste was interrupted.")?
+        }.await;
+        if result.is_err() {
+            if let Some(window) = app.get_webview_window("main") { let _ = window.show(); let _ = window.set_focus(); }
+        }
+        result
     }
 }
 // Read once, immediately before posting; never retry or restore over another clipboard owner.

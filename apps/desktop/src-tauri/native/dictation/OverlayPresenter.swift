@@ -75,7 +75,7 @@ final class OverlayPresenter {
             contentWidth = (appState.overlaySettings.showRecordingShortcutHints ?? true)
                 ? min(440, 150 + CGFloat(appState.recordingHints.count) * 90)
                 : 164
-        case "transcribing":
+        case "transcribing", "processing":
             contentWidth = (appState.overlaySettings.showTranscriptionStatus ?? true) ? 220 : 164
         default: contentWidth = 164
         }

@@ -19,6 +19,9 @@ impl KeySession {
         self.key = None;
         self.denied = None;
     }
+    pub fn allow_retry(&mut self) {
+        self.denied = None;
+    }
     pub fn load(
         &mut self,
         read: impl FnOnce() -> Result<Option<Vec<u8>>, String>,
@@ -89,5 +92,14 @@ mod tests {
             .load(|| Ok(Some(b"fixture".to_vec())))
             .unwrap()
             .is_some());
+    }
+    #[test]
+    fn explicit_authorization_can_retry_a_recent_silent_denial() {
+        let mut session = KeySession::default();
+        assert!(session.load(|| Err("authorization required".into())).is_err());
+        session.allow_retry();
+        assert!(session.load(|| Ok(Some(b"fixture".to_vec()))).unwrap().is_some());
+        session.allow_retry();
+        assert!(session.load(|| panic!("an authorized key stays cached")).unwrap().is_some());
     }
 }

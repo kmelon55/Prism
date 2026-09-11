@@ -177,7 +177,7 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
                 controller.cancel()
             }
         }
-        for (mode, startPrompt, finishPrompt, expectedMode) in [("off",false,false,"none"), ("cleanup",false,false,"cleanup"), ("prompt",false,false,"none"), ("prompt",false,true,"prompt"), ("prompt",true,false,"none"), ("prompt",true,true,"prompt")] {
+        for (mode, startPrompt, finishPrompt, expectedMode) in [("off",false,false,"none"), ("cleanup",false,false,"cleanup"), ("prompt",false,false,"none"), ("prompt",false,true,"prompt"), ("prompt",true,false,"none"), ("prompt",true,true,"prompt"), ("both",false,false,"cleanup"), ("both",false,true,"prompt"), ("both",true,false,"cleanup"), ("both",true,true,"prompt")] {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio
             var delivered: [String] = []; var didPaste = false
@@ -187,8 +187,10 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             controller.callback = { pointer in MainActor.assumeIsolated { ProcessingFixture.event(pointer) } }
             var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
             value["whisperPath"] = executable.path; value["enhancementMode"] = mode; value["defaultDelivery"] = "copy"
-            value["processingModel"] = ["provider":"vercel", "model":"fixture/" + mode]
-            value["processingPrompt"] = "Custom instructions for " + mode
+            value["cleanupModel"] = ["provider":"vercel", "model":"fixture/cleanup"]
+            value["promptModel"] = ["provider":"openai", "model":"fixture/prompt"]
+            value["cleanupInstruction"] = "Custom instructions for cleanup"
+            value["promptInstruction"] = "Custom instructions for prompt"
             controller.toggle(fallbackPID: 0, promptMode: startPrompt)
             controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
             try await Task.sleep(for: .milliseconds(30))
@@ -199,12 +201,12 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             precondition(ProcessingFixture.calls.count == (expectedMode == "none" ? 0 : 1))
             if expectedMode != "none" {
                 precondition(ProcessingFixture.calls[0]["processingMode"] as? String == expectedMode)
-                precondition(ProcessingFixture.calls[0]["processingPrompt"] as? String == "Custom instructions for " + mode)
-                precondition((ProcessingFixture.calls[0]["processingModel"] as? [String:Any])?["model"] as? String == "fixture/" + mode)
+                precondition(ProcessingFixture.calls[0]["processingPrompt"] as? String == "Custom instructions for " + expectedMode)
+                precondition((ProcessingFixture.calls[0]["processingModel"] as? [String:Any])?["model"] as? String == "fixture/" + expectedMode)
             }
             controller.cancel()
         }
-        print("PASS: exclusive enhancement modes, optional prompt shortcut during ordinary recording, raw exit from prompt recording, per-profile instructions and explicit paste")
+        print("PASS: independent enhancement modes, prompt override during ordinary recording, cleanup or raw exit from prompt recording, per-profile instructions and explicit paste")
         var receipt = UsageReceipt()
         receipt.add(UsageMeasurement(inputTokens: 100, outputTokens: 20, costUsd: 0.00001, costKind: "estimated"))
         receipt.add(UsageMeasurement(costKind: "unknown"))

@@ -16,7 +16,7 @@ struct WaveformView: View {
                 // 중간 음량을 끌어올려 말할 때 높이 변화가 눈에 보이게 합니다.
                 let responsiveAmplitude = pow(max(0, amplitude), 0.72)
                 let isRecording = phase == "recording"
-                let isTranscribing = phase == "transcribing"
+                let isTranscribing = phase == "transcribing" || phase == "processing"
                 let loadingPulse = (sin(time * 3.8) + 1) / 2
                 let energy = isRecording
                     ? min(0.90, max(0.13, responsiveAmplitude * 1.35))

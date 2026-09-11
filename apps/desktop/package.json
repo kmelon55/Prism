@@ -1,6 +1,6 @@
 {
   "name": "@prism/desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -12,6 +12,7 @@
     "tauri": "node ../../scripts/run-tauri.mjs"
   },
   "dependencies": {
+    "@noble/hashes": "2.0.1",
     "@prism/command-core": "workspace:*",
     "@tauri-apps/api": "^2.11.1",
     "lucide-react": "^0.544.0",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^22.20.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",

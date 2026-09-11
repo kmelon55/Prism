@@ -1,4 +1,4 @@
-import { t, localizeCommand } from "../i18n";
+import { t, localizeCommand, currentLocale } from "../i18n";
 import { invoke } from "@tauri-apps/api/core";
 import {
   createCatalogProvider,
@@ -26,11 +26,17 @@ export const systemCommandIds = {
   dateTime: "system:settings:date-time",
   softwareUpdate: "system:settings:software-update",
   lockScreen: "system:lock-screen",
+  sleep: "system:sleep",
+  sleepDisplays: "system:sleep-displays",
+  restart: "system:restart",
+  shutdown: "system:shutdown",
+  logOut: "system:log-out",
 } as const;
 
 export const systemActionIds = {
   openSetting: "open-system-setting",
   lockScreen: "lock-screen",
+  power: "run-system-action",
 } as const;
 
 export interface SystemCommandResult {
@@ -173,7 +179,7 @@ function lockScreenDefinition(
     detail: {
       eyebrow: t("Safe system action"),
       title: t("Lock Screen"),
-      description: t("Locks the current session. Prism does not expose restart, shutdown, or sleep actions."),
+      description: t("Locks the current session"),
       metadata: [
         { label: t("Platform"), value: platformLabel(platform) },
         { label: t("Effect"), value: t("Locks the current session") },
@@ -192,16 +198,37 @@ function lockScreenDefinition(
   };
 }
 
-export function systemCommandDefinitions(platform: SystemPlatform): readonly CommandDefinition[] {
+const powerDescriptors = [
+  setting(systemCommandIds.sleep, "Sleep", "Put this computer to sleep", ["sleep", "suspend", "잠자기", "절전"], "moon", "blue"),
+  setting(systemCommandIds.sleepDisplays, "Sleep Displays", "Turn off displays until the next input", ["sleep displays", "display", "monitor", "화면 끄기", "디스플레이 잠자기"], "monitor", "blue"),
+  setting(systemCommandIds.restart, "Restart", "Restart this computer after confirmation", ["restart", "reboot", "재시동", "재부팅"], "refresh", "rose"),
+  setting(systemCommandIds.shutdown, "Shut Down", "Shut down this computer after confirmation", ["shutdown", "shut down", "power off", "시스템 종료", "전원 끄기"], "power", "rose"),
+  setting(systemCommandIds.logOut, "Log Out", "Log out of this session after confirmation", ["logout", "log out", "sign out", "로그아웃"], "log-out", "rose"),
+] as const;
+
+function powerDefinition(descriptor: SettingDescriptor): CommandDefinition {
+  return {
+    id: descriptor.id, title: t(descriptor.title), subtitle: t(descriptor.subtitle),
+    section: t("System Actions"), kind: "command", icon: descriptor.icon,
+    rankingBoost: 0.2,
+    accent: descriptor.accent, keywords: ["system", "power", ...descriptor.keywords],
+    data: { systemCommandId: descriptor.id },
+    actions: [{ id: systemActionIds.power, title: t(descriptor.title), shortcut: ["↵"], style: "accent" }],
+    management: { ...manageableBuiltIn },
+  };
+}
+
+export function systemCommandDefinitions(platform: SystemPlatform, capabilities?: DesktopCapabilities): readonly CommandDefinition[] {
   if (platform === "unsupported") return [];
   return [
     ...settingDescriptors[platform].map((descriptor) => settingDefinition(platform, descriptor)),
     lockScreenDefinition(platform),
+    ...powerDescriptors.filter(command => (command.id !== systemCommandIds.sleepDisplays || capabilities?.sleepDisplays !== false) && (command.id !== systemCommandIds.logOut || capabilities?.logOut !== false)).map(powerDefinition),
   ];
 }
 
-export function createSystemProvider(platform: SystemPlatform): CommandProvider {
-  const provider = createCatalogProvider({id:systemProviderId,label:t("System"),commands:systemCommandDefinitions(platform)});
+export function createSystemProvider(platform: SystemPlatform, capabilities?: DesktopCapabilities): CommandProvider {
+  const provider = createCatalogProvider({id:systemProviderId,label:t("System"),commands:systemCommandDefinitions(platform, capabilities)});
   return {...provider, async search(query,signal) {return (await provider.search(query,signal)).map(localizeCommand);}};
 }
 
@@ -230,7 +257,7 @@ export const systemProvider: CommandProvider = {
   async search(query, signal) {
     const platform = await getSystemPlatform();
     if (signal.aborted || platform === "unsupported") return [];
-    return createSystemProvider(platform).search(query, signal);
+    return createSystemProvider(platform, await getDesktopCapabilities()).search(query, signal);
   },
 };
 
@@ -244,5 +271,27 @@ export function runSystemCommand(
   if (actionId === systemActionIds.lockScreen && commandId === systemCommandIds.lockScreen) {
     return invoke<SystemCommandResult>("lock_screen");
   }
+  if (actionId === systemActionIds.power && powerDescriptors.some(command => command.id === commandId)) {
+    return invoke<SystemCommandResult>("run_system_action", { commandId, locale: currentLocale() });
+  }
   return Promise.reject(new Error(t("Unknown system action: {0}", {"0": actionId})));
+}
+
+export interface DesktopCapabilities {
+  windowManagement: boolean;
+  paste: boolean;
+  sleepDisplays: boolean;
+  logOut: boolean;
+  reason: string | null;
+}
+let capabilitiesRequest: Promise<DesktopCapabilities> | undefined;
+export function getDesktopCapabilities(): Promise<DesktopCapabilities> {
+  if (typeof window === "undefined" || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve({ windowManagement: true, paste: false, sleepDisplays: true, logOut: true, reason: null });
+  }
+  capabilitiesRequest ??= invoke<DesktopCapabilities>("desktop_capabilities").catch(() => ({
+    windowManagement: false, paste: false, sleepDisplays: false, logOut: false,
+    reason: "Could not determine desktop capabilities.",
+  }));
+  return capabilitiesRequest;
 }

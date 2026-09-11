@@ -848,8 +848,7 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (path, reveal);
-        Err("파일 열기는 현재 macOS에서 지원합니다.".into())
+        prism_desktop_platform::open_path(path, reveal)
     }
 }
 #[tauri::command]
@@ -1231,7 +1230,6 @@ fn build_preview(path: &Path, id: String) -> Result<FilePreview, String> {
     }
     Ok(preview)
 }
-#[cfg(target_os = "macos")]
 fn raster_thumbnail(bytes: &[u8]) -> Option<String> {
     use base64::Engine;
     let format = image::guess_format(bytes).ok()?;
@@ -1257,11 +1255,6 @@ fn raster_thumbnail(bytes: &[u8]) -> Option<String> {
         base64::engine::general_purpose::STANDARD.encode(output.into_inner())
     ))
 }
-#[cfg(not(target_os = "macos"))]
-fn raster_thumbnail(_bytes: &[u8]) -> Option<String> {
-    None
-}
-
 #[tauri::command]
 pub async fn library_preview_file(
     app: tauri::AppHandle,

@@ -27,9 +27,10 @@ See [Apple's instructions](https://support.apple.com/en-us/102445).
 
 Prism asks for permissions when a feature needs them. Accessibility enables window
 management and inserting text into other apps; dictation needs microphone access.
-Existing ad-hoc installations may need one-time authorization when moving to the
-persistent certificate. Subsequent updates verify the app signing identity before
-replacement. Update archive signatures are separate from Apple notarization.
+New packaged builds require a persistent signing certificate. Existing ad-hoc installs
+may need authorization once when moving to that identity. Updates with incompatible
+signatures are rejected before replacing the app. Update archive signatures and Apple
+notarization are separate checks. See [signing setup](docs/releases.md#signing-and-notarization).
 
 ## Updates and everyday use
 
@@ -77,9 +78,9 @@ For a native development session, explicitly run `pnpm tauri dev` after quitting
 the installed app. Do not start another server if one is already running.
 Debug builds do not install updates. Do not keep separate “Prism Test” copies.
 
-For daily use, open `/Applications/Prism.app`. Source edits reach the installed app
-only after a new GitHub release; they do not modify it live. See the
-[release workflow](docs/releases.md) to publish the next version.
+For daily use, open `/Applications/Prism.app`. Source edits do not modify it live.
+Use the [local signing and installation workflow](docs/releases.md#signing-and-notarization) for an
+authorized local update, or publish a signed GitHub release; notarization is optional.
 
 ```text
 apps/desktop/          React + Tauri desktop app

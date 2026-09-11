@@ -70,11 +70,27 @@ export function DictationApiKey({ provider, nativeRuntime, disabled, onConfigure
       if (mounted.current) setBusy(false);
     }
   }
+  async function unlock() {
+    if (unavailable || mutation.current) return;
+    mutation.current = true; revision.current++;
+    setBusy(true); setChecking(false); setError(""); setNotice("");
+    try {
+      const next = await invoke<AiKeyInfo>("dictation_unlock_key", { provider });
+      if (mounted.current) setInfo(next);
+      notifyAiSettingsChanged();
+    } catch (error) {
+      if (mounted.current) setError(String(error));
+    } finally {
+      mutation.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
   return <div role="group" aria-label={t("API key")}>
     <div className="settings-row"><div className="preference-copy"><strong>{t("API key")}</strong><span>{shared ? t("AI 설정에 저장한 키를 함께 사용합니다.") : t("API 키는 macOS 키체인에 저장합니다.")}</span></div></div>
     {info?.configured && <div className="dictation-saved-key">
       <Check size={15} aria-hidden="true" /><strong>{t("키 저장됨")}</strong>
       <code aria-label={t("저장된 API 키")}>{info.maskedKey || "•••• ••••"}</code>
+      {!info.unlocked && <button className="settings-toolbar-button" disabled={unavailable} onClick={() => void unlock()}>{t("Allow key use")}</button>}
       <button className="settings-toolbar-button" disabled={unavailable} onClick={() => { setEditing(true); setConfirmDelete(false); setNotice(""); }}>{t("변경")}</button>
       <button className="settings-toolbar-button" disabled={unavailable} onClick={() => { if (!confirmDelete) setConfirmDelete(true); else void update(true); }}>{confirmDelete ? t("삭제 확인") : t("키 삭제")}</button>
     </div>}

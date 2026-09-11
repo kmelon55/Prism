@@ -151,10 +151,10 @@ impl DictationSettings {
             self.cleanup_model = self.processing_model.clone();
             self.prompt_model = self.processing_model.clone();
         }
-        self.refine_text = self.enhancement_mode.as_deref() == Some("cleanup");
+        self.refine_text = matches!(self.enhancement_mode.as_deref(), Some("cleanup" | "both"));
     }
     fn validate(&self) -> Result<(), String> {
-        if let Some(mode) = &self.enhancement_mode { if !["off", "cleanup", "prompt"].contains(&mode.as_str()) { return Err("Choose a dictation enhancement.".into()); } }
+        if let Some(mode) = &self.enhancement_mode { if !["off", "cleanup", "prompt", "both"].contains(&mode.as_str()) { return Err("Choose a dictation enhancement.".into()); } }
         for model in [&self.processing_model, &self.cleanup_model, &self.prompt_model].into_iter().flatten() { model.validate()?; }
         processing::instruction("cleanup", Some(&self.cleanup_instruction))?;
         processing::instruction("prompt", Some(&self.prompt_instruction))?;
@@ -417,6 +417,28 @@ pub async fn dictation_key_info(provider: String) -> Result<crate::ai::KeyInfo, 
     .map_err(|_| "키체인 작업을 완료하지 못했습니다.")?
 }
 #[tauri::command]
+pub async fn dictation_unlock_key(provider: String) -> Result<crate::ai::KeyInfo, String> {
+    if let Some(provider) = shared_provider(&provider) {
+        return crate::ai::ai_unlock_key(provider).await;
+    }
+    let account = key_account(&provider)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "macos")]
+        {
+            let mut sessions = key_sessions().lock().map_err(|_| "키 상태를 읽지 못했습니다.")?;
+            let session = sessions.entry(account).or_default();
+            session.allow_retry();
+            let key = session.load(|| crate::keychain::read(KEY_SERVICE, account, true))?;
+            Ok(crate::ai::key_info(key.as_ref().map(|key| key.as_slice())))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = account;
+            Err("키 저장은 현재 macOS에서 지원합니다.".into())
+        }
+    }).await.map_err(|_| "키체인 작업을 완료하지 못했습니다.")?
+}
+#[tauri::command]
 pub async fn dictation_save_key(
     provider: String,
     key: String,
@@ -499,14 +521,7 @@ fn read_provider_key(provider: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, Stri
                 .map_err(|_| "키 상태를 읽지 못했습니다.")?
                 .entry(account)
                 .or_default()
-                .load(|| {
-                    match security_framework::passwords::get_generic_password(KEY_SERVICE, account)
-                    {
-                        Ok(bytes) => Ok(Some(bytes)),
-                        Err(error) if error.code() == -25300 => Ok(None),
-                        Err(_) => Err("키체인 접근을 허용한 뒤 다시 시도하세요.".into()),
-                    }
-                })?
+                .load(|| crate::keychain::read(KEY_SERVICE, account, false))?
                 .ok_or("받아쓰기 설정에서 API 키를 저장하세요.")?
         }
         #[cfg(not(target_os = "macos"))]
@@ -535,8 +550,8 @@ fn overlay_configuration(
 fn configuration(app: &tauri::AppHandle, prompt_mode: bool) -> Result<zeroize::Zeroizing<String>, String> {
     let settings = dictation_get_settings(app.clone())?;
     settings.preflight()?;
-    if prompt_mode && settings.enhancement_mode.as_deref() != Some("prompt") { return Err("Enable prompt structuring first.".into()); }
-    let (processing_model, processing_prompt) = if settings.enhancement_mode.as_deref() == Some("prompt") { (settings.prompt_model.clone(), settings.prompt_instruction.clone()) } else { (settings.cleanup_model.clone(), settings.cleanup_instruction.clone()) };
+    if prompt_mode && !matches!(settings.enhancement_mode.as_deref(), Some("prompt" | "both")) { return Err("Enable prompt structuring first.".into()); }
+    let (processing_model, processing_prompt) = if prompt_mode { (settings.prompt_model.clone(), settings.prompt_instruction.clone()) } else { (settings.cleanup_model.clone(), settings.cleanup_instruction.clone()) };
     if prompt_mode && processing_model.is_none() { return Err("Choose a text processing model.".into()); }
     let key = read_provider_key(&settings.provider)?;
     // This JSON crosses an in-process FFI boundary only, never IPC or disk.
@@ -547,7 +562,7 @@ fn configuration(app: &tauri::AppHandle, prompt_mode: bool) -> Result<zeroize::Z
         value["primaryShortcutLabel"] = app.try_state::<crate::shortcut::GlobalShortcutManager>().and_then(|m| m.prompt_shortcut_label()).map(Value::String).unwrap_or(Value::Null);
         value["primaryDoubleModifier"] = app.try_state::<crate::shortcut::GlobalShortcutManager>().and_then(|m| m.prompt_double_modifier()).map(Value::from).unwrap_or(Value::Null);
     }
-    if value["enhancementMode"].as_str() == Some("prompt") {
+    if matches!(value["enhancementMode"].as_str(), Some("prompt" | "both")) {
         let modifiers = app.try_state::<crate::shortcut::GlobalShortcutManager>().map(|m| [m.dictation_double_modifier(), m.prompt_double_modifier()].into_iter().flatten().collect::<Vec<_>>()).unwrap_or_default();
         value["additionalDoubleModifiers"] = serde_json::json!(modifiers);
     }
@@ -739,6 +754,24 @@ pub async fn dictation_pick_file(kind: String) -> Result<Option<String>, String>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn both_enhancements_survive_roundtrip_without_changing_profiles() {
+        let mut settings = super::DictationSettings::default();
+        settings.enhancement_mode = Some("both".into());
+        settings.cleanup_instruction = "Keep names".into();
+        settings.prompt_instruction = "Keep constraints".into();
+        settings.upgrade();
+        assert!(settings.refine_text);
+        assert!(settings.validate().is_ok());
+        let mut restored: super::DictationSettings = serde_json::from_value(serde_json::to_value(&settings).unwrap()).unwrap();
+        restored.upgrade();
+        assert_eq!(restored.enhancement_mode.as_deref(), Some("both"));
+        assert_eq!(restored.cleanup_instruction, "Keep names");
+        assert_eq!(restored.prompt_instruction, "Keep constraints");
+        restored.enhancement_mode = Some("prompt".into());
+        restored.upgrade();
+        assert!(!restored.refine_text);
+    }
     #[test]
     fn migrates_shared_model_once_and_retains_independent_profiles_when_off() {
         let mut value = serde_json::to_value(super::DictationSettings::default()).unwrap();

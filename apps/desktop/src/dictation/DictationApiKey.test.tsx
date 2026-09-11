@@ -36,6 +36,25 @@ it("preserves an unsaved key through focus and catalog notifications", async () 
   expect(invoke.mock.calls.every(([command]) => command === "dictation_key_info")).toBe(true);
 });
 
+it("requests Keychain authorization only after Allow key use is clicked", async () => {
+  invoke.mockResolvedValue({ configured: true, maskedKey: null, unlocked: false });
+  await mount(); await focus();
+  expect(invoke.mock.calls.every(([command]) => command === "dictation_key_info")).toBe(true);
+  invoke.mockResolvedValue(saved);
+  await click("Allow key use");
+  expect(invoke).toHaveBeenCalledWith("dictation_unlock_key", { provider: "groq" });
+  expect(element.textContent).not.toContain("Allow key use");
+  expect(element.querySelector("code")?.textContent).toBe(saved.maskedKey);
+});
+
+it("does not retry a canceled authorization on focus or status refresh", async () => {
+  const locked = { configured: true, maskedKey: null, unlocked: false };
+  invoke.mockImplementation(command => command === "dictation_unlock_key" ? Promise.reject("Authorization canceled") : Promise.resolve(locked));
+  await mount(); await click("Allow key use"); await focus();
+  await act(async () => { window.dispatchEvent(new Event("prism:ai-settings-changed")); });
+  expect(invoke.mock.calls.filter(([command]) => command === "dictation_unlock_key")).toHaveLength(1);
+});
+
 it("keeps the acknowledged masked key visible through refresh and remount", async () => {
   await mount(); await type("fixture-secret-1234");
   invoke.mockResolvedValue(saved);

@@ -1,3 +1,4 @@
+import { AnimatedDetails } from "./settings/InterfaceMotion";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -65,7 +66,7 @@ export function Updates({ compact = false }: { compact?: boolean }) {
           <strong>Prism {status?.currentVersion}{status?.version ? ` → ${status.version}` : ""}</strong>
           <span>{status ? t(labels[status.phase]) : t("Checking for updates…")}</span>
           {error ? <span role="alert">{error}</span> : null}
-          {!compact && status?.error ? <details><summary>{t("Error details")}</summary><small>{status.error}</small></details> : null}
+          {!compact && status?.error ? <AnimatedDetails><summary>{t("Error details")}</summary><small>{status.error}</small></AnimatedDetails> : null}
         </div>
         <div className="preference-actions">
           <button disabled={disabled} onClick={() => void run()}><RefreshCw size={14} />{t(label)}</button>

@@ -10,15 +10,44 @@ use tauri::{AppHandle, Manager, State};
 
 const MAX_REMEMBERED_LAYOUTS: usize = 128;
 
+#[cfg(not(target_os = "macos"))]
+#[path = "window_management_portable.rs"]
+mod portable;
+
 #[derive(Default)]
 pub struct WindowManager {
     pub(crate) target_pid: AtomicI32,
     target_window: AtomicUsize,
     previous_layouts: Mutex<PreviousLayouts>,
+    cycle: Mutex<Option<CycleStep>>,
+}
+
+#[cfg(not(target_os = "macos"))]
+impl WindowManager {
+    pub(crate) fn target(&self) -> prism_desktop_platform::TargetWindow {
+        prism_desktop_platform::TargetWindow {
+            id: self.target_window.load(Ordering::Acquire),
+            pid: self.target_pid.load(Ordering::Acquire) as u32,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WindowAction {
+    MaximizeWidth,
+    MaximizeHeight,
+    ReasonableSize,
+    FirstFourth,
+    SecondFourth,
+    ThirdFourth,
+    LastFourth,
+    MoveLeft,
+    MoveRight,
+    MoveUp,
+    MoveDown,
+    NextDisplay,
+    PreviousDisplay,
+
     LeftHalf,
     RightHalf,
     TopHalf,
@@ -48,6 +77,20 @@ enum WindowAction {
 impl WindowAction {
     fn parse(raw: &str) -> Result<Self, WindowActionError> {
         match raw.trim().to_ascii_lowercase().as_str() {
+            "maximize-width" => Ok(Self::MaximizeWidth),
+            "maximize-height" => Ok(Self::MaximizeHeight),
+            "reasonable-size" => Ok(Self::ReasonableSize),
+            "first-fourth" => Ok(Self::FirstFourth),
+            "second-fourth" => Ok(Self::SecondFourth),
+            "third-fourth" => Ok(Self::ThirdFourth),
+            "last-fourth" => Ok(Self::LastFourth),
+            "move-left" => Ok(Self::MoveLeft),
+            "move-right" => Ok(Self::MoveRight),
+            "move-up" => Ok(Self::MoveUp),
+            "move-down" => Ok(Self::MoveDown),
+            "next-display" => Ok(Self::NextDisplay),
+            "previous-display" => Ok(Self::PreviousDisplay),
+
             "left-half" | "left_half" | "left" => Ok(Self::LeftHalf),
             "right-half" | "right_half" | "right" => Ok(Self::RightHalf),
             "top-half" => Ok(Self::TopHalf),
@@ -83,6 +126,20 @@ impl WindowAction {
 
     fn name(self) -> &'static str {
         match self {
+            Self::MaximizeWidth => "maximize-width",
+            Self::MaximizeHeight => "maximize-height",
+            Self::ReasonableSize => "reasonable-size",
+            Self::FirstFourth => "first-fourth",
+            Self::SecondFourth => "second-fourth",
+            Self::ThirdFourth => "third-fourth",
+            Self::LastFourth => "last-fourth",
+            Self::MoveLeft => "move-left",
+            Self::MoveRight => "move-right",
+            Self::MoveUp => "move-up",
+            Self::MoveDown => "move-down",
+            Self::NextDisplay => "next-display",
+            Self::PreviousDisplay => "previous-display",
+
             Self::LeftHalf => "left-half",
             Self::RightHalf => "right-half",
             Self::TopHalf => "top-half",
@@ -286,7 +343,11 @@ pub fn remember_frontmost_app(app: &AppHandle) {
     }
 
     #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    if let Some(manager) = app.try_state::<WindowManager>() {
+        let target = prism_desktop_platform::foreground().unwrap_or_default();
+        manager.target_pid.store(target.pid as i32, Ordering::Release);
+        manager.target_window.store(target.id, Ordering::Release);
+    }
 }
 
 #[tauri::command]
@@ -326,14 +387,7 @@ pub fn manage_window(
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, manager);
-        Err(WindowActionError::new(
-            "unsupportedPlatform",
-            format!(
-                "The {} window action is currently implemented only on macOS.",
-                action.name()
-            ),
-        ))
+        portable::apply(&app, &manager, action)
     }
 }
 
@@ -343,6 +397,126 @@ struct Rect {
     y: f64,
     width: f64,
     height: f64,
+}
+
+#[derive(Clone, Copy)]
+struct CycleStep {
+    identity: WindowIdentity,
+    action: WindowAction,
+    index: usize,
+    bounds: Rect,
+}
+
+fn transfer_rect(current: Rect, source: Rect, destination: Rect) -> Rect {
+    let relative_x = ((current.x - source.x) / source.width.max(1.0)).clamp(0.0, 1.0);
+    let relative_y = ((current.y - source.y) / source.height.max(1.0)).clamp(0.0, 1.0);
+    clamp_rect_to_work_area(
+        Rect {
+            x: destination.x + relative_x * destination.width,
+            y: destination.y + relative_y * destination.height,
+            ..current
+        },
+        destination,
+    )
+}
+
+fn close_bounds(a: Rect, b: Rect) -> bool {
+    (a.x - b.x).abs() <= 2.0
+        && (a.y - b.y).abs() <= 2.0
+        && (a.width - b.width).abs() <= 2.0
+        && (a.height - b.height).abs() <= 2.0
+}
+
+fn cycle_index(
+    previous: Option<CycleStep>,
+    identity: WindowIdentity,
+    action: WindowAction,
+    current: Rect,
+    enabled: bool,
+) -> usize {
+    if !enabled || !matches!(action, WindowAction::LeftHalf | WindowAction::RightHalf) {
+        return 0;
+    }
+    previous
+        .filter(|step| {
+            step.identity == identity && step.action == action && close_bounds(step.bounds, current)
+        })
+        .map_or(0, |step| (step.index + 1) % 3)
+}
+
+fn configured_rect(
+    action: WindowAction,
+    work: Rect,
+    current: Rect,
+    options: &crate::window_preferences::WindowOptions,
+    index: usize,
+) -> Rect {
+    let edge = f64::from(options.edge_gap).min(work.width.min(work.height) / 4.0);
+    let area = Rect {
+        x: work.x + edge,
+        y: work.y + edge,
+        width: work.width - 2.0 * edge,
+        height: work.height - 2.0 * edge,
+    };
+    let mapped = match (action, index, options.reverse_cycle) {
+        (WindowAction::LeftHalf, 1, false) | (WindowAction::LeftHalf, 2, true) => {
+            WindowAction::FirstThird
+        }
+        (WindowAction::LeftHalf, 2, false) | (WindowAction::LeftHalf, 1, true) => {
+            WindowAction::LeftTwoThirds
+        }
+        (WindowAction::RightHalf, 1, false) | (WindowAction::RightHalf, 2, true) => {
+            WindowAction::LastThird
+        }
+        (WindowAction::RightHalf, 2, false) | (WindowAction::RightHalf, 1, true) => {
+            WindowAction::RightTwoThirds
+        }
+        _ => action,
+    };
+    if action == WindowAction::AlmostMaximize {
+        let fraction = f64::from(options.almost_maximize) / 100.0;
+        return Rect {
+            x: area.x + area.width * (1.0 - fraction) / 2.0,
+            y: area.y + area.height * (1.0 - fraction) / 2.0,
+            width: area.width * fraction,
+            height: area.height * fraction,
+        };
+    }
+    let mut rect = target_rect(mapped, area, current);
+    if !matches!(
+        action,
+        WindowAction::Center
+            | WindowAction::Maximize
+            | WindowAction::RestorePreviousLayout
+            | WindowAction::MaximizeWidth
+            | WindowAction::MaximizeHeight
+            | WindowAction::ReasonableSize
+            | WindowAction::MoveLeft
+            | WindowAction::MoveRight
+            | WindowAction::MoveUp
+            | WindowAction::MoveDown
+            | WindowAction::NextDisplay
+            | WindowAction::PreviousDisplay
+    ) {
+        let inset = f64::from(options.gap).min(rect.width.min(rect.height) / 2.0) / 2.0;
+        let right = rect.x + rect.width;
+        let bottom = rect.y + rect.height;
+        if rect.x > area.x + 1.0 {
+            rect.x += inset;
+            rect.width -= inset;
+        }
+        if right < area.x + area.width - 1.0 {
+            rect.width -= inset;
+        }
+        if rect.y > area.y + 1.0 {
+            rect.y += inset;
+            rect.height -= inset;
+        }
+        if bottom < area.y + area.height - 1.0 {
+            rect.height -= inset;
+        }
+    }
+    rect
 }
 
 fn clamp_rect_to_work_area(bounds: Rect, work_area: Rect) -> Rect {
@@ -383,6 +557,67 @@ fn target_rect(action: WindowAction, work_area: Rect, current: Rect) -> Rect {
     let half_height = work_area.height / 2.0;
     let third_width = work_area.width / 3.0;
     match action {
+        WindowAction::MaximizeWidth => Rect {
+            x: work_area.x,
+            width: work_area.width,
+            ..clamp_rect_to_work_area(current, work_area)
+        },
+        WindowAction::MaximizeHeight => Rect {
+            y: work_area.y,
+            height: work_area.height,
+            ..clamp_rect_to_work_area(current, work_area)
+        },
+        WindowAction::ReasonableSize => {
+            let width = (work_area.width * 0.6).min(1025.0);
+            let height = (work_area.height * 0.6).min(900.0);
+            Rect {
+                x: work_area.x + (work_area.width - width) / 2.0,
+                y: work_area.y + (work_area.height - height) / 2.0,
+                width,
+                height,
+            }
+        }
+        WindowAction::FirstFourth
+        | WindowAction::SecondFourth
+        | WindowAction::ThirdFourth
+        | WindowAction::LastFourth => {
+            let index = match action {
+                WindowAction::SecondFourth => 1.0,
+                WindowAction::ThirdFourth => 2.0,
+                WindowAction::LastFourth => 3.0,
+                _ => 0.0,
+            };
+            Rect {
+                x: work_area.x + work_area.width * index / 4.0,
+                width: work_area.width / 4.0,
+                ..work_area
+            }
+        }
+        WindowAction::MoveLeft => Rect {
+            x: work_area.x,
+            ..clamp_rect_to_work_area(current, work_area)
+        },
+        WindowAction::MoveRight => {
+            let rect = clamp_rect_to_work_area(current, work_area);
+            Rect {
+                x: work_area.x + work_area.width - rect.width,
+                ..rect
+            }
+        }
+        WindowAction::MoveUp => Rect {
+            y: work_area.y,
+            ..clamp_rect_to_work_area(current, work_area)
+        },
+        WindowAction::MoveDown => {
+            let rect = clamp_rect_to_work_area(current, work_area);
+            Rect {
+                y: work_area.y + work_area.height - rect.height,
+                ..rect
+            }
+        }
+        WindowAction::NextDisplay | WindowAction::PreviousDisplay => {
+            clamp_rect_to_work_area(current, work_area)
+        }
         WindowAction::LeftHalf => Rect {
             width: half_width,
             ..work_area
@@ -512,9 +747,7 @@ fn target_rect(action: WindowAction, work_area: Rect, current: Rect) -> Rect {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{
-        target_rect, Rect, WindowAction, WindowActionError, WindowIdentity, WindowManager,
-    };
+    use super::{Rect, WindowAction, WindowActionError, WindowIdentity, WindowManager};
     use accessibility_sys::{
         error_string, kAXErrorSuccess, kAXFocusedWindowAttribute, kAXPositionAttribute,
         kAXSizeAttribute, kAXTrustedCheckOptionPrompt, kAXValueTypeCGPoint, kAXValueTypeCGSize,
@@ -673,6 +906,11 @@ mod macos {
             };
             set_rect(window, super::clamp_rect_to_work_area(previous, work_area))?;
             previous_layouts.complete_restore(identity);
+            drop(previous_layouts);
+            *manager
+                .cycle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
             return Ok(());
         }
 
@@ -701,46 +939,104 @@ mod macos {
             width: f64::from(work.size.width) / scale,
             height: f64::from(work.size.height) / scale,
         };
-        let target = target_rect(action, work_area, current);
+        let options = crate::window_preferences::load(app)
+            .map_err(|message| WindowActionError::new("invalidWindowOptions", message))?;
+        let mut cycle = manager
+            .cycle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let index = super::cycle_index(*cycle, identity, action, current, options.cycle);
+        let continuing = options.cycle
+            && cycle.is_some_and(|step| {
+                step.identity == identity
+                    && step.action == action
+                    && super::close_bounds(step.bounds, current)
+            });
+        let target = if matches!(
+            action,
+            WindowAction::NextDisplay | WindowAction::PreviousDisplay
+        ) {
+            let mut monitors = app.available_monitors().map_err(|_| {
+                WindowActionError::new("monitorUnavailable", "Could not inspect displays.")
+            })?;
+            monitors.sort_by_key(|monitor| (monitor.position().x, monitor.position().y));
+            let source = monitors
+                .iter()
+                .position(|candidate| candidate.position() == monitor.position())
+                .unwrap_or(0);
+            if monitors.len() < 2 {
+                return Err(WindowActionError::new(
+                    "noOtherDisplay",
+                    "Connect another display to move this window.",
+                ));
+            }
+            let destination = if action == WindowAction::NextDisplay {
+                (source + 1) % monitors.len()
+            } else {
+                (source + monitors.len() - 1) % monitors.len()
+            };
+            let monitor = &monitors[destination];
+            let scale = monitor.scale_factor();
+            let work = monitor.work_area();
+            let destination = Rect {
+                x: f64::from(work.position.x) / scale,
+                y: f64::from(work.position.y) / scale,
+                width: f64::from(work.size.width) / scale,
+                height: f64::from(work.size.height) / scale,
+            };
+            super::transfer_rect(current, work_area, destination)
+        } else {
+            super::configured_rect(action, work_area, current, &options, index)
+        };
 
         let mut previous_layouts = manager
             .previous_layouts
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let replaced = previous_layouts.remember(identity, current);
-        if let Err(error) = set_point(
-            window,
-            CGPoint {
-                x: target.x,
-                y: target.y,
-            },
-        ) {
-            previous_layouts.rollback_remember(identity, replaced);
+        let replaced = if continuing {
+            None
+        } else {
+            Some(previous_layouts.remember(identity, current))
+        };
+        if let Err(error) = set_rect(window, target) {
+            // A size failure may follow a position change. Restore geometry as well as history.
+            if set_rect(window, current).is_ok() {
+                if let Some(previous) = replaced {
+                    previous_layouts.rollback_remember(identity, previous);
+                }
+            }
+            *cycle = None;
             return Err(error);
         }
-        set_size(
-            window,
-            CGSize {
-                width: target.width,
-                height: target.height,
-            },
-        )?;
+        *cycle = if options.cycle
+            && matches!(action, WindowAction::LeftHalf | WindowAction::RightHalf)
+        {
+            Some(super::CycleStep {
+                identity,
+                action,
+                index,
+                bounds: target,
+            })
+        } else {
+            None
+        };
         Ok(())
     }
 
     fn set_rect(window: AXUIElementRef, bounds: Rect) -> Result<(), WindowActionError> {
-        set_point(
-            window,
-            CGPoint {
-                x: bounds.x,
-                y: bounds.y,
-            },
-        )?;
+        // Resize first so the old width does not constrain an edge-aligned move.
         set_size(
             window,
             CGSize {
                 width: bounds.width,
                 height: bounds.height,
+            },
+        )?;
+        set_point(
+            window,
+            CGPoint {
+                x: bounds.x,
+                y: bounds.y,
             },
         )
     }
@@ -862,6 +1158,147 @@ mod macos {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repeated_half_cycles_and_resets_for_other_windows_actions_and_manual_moves() {
+        let work = Rect {
+            x: -1200.0,
+            y: 30.0,
+            width: 1200.0,
+            height: 900.0,
+        };
+        let identity = WindowIdentity {
+            pid: 1,
+            accessibility_hash: 1,
+        };
+        let options = crate::window_preferences::WindowOptions::default();
+        let mut previous = None;
+        let mut current = Rect {
+            x: -1000.0,
+            y: 100.0,
+            width: 500.0,
+            height: 400.0,
+        };
+        for expected in [600.0, 400.0, 800.0, 600.0] {
+            let index = cycle_index(previous, identity, WindowAction::LeftHalf, current, true);
+            current = configured_rect(WindowAction::LeftHalf, work, current, &options, index);
+            assert_eq!(current.width, expected);
+            assert_eq!(current.x, work.x);
+            previous = Some(CycleStep {
+                identity,
+                action: WindowAction::LeftHalf,
+                index,
+                bounds: current,
+            });
+        }
+        assert_eq!(
+            cycle_index(
+                previous,
+                WindowIdentity { pid: 2, ..identity },
+                WindowAction::LeftHalf,
+                current,
+                true
+            ),
+            0
+        );
+        assert_eq!(
+            cycle_index(previous, identity, WindowAction::RightHalf, current, true),
+            0
+        );
+        assert_eq!(
+            cycle_index(
+                previous,
+                identity,
+                WindowAction::LeftHalf,
+                Rect {
+                    x: current.x + 10.0,
+                    ..current
+                },
+                true
+            ),
+            0
+        );
+        assert_eq!(
+            cycle_index(previous, identity, WindowAction::LeftHalf, current, false),
+            0
+        );
+    }
+
+    #[test]
+    fn configured_gaps_are_shared_and_reverse_cycle_changes_order() {
+        let work = Rect {
+            x: 0.0,
+            y: 25.0,
+            width: 1200.0,
+            height: 900.0,
+        };
+        let options = crate::window_preferences::WindowOptions {
+            gap: 12,
+            edge_gap: 20,
+            reverse_cycle: true,
+            ..Default::default()
+        };
+        let left = configured_rect(WindowAction::LeftHalf, work, Rect::default(), &options, 0);
+        let right = configured_rect(WindowAction::RightHalf, work, Rect::default(), &options, 0);
+        assert_eq!(left.x, 20.0);
+        assert_eq!(left.y, 45.0);
+        assert_eq!(right.x - left.x - left.width, 12.0);
+        assert_eq!(right.x + right.width, 1180.0);
+        let large = configured_rect(WindowAction::RightHalf, work, Rect::default(), &options, 1);
+        let small = configured_rect(WindowAction::RightHalf, work, Rect::default(), &options, 2);
+        assert!(large.width > right.width && right.width > small.width);
+        assert!((large.x + large.width - 1180.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn size_edge_and_display_commands_preserve_unaffected_geometry() {
+        let work = Rect {
+            x: 0.0,
+            y: 25.0,
+            width: 1200.0,
+            height: 900.0,
+        };
+        let current = Rect {
+            x: 100.0,
+            y: 80.0,
+            width: 400.0,
+            height: 500.0,
+        };
+        assert_eq!(
+            target_rect(WindowAction::MaximizeWidth, work, current),
+            Rect {
+                x: 0.0,
+                width: 1200.0,
+                ..current
+            }
+        );
+        assert_eq!(
+            target_rect(WindowAction::MoveRight, work, current),
+            Rect {
+                x: 800.0,
+                ..current
+            }
+        );
+        assert_eq!(
+            target_rect(WindowAction::LastFourth, work, current),
+            Rect {
+                x: 900.0,
+                width: 300.0,
+                ..work
+            }
+        );
+        let destination = Rect {
+            x: -800.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        };
+        let moved = transfer_rect(current, work, destination);
+        assert_eq!(moved.width, current.width);
+        assert_eq!(moved.height, current.height);
+        assert!(moved.x >= -800.0 && moved.x + moved.width <= 0.0);
+        assert!(moved.y >= 0.0 && moved.y + moved.height <= 600.0);
+    }
 
     #[test]
     fn action_parser_accepts_frontend_friendly_aliases() {

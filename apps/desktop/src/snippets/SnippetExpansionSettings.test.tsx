@@ -33,7 +33,7 @@ it("uses default-off native state and never requests permission on mount", async
   await click("Review permissions");
   expect(mocks.invoke).toHaveBeenCalledWith("snippet_expansion_request_permissions");
 });
-it("preserves an unsaved exclusion draft across permission refresh and saves explicitly", async () => {
+it("preserves an exclusion draft across permission refresh and saves automatically", async () => {
   await mount(); const input = container.querySelector("textarea")!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, "com.example.editor\ncom.example.editor\n");
@@ -41,7 +41,7 @@ it("preserves an unsaved exclusion draft across permission refresh and saves exp
   });
   state = { ...state, accessibilityGranted: true, inputMonitoringGranted: true };
   await click("Refresh status"); expect(input.value).toContain("com.example.editor");
-  await click("Save excluded applications");
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 450)); });
   expect(mocks.invoke).toHaveBeenCalledWith("snippet_expansion_configure", { enabled: false, excludedApps: ["com.example.editor"] });
 });
 it("fails closed after a configure failure without displaying enabled state", async () => {

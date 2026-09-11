@@ -4,6 +4,7 @@ import { PrismMark } from "./PrismMark";
 import { normalizeReflections } from "./settings/reflectionPreferences";
 import { useGlassRefraction } from "./interaction/useGlassRefraction";
 import { ClipboardSettings } from "./clipboard/ClipboardSettings";
+import { RaycastImport } from "./backup/RaycastImport";
 import { BackupSettings } from "./backup/BackupSettings";
 import { mergeSafePreferences } from "./backup/backup";
 import { loadPreferences, persistPreferences, recoverPreferences, restoreReviewedBackupPreferences } from "./backup/preferencesPersistence";
@@ -50,6 +51,7 @@ import {
   History,
   Keyboard,
   LockKeyhole,
+  LogOut,
   MoonStar,
   Maximize2,
   Monitor,
@@ -60,6 +62,7 @@ import {
   PanelRight,
   PanelsTopLeft,
   Plus,
+  Power,
   RefreshCw,
   Scan,
   Pin,
@@ -156,6 +159,7 @@ import {
 } from "./providers/scripts";
 import {
   getSystemPlatform,
+  getDesktopCapabilities,
   runSystemCommand,
   systemActionIds,
   systemCommandDefinitions,
@@ -182,7 +186,7 @@ const providers = isTauriRuntime()
       webProvider,
       nativeScriptCommandProvider,
     ]
-  : [prismProvider, unitProvider, dateTimeProvider];
+  : [prismProvider, systemProvider, unitProvider, dateTimeProvider];
 const manageableCommands = prismCommandDefinitions.filter(
   (command) => command.management.canDisable,
 );
@@ -222,6 +226,9 @@ const iconMap: Record<string, LucideIcon> = {
   history: History,
   keyboard: Keyboard,
   "lock-keyhole": LockKeyhole,
+  "log-out": LogOut,
+  moon: MoonStar,
+  power: Power,
   monitor: Monitor,
   mouse: MousePointer2,
   network: Network,
@@ -342,6 +349,7 @@ function normalizePreferences(value: unknown): Preferences {
     theme: stored?.theme === "dark" || stored?.theme === "light" ? stored.theme : "system",
     reduceMotion: Boolean(stored?.reduceMotion),
     ...normalizeReflections(stored),
+    prismHighlights: stored?.prismHighlights === true,
     backgroundOpacity: storedOpacity,
     backgroundBlur: normalizeBackgroundBlur(stored?.backgroundBlur),
     showApplicationIcons: stored?.showApplicationIcons !== false,
@@ -814,11 +822,10 @@ export function App() {
   }, [nativeRuntime]);
 
   useEffect(() => {
-    if (!nativeRuntime) return;
     let active = true;
-    void getSystemPlatform()
-      .then((platform) => {
-        if (active) setSystemCommands(systemCommandDefinitions(platform));
+    void Promise.all([getSystemPlatform(), getDesktopCapabilities()])
+      .then(([platform, capabilities]) => {
+        if (active) setSystemCommands(systemCommandDefinitions(platform, capabilities));
       })
       .catch((error) => {
         console.error("Prism could not load system command definitions", error);
@@ -1293,14 +1300,15 @@ export function App() {
     setShortcutDraft(accelerator);
     setShortcutError("");
     setShortcutRecording(false);
+    void saveShortcut(accelerator);
   };
 
-  const saveShortcut = async () => {
+  const saveShortcut = async (accelerator: string) => {
     if (!nativeRuntime || shortcutBusy) return;
     setShortcutBusy(true);
     setShortcutError("");
     try {
-      const setting = await setGlobalShortcut(shortcutDraft);
+      const setting = await setGlobalShortcut(accelerator);
       setShortcut(setting);
       setShortcutDraft(setting.accelerator);
       setToast(t("Global shortcut updated"));
@@ -1629,7 +1637,7 @@ export function App() {
         if (nativeRuntime) await invoke("copy_plain_text", { text }); else await navigator.clipboard.writeText(text);
         setToast(t("복사했습니다."));
       }
-      else if (action.id === systemActionIds.openSetting || action.id === systemActionIds.lockScreen) {
+      else if (action.id === systemActionIds.openSetting || action.id === systemActionIds.lockScreen || action.id === systemActionIds.power) {
         if (!nativeRuntime) {
           setToast(t("System commands are available in the Prism desktop app"));
           return;
@@ -1808,7 +1816,6 @@ export function App() {
             setShortcutError("");
           }}
           onShortcutRecord={recordShortcut}
-          onShortcutSave={() => void saveShortcut()}
           onShortcutReset={() => void resetShortcut()}
           onToggleCommand={toggleCommand}
           maintenanceTask={maintenanceTask}
@@ -1817,6 +1824,17 @@ export function App() {
           clipboardDetails={<ClipboardSettings onChanged={(state) => { setClipboardEnabledState(state.enabled); setCatalogRevision(value => value + 1); }} />}
           snippetDetails={nativeRuntime ? <SnippetExpansionSettings /> : undefined}
           backupDetails={<>
+            <RaycastImport nativeRuntime={nativeRuntime} aliases={{
+              read: () => readPreferences().preferences.commandAliases,
+              disabled: () => readPreferences().preferences.disabledCommandIds,
+              write: async commandAliases => {
+                if (!updatePreferences({ ...readPreferences().preferences, commandAliases })) throw new Error(t("설정을 저장하지 못했습니다."));
+              },
+            }} onChanged={async () => {
+              const [commands, launcher] = await Promise.all([getCommandShortcuts(), getGlobalShortcut()]);
+              setCommandShortcutsState(Object.fromEntries(commands.map(command => [command.commandId, command.accelerator])));
+              setShortcut(launcher); reloadLibrary();
+            }} />
             {preferencesLoad.status === "malformed" && <PreferencesRecovery review={preferencesLoad.recovery}
               onReviewAgain={() => setPreferencesLoad(readPreferences())}
               onRecover={async () => {

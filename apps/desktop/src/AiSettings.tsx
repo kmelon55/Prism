@@ -1,4 +1,6 @@
 import { AiUsage } from "./AiUsage";
+import { AnimatePresence } from "motion/react";
+import { AnimatedPanel } from "./settings/InterfaceMotion";
 import { t, useLocale } from "./i18n";
 import { AiToolSettings } from "./AiToolSettings";
 import { useEffect, useRef, useState } from "react";
@@ -146,7 +148,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
   const activeModel = saved.provider === provider ? models.find((entry) => entry.id === saved.model) : undefined;
   const busy = savingKey || Boolean(savingModel);
 
-  const modelMenu = modelsOpen ? (<section className="ai-model-settings ai-settings-model-popover ai-feedback-enter" role="dialog" aria-label={t("기본 모델 선택")} onKeyDown={(event) => {
+  const modelMenu = modelsOpen ? (<AnimatedPanel className="ai-model-settings ai-settings-model-popover" role="dialog" aria-label={t("기본 모델 선택")} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeModels(); }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -178,7 +180,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       </div>
       <p className="ai-settings-note ai-pricing-note">{t("USD / 100만 토큰 · 제공업체 API의 기본 요금입니다. * 구간·경로에 따라 요금 변동. 캐시 등 추가 조건은 별도입니다.")}{provider === "openai" && <> {t("OpenAI 목록 API는 가격을 제공하지 않습니다.")}<button type="button" onClick={() => openUrl("https://developers.openai.com/api/docs/pricing")}>{t("공식 요금표")}<ExternalLink size={11} /></button></>}</p>
       {loaded && saved.provider === provider && saved.model && !activeModel && <p className="ai-settings-note">{t("저장한 모델이 현재 목록에 없습니다. 현재 선택은 유지되며 다른 모델로 바꿀 수 있습니다.")}</p>}
-    </section>) : null;
+    </AnimatedPanel>) : null;
 
   return <div className="ai-settings" aria-label={t("AI 설정")}>
     {!nativeRuntime && <p className="ai-settings-note">{t("브라우저 미리보기입니다. 키 저장과 모델 조회는 macOS 앱에서 사용할 수 있습니다.")}</p>}
@@ -190,7 +192,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       {activeModel && <small>{t("입력")}{formatAiPrice(activeModel.inputPrice)} {t("· 출력")}{formatAiPrice(activeModel.outputPrice)} {t("/ 100만 토큰")}</small>}
       </div>
       <button ref={modelTrigger} type="button" className="ai-settings-model-trigger" aria-label={t("기본 모델 변경")} aria-haspopup="dialog" aria-expanded={modelsOpen} disabled={!ready || busy} onClick={() => {setQuery("");setLimit(40);setModelsOpen(value => !value);}}>{saved.model ? t("모델 변경") : t("모델 선택")}<ChevronDown size={14}/></button>
-      {modelMenu}
+      <AnimatePresence initial={false}>{modelMenu}</AnimatePresence>
     </section>
     <section className="ai-connection" aria-label={t("AI 연결")}>
       <div className="ai-section-heading"><h3>{t("제공업체")}</h3><span>{t("본인 API 키로 연결")}</span></div>
@@ -199,7 +201,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       </div>
       <div className="ai-key-heading"><span>{providerInfo.description}</span><button type="button" onClick={() => openUrl(providerInfo.keyUrl)}>{t("키 발급")}<ExternalLink size={12} /></button></div>
       {keyInfo?.configured && <div className="ai-saved-key"><Check size={15} /><strong>{t("키 저장됨")}</strong><code aria-label={t("저장된 API 키")}>{keyInfo.maskedKey || t("macOS 키체인에 보관됨")}</code>{keyInfo.unlocked === false && <button type="button" disabled={busy || checking} onClick={() => void unlockKey()}>{t("키 사용 허용")}</button>}<button type="button" disabled={busy || checking} onClick={() => { setEditing(true); setNotice(""); }}>{t("변경")}</button><button type="button" disabled={busy || checking} onClick={() => void updateKey(true)}>{t("삭제")}</button></div>}
-      {keyInfo?.configured && keyInfo.unlocked === false && <p className="ai-settings-note">{t("저장된 키는 유지됩니다. 키 사용을 허용하거나 첫 메시지를 보낼 때 macOS에서 한 번 승인을 요청할 수 있습니다.")}</p>}
+      {keyInfo?.configured && keyInfo.unlocked === false && <p className="ai-settings-note">{t("저장된 키는 유지됩니다. 승인이 필요하면 ‘키 사용 허용’을 눌러 주세요. 채팅이나 받아쓰기가 비밀번호 창을 자동으로 열지 않습니다.")}</p>}
       {checking && <p className="ai-settings-note" role="status">{t("저장된 키 확인 중…")}</p>}
       {!checking && !keyInfo && nativeRuntime && keyError && <p className="ai-settings-note">{t("키 저장 상태를 확인하지 못했습니다.")}<button type="button" onClick={() => setKeyRevision((value) => value + 1)}>{t("다시 확인")}</button></p>}
       {(!keyInfo?.configured || editing) && <form className="ai-key-form" onSubmit={(event) => { event.preventDefault(); void updateKey(); }}>

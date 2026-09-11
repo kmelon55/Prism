@@ -29,6 +29,9 @@ pub(crate) fn application_roots() -> Vec<PathBuf> {
     let mut roots = vec![
         PathBuf::from("/Applications"),
         PathBuf::from("/System/Applications"),
+        // Safari in /Applications can link into the system Cryptex app volume.
+        // Resolve this root too so discovery and launch validation agree.
+        PathBuf::from("/System/Cryptexes/App/System/Applications"),
     ];
     if let Some(home) = home_dir() {
         roots.push(home.join("Applications"));
@@ -53,9 +56,32 @@ pub(crate) fn application_roots() -> Vec<PathBuf> {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn application_roots() -> Vec<PathBuf> {
-    let mut roots = vec![PathBuf::from("/usr/share/applications")];
+    let data_home = env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| home_dir().map(|home| home.join(".local/share")));
+    let mut roots: Vec<PathBuf> = data_home
+        .into_iter()
+        .map(|root| root.join("applications"))
+        .collect();
+    for root in env::split_paths(
+        &env::var_os("XDG_DATA_DIRS")
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "/usr/local/share:/usr/share".into()),
+    ) {
+        if root.is_absolute() {
+            roots.push(root.join("applications"));
+        }
+    }
+    roots.extend(
+        [
+            "/var/lib/flatpak/exports/share/applications",
+            "/var/lib/snapd/desktop/applications",
+        ]
+        .map(PathBuf::from),
+    );
     if let Some(home) = home_dir() {
-        roots.push(home.join(".local/share/applications"));
+        roots.push(home.join(".local/share/flatpak/exports/share/applications"));
     }
     roots
 }
@@ -135,6 +161,7 @@ fn scan_root(root: &Path, apps: &mut BTreeMap<String, NativeApplication>) {
 
 #[cfg(target_os = "linux")]
 fn scan_root(root: &Path, apps: &mut BTreeMap<String, NativeApplication>) {
+    use gio::prelude::*;
     let Ok(entries) = fs::read_dir(root) else {
         return;
     };
@@ -143,19 +170,19 @@ fn scan_root(root: &Path, apps: &mut BTreeMap<String, NativeApplication>) {
         if path.extension().and_then(|value| value.to_str()) != Some("desktop") {
             continue;
         }
-        let Ok(contents) = fs::read_to_string(&path) else {
-            continue;
-        };
-        if contents.lines().any(|line| line.trim() == "NoDisplay=true") {
+        // A user-level Hidden entry masks the system entry, even though it is not listed.
+        if application_roots()
+            .into_iter()
+            .take_while(|candidate| candidate != root)
+            .any(|candidate| candidate.join(entry.file_name()).is_file())
+        {
             continue;
         }
-        let name = contents
-            .lines()
-            .find_map(|line| line.strip_prefix("Name="))
-            .map(str::trim)
-            .filter(|value| !value.is_empty());
-        if let Some(name) = name {
-            insert_app(apps, name.to_string(), path);
+        // GLib handles localized names, OnlyShowIn, NotShowIn, TryExec and desktop entry escaping.
+        if let Some(info) = gio::DesktopAppInfo::from_filename(&path) {
+            if info.should_show() && !info.is_hidden() {
+                insert_app(apps, info.display_name().to_string(), path);
+            }
         }
     }
 }
@@ -168,10 +195,26 @@ pub fn discover() -> Vec<NativeApplication> {
     for root in application_roots() {
         scan_root(&root, &mut apps);
     }
+    #[cfg(target_os = "windows")]
+    if let Ok(entries) = prism_desktop_platform::shell_applications() {
+        for (name, target) in entries {
+            insert_app(&mut apps, name, PathBuf::from(target));
+        }
+    }
     apps.into_values().collect()
 }
 
 pub(crate) fn validated_target(target: &str) -> Result<PathBuf, String> {
+    #[cfg(target_os = "windows")]
+    if target.starts_with("shell:AppsFolder\\") {
+        if prism_desktop_platform::shell_applications()?
+            .iter()
+            .any(|(_, candidate)| candidate == target)
+        {
+            return Ok(PathBuf::from(target));
+        }
+        return Err("The Windows application is no longer installed.".into());
+    }
     let requested = PathBuf::from(target);
     if !requested.is_absolute() || !requested.exists() {
         return Err("The application target no longer exists.".to_string());
@@ -184,6 +227,13 @@ pub(crate) fn validated_target(target: &str) -> Result<PathBuf, String> {
             .map(|candidate| canonical.starts_with(candidate))
             .unwrap_or(false)
     });
+    // Flatpak exports may be symlinks to an application deployment outside the export root.
+    // Accept only an exact catalog entry; never widen the root to the whole deployment tree.
+    #[cfg(target_os = "linux")]
+    let allowed = allowed
+        || discover()
+            .iter()
+            .any(|app| Path::new(&app.path).canonicalize().ok().as_ref() == Some(&canonical));
     if !allowed {
         return Err("Prism refused to open a target outside the application catalog.".to_string());
     }
@@ -197,20 +247,6 @@ fn launch_command(target: &Path) -> Command {
     command
 }
 
-#[cfg(target_os = "windows")]
-fn launch_command(target: &Path) -> Command {
-    let mut command = Command::new("explorer.exe");
-    command.arg(target);
-    command
-}
-
-#[cfg(target_os = "linux")]
-fn launch_command(target: &Path) -> Command {
-    let mut command = Command::new("gio");
-    command.arg("launch").arg(target);
-    command
-}
-
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn launch_command(_target: &Path) -> Command {
     Command::new("false")
@@ -218,6 +254,18 @@ fn launch_command(_target: &Path) -> Command {
 
 pub fn launch(target: &str) -> Result<(), String> {
     let target = validated_target(target)?;
+    #[cfg(target_os = "windows")]
+    return prism_desktop_platform::open_path(&target, false);
+    #[cfg(target_os = "linux")]
+    {
+        use gio::prelude::*;
+        let app = gio::DesktopAppInfo::from_filename(&target)
+            .ok_or("The desktop application entry is invalid.")?;
+        return app
+            .launch(&[], None::<&gio::AppLaunchContext>)
+            .map_err(|error| format!("Could not open the application: {error}"));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     launch_command(&target)
         .spawn()
         .map(|_| ())
@@ -226,6 +274,10 @@ pub fn launch(target: &str) -> Result<(), String> {
 
 pub fn reveal(target: &str) -> Result<(), String> {
     let target = validated_target(target)?;
+    #[cfg(target_os = "windows")]
+    if target.to_string_lossy().starts_with("shell:AppsFolder\\") {
+        return prism_desktop_platform::open_path(Path::new("shell:AppsFolder"), false);
+    }
 
     #[cfg(target_os = "macos")]
     let mut command = {
@@ -234,27 +286,19 @@ pub fn reveal(target: &str) -> Result<(), String> {
         command
     };
 
-    #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut command = Command::new("explorer.exe");
-        command.arg("/select,").arg(&target);
-        command
-    };
-
-    #[cfg(target_os = "linux")]
-    let mut command = {
-        let mut command = Command::new("xdg-open");
-        command.arg(target.parent().unwrap_or(Path::new("/")));
-        command
-    };
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    return prism_desktop_platform::open_path(&target, true);
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     let mut command = Command::new("false");
 
-    command
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| format!("Could not reveal the application: {error}"))
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        command
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("Could not reveal the application: {error}"))
+    }
 }
 
 #[cfg(test)]
@@ -275,6 +319,40 @@ mod id_tests {
 mod tests {
     use super::*;
     use std::time::Instant;
+
+    #[test]
+    fn validates_safari_at_its_resolved_system_location() {
+        let safari = Path::new("/Applications/Safari.app");
+        if !safari.exists() {
+            return;
+        }
+
+        assert_eq!(
+            validated_target(safari.to_str().unwrap()).unwrap(),
+            safari.canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn rejects_applications_outside_catalog_roots() {
+        let root = env::temp_dir().join(format!(
+            "prism-catalog-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let app = root.join("External.app");
+        fs::create_dir_all(&app).unwrap();
+        let result = validated_target(app.to_str().unwrap());
+        fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(
+            result.unwrap_err(),
+            "Prism refused to open a target outside the application catalog."
+        );
+    }
 
     #[test]
     fn discovers_application_metadata_without_loading_icons() {

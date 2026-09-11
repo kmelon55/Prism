@@ -10,12 +10,12 @@ release build. Preserve running development servers and unrelated worktree chang
    `apps/desktop/src-tauri/tauri.conf.json`, and `apps/desktop/src-tauri/Cargo.toml`.
    Refresh the Prism package entry in `Cargo.lock`.
 2. Update `docs/release-notes.md` in English. Run `pnpm typecheck`, `pnpm test`,
-   `pnpm build`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
+   `pnpm build`, `bash scripts/test-dictation-native.sh`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
    and `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`.
 3. Build and verify the complete release before publishing. Commit in English,
-   push `main`, then push an annotated version tag such as `v0.1.1`.
+   push `main`, then push an annotated version tag such as `v0.1.2`.
 4. Create a draft GitHub release with `docs/release-notes.md`, upload every file in
-   `dist/releases/v0.1.1`, verify the assets, then publish it as latest.
+   `dist/releases/v0.1.2`, verify the assets, then publish it as latest.
    Published releases are immutable; use a new version to correct mistakes.
 5. Verify the public `releases/latest/download/latest.json`, archive signature,
    checksums, and both macOS architecture entries. Artifact checks do not prove an
@@ -79,6 +79,35 @@ requires a Developer ID signature and a valid stapled notarization ticket.
 CI selects Xcode 26.3 to compile macOS 26 glass APIs while retaining macOS 14 support.
 The workflow can be dispatched for an existing tag to retry an unpublished release.
 
+### Local builds without a Developer ID certificate
+
+Run `pnpm macos:signing:setup` once. It creates a persistent signing identity in
+`~/Library/Application Support/Prism Signing`, with an encrypted signing keychain
+and PKCS#12 backup. The directory is owner-only and never belongs in Git.
+macOS asks the user to approve certificate trust for code signing in their user
+account. It does not change system trust, HTTPS trust, Gatekeeper, or app permissions.
+Repeated setup reuses the certificate; builds must never generate a replacement.
+Keep a secure backup of the entire directory and do not copy its secrets into chat.
+
+The Tauri wrapper automatically uses this local identity when no explicit identity
+is set, and unlocks only its dedicated signing keychain. This identity supports non-notarized GitHub releases. Use `PRISM_RELEASE_MODE=local-signed` and `PRISM_INSTALLED_APP=/Applications/Prism.app` when packaging; the installed signer must match. A transition to Developer ID is a separate one-time
+migration; local installs reject incompatible public updates instead of losing grants.
+
+Before replacing an existing app with the same signer, run:
+
+```sh
+pnpm macos:signing:verify path/to/Prism.app /Applications/Prism.app
+pnpm macos:install path/to/Prism.app
+```
+
+The verifier checks both apps against each other's designated requirements on every
+architecture. For the initial ad-hoc-to-certificate migration, verify the candidate
+alone and use `pnpm macos:install path/to/Prism.app --migrate-from-adhoc` after quitting
+Prism. The installer backs up the previous app, checks signatures, and preserves app
+data; it refuses to stop an app or replace a certificate signer. Obtain the initial macOS grants
+in the newly installed app. Test two different builds signed with the same identity
+before claiming that future updates preserve permissions.
+
 ## Update behavior
 
 The native process checks GitHub 20 seconds after startup and every six hours.
@@ -88,6 +117,11 @@ extracted app's code signature and mutual compatibility with the installed app.
 An ad-hoc or different signer is rejected before replacement. Installation is
 explicit; restarting is a separate action. Errors do not restart the app.
 Development builds cannot install updates.
+
+Chat and dictation read already-authorized keys without permitting a macOS password
+dialog. When authorization is required, their settings provide an explicit **Allow
+key use** action. Focus and status reads remain metadata-only. Successfully opened
+keys stay in zeroizing process memory, and no credentials move to plaintext settings.
 
 ## Cleanup
 

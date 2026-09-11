@@ -201,6 +201,7 @@ fn validate_file_references(urls: &[String]) -> Result<Vec<PathBuf>, String> {
 }
 
 /// File availability has been checked outside the history lock for this action.
+#[derive(Clone)]
 pub(crate) struct PreparedClipboardPayload(ClipboardPayload);
 impl PreparedClipboardPayload {
     pub(crate) fn new(payload: ClipboardPayload) -> Result<Self, String> {
@@ -955,14 +956,15 @@ fn image_payload(bytes: Vec<u8>, mime_type: &str) -> Result<ClipboardPayload, St
     })
 }
 #[cfg(not(target_os = "macos"))]
-fn read_capture_candidate(
-    _previous: Option<&str>,
-) -> Option<(String, Result<Option<ClipboardPayload>, String>)> {
-    let text = arboard::Clipboard::new().ok()?.get_text().ok()?;
-    Some((
-        text.clone(),
-        Ok(should_capture(&text).then_some(ClipboardPayload::Text(text))),
-    ))
+#[path = "clipboard_portable.rs"]
+mod portable;
+#[cfg(not(target_os = "macos"))]
+fn read_capture_candidate(previous: Option<&str>) -> Option<(String, Result<Option<ClipboardPayload>, String>)> {
+    portable::capture(previous)
+}
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn clipboard_matches(prepared: &PreparedClipboardPayload) -> bool {
+    portable::matches(&prepared.0)
 }
 
 /// Called only by explicit copy, or after paste target validation on the main thread.
@@ -1041,14 +1043,8 @@ pub(crate) fn write_prepared_clipboard_payload(
         })
     }
     #[cfg(not(target_os = "macos"))]
-    match payload {
-        ClipboardPayload::Text(text) => arboard::Clipboard::new()
-            .map_err(|_| "Prism could not access the clipboard.")?
-            .set_text(text)
-            .map(|_| None)
-            .map_err(|_| "Prism could not copy that history entry.".into()),
-        _ => Err("Image and file clipboard reuse is currently available on macOS.".into()),
-    }
+    { portable::write(payload) }
+
 }
 fn is_private_clipboard_type(kind: &str) -> bool {
     let kind = kind.to_ascii_lowercase();
@@ -1168,7 +1164,6 @@ pub async fn get_clipboard_history_entry_preview(
     .await
     .map_err(|_| "Image preview could not be prepared.".to_string())?
 }
-#[cfg(target_os = "macos")]
 fn image_preview(payload: ClipboardPayload) -> Result<String, String> {
     use base64::Engine;
     let ClipboardPayload::Image {
@@ -1214,11 +1209,6 @@ fn image_preview(payload: ClipboardPayload) -> Result<String, String> {
         base64::engine::general_purpose::STANDARD.encode(bytes)
     ))
 }
-#[cfg(not(target_os = "macos"))]
-fn image_preview(_payload: ClipboardPayload) -> Result<String, String> {
-    Err("Image previews are currently available on macOS.".into())
-}
-
 #[tauri::command]
 pub async fn copy_clipboard_history_entry(
     history: State<'_, ClipboardHistory>,

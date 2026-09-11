@@ -1,11 +1,11 @@
 # Dictation refinement and AI usage
 
-Dictation settings offer two side-by-side enhancements: **Refine speech** and **Structure prompt**. Exactly one can be selected, or both can be off. Each retains its own text model and editable processing prompt. Clicking the selected enhancement turns it off without discarding either profile. Models are independent of AI Chat and reuse the existing provider keys. Legacy shared-model settings migrate once into both profiles.
+Dictation settings offer two side-by-side enhancements: **Refine speech** and **Structure prompt**. Enable either, both, or neither. Each retains its own text model and editable processing prompt. Each switch changes only its own enhancement without discarding either profile. Models are independent of AI Chat and reuse the existing provider keys. Legacy shared-model settings migrate once into both profiles.
 
 - Ordinary dictation with both enhancements off transcribes and delivers directly.
 - Refinement adds one text-only request automatically after transcription.
-- In prompt mode, the ordinary shortcut and recording copy/paste/send controls deliver the original transcription. The separate prompt shortcut structures and pastes the result, even when default delivery is copy.
-- The prompt shortcut can start a recording or finish an ordinary recording. Its second invocation structures the result; finishing with the ordinary shortcut preserves the original. Cleanup never runs first.
+- The ordinary shortcut follows the speech refinement setting: cleaned text when enabled, original transcription otherwise. The separate prompt shortcut structures and pastes the result, even when default delivery is copy.
+- The prompt shortcut can start a recording or finish an ordinary recording. When both enhancements are enabled, prompt formatting receives the original transcription directly and makes one AI request; cleanup is not chained first. Its second invocation structures the result; finishing with the ordinary shortcut preserves the original. Cleanup never runs first.
 - Both ordinary and prompt double-modifier shortcuts retain priority over single-modifier recording actions.
 - Local STT model and executable paths are selected inside **Change model → Local**. Settings dropdowns use the same custom keyboard-accessible menu in browser and native WebView.
 - Processing is instructed to preserve intent, negation, uncertainty, names and constraints. It must not answer the dictated prompt or add requirements. These are model instructions, not a guarantee of semantic fidelity.

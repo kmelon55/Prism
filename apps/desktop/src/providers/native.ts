@@ -286,6 +286,20 @@ interface NativeClipboardHistoryEntry {
 }
 
 export type WindowManagementAction =
+  | "maximize-width"
+  | "maximize-height"
+  | "reasonable-size"
+  | "first-fourth"
+  | "second-fourth"
+  | "third-fourth"
+  | "last-fourth"
+  | "move-left"
+  | "move-right"
+  | "move-up"
+  | "move-down"
+  | "next-display"
+  | "previous-display"
+
   | "left-half"
   | "right-half"
   | "top-half"

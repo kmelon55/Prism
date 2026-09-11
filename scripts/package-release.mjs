@@ -11,6 +11,8 @@ if (version !== config.version || (process.env.RELEASE_TAG && process.env.RELEAS
 const bundle = "apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle";
 const output = `dist/releases/v${version}`;
 const app = join(bundle, "macos/Prism.app");
+const appVersion = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleShortVersionString", join(app, "Contents/Info.plist")], { encoding: "utf8" }).trim();
+if (appVersion !== version) throw new Error("The built app version does not match the release version.");
 const mode = process.env.PRISM_RELEASE_MODE;
 if (mode !== "local-signed" && mode !== "notarized") {
   throw new Error("Set PRISM_RELEASE_MODE to local-signed or notarized explicitly.");
@@ -23,7 +25,7 @@ if (mode === "notarized") {
   verifyCompatibleSignatures(process.env.PRISM_INSTALLED_APP, app);
 }
 mkdirSync(output, { recursive: true });
-const dmg = readdirSync(join(bundle, "dmg")).find(name => name.endsWith(".dmg"));
+const dmg = readdirSync(join(bundle, "dmg")).find(name => name === `Prism_${version}_universal.dmg`);
 if (!dmg) throw new Error("DMG is missing.");
 copyFileSync(join(bundle, "dmg", dmg), join(output, `Prism_${version}_universal.dmg`));
 execFileSync("codesign", ["--verify", "--deep", "--strict", join(bundle, "macos/Prism.app")], { stdio: "inherit" });

@@ -1,5 +1,6 @@
-import { InterfaceMotion } from "./InterfaceMotion";
 import { SettingsSelect } from "./SettingsSelect";
+import { InterfaceMotion } from "./InterfaceMotion";
+import { SettingsSlider } from "./SettingsSlider";
 import { Updates } from "../Updates";
 import { useEffect, useLayoutEffect, useRef, useState, useId, type ComponentType, type ReactNode } from "react";
 import { ArrowLeft, Check, Clipboard, ExternalLink, FolderOpen, MoonStar, Plus, RefreshCw, Search, ShieldCheck, Sun, SunMoon, Terminal, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react";
@@ -8,6 +9,8 @@ import { t, bilingual, useLocale, type Language } from "../i18n";
 import { PermissionRuntimeDetails } from "./PermissionRuntimeDetails";
 import { PrismMark } from "../PrismMark";
 import { ShortcutCapture, doubleShortcutKeys, useShortcutCaptureLease } from "./shortcutCapture";
+import { WindowOptions } from "./WindowOptions";
+import "./settingsPolish.css";
 import { AnimationSettings } from "./AnimationSettings";
 import { MAX_BACKGROUND_BLUR } from "./appearance";
 import { AiSettings } from "../AiSettings";
@@ -24,6 +27,7 @@ export interface SettingsPreferences {
   theme: ThemePreference;
   reduceMotion: boolean;
   openingLightAnimation?: boolean;
+  prismHighlights?: boolean;
   reflectionIntensity?: number;
   reflectionEdge?: number;
   reflectionHighlight?: number;
@@ -54,7 +58,6 @@ export interface SettingsViewProps {
   shortcutRecording: boolean;
   onShortcutRecordingChange: (recording: boolean) => void;
   onShortcutRecord: (accelerator: string) => void;
-  onShortcutSave: () => void;
   onShortcutReset: () => void;
   onToggleCommand: (commandId: string) => void;
   maintenanceTask?: "refresh" | "clear";
@@ -178,7 +181,6 @@ export function SettingsView(props: SettingsViewProps) {
     shortcutRecording,
     onShortcutRecordingChange,
     onShortcutRecord,
-    onShortcutSave,
     onShortcutReset,
     onToggleCommand,
     maintenanceTask,
@@ -220,6 +222,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [section, setSection] = useState<PreferencesSection>("general");
   const [confirmClipboardClear, setConfirmClipboardClear] = useState(false);
   const [confirmIconClear, setConfirmIconClear] = useState(false);
+  const [windowGroup, setWindowGroup] = useState("all");
   const [applicationQuery, setApplicationQuery] = useState("");
   const [applicationResults, setApplicationResults] = useState<NativeApplication[]>([]);
   const [applicationsBusy, setApplicationsBusy] = useState(false);
@@ -507,6 +510,7 @@ export function SettingsView(props: SettingsViewProps) {
   return (
     <InterfaceMotion reducedMotion={preferences.reduceMotion}><section
       className="preferences-view preferences-v2"
+      data-prism-highlights={preferences.prismHighlights === true}
       ref={settingsRef}
       role={standalone ? "region" : "dialog"}
       aria-modal={standalone ? undefined : "true"}
@@ -569,7 +573,7 @@ export function SettingsView(props: SettingsViewProps) {
       <div className="settings-content">
         <header className="settings-header">
           <div className="settings-title">
-            <div><span className="settings-context">Prism</span><h2 id={headingId}>{currentSection ? t(currentSection.label) : t("No settings found")}</h2><p>{currentSection ? t(currentSection.description) : t("Try another setting name or keyword.")}</p></div>
+            <div><span className="settings-context">Prism</span><h2 id={headingId}>{currentSection ? t(currentSection.label) : t("No settings found")}</h2>{!currentSection && <p>{t("Try another setting name or keyword.")}</p>}</div>
           </div>
           {!standalone ? <button className="icon-button" onClick={onClose} aria-label={t("Close settings")}><X size={16} /></button> : null}
         </header>
@@ -597,7 +601,7 @@ export function SettingsView(props: SettingsViewProps) {
               <div className="settings-group" role="group" aria-label={t("Appearance")}>
                 <h3 className="settings-group-title">{t("Appearance")}</h3>
                 <div className="settings-row settings-row-stack">
-                  <div className="preference-copy"><strong>{t("Theme")}</strong><span>{t("Match the system or keep one appearance.")}</span></div>
+                  <div className="preference-copy"><strong>{t("Theme")}</strong></div>
                   <div className="theme-options" role="radiogroup" aria-label={t("Appearance")}
                     onKeyDown={(event) => {
                       if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -618,17 +622,23 @@ export function SettingsView(props: SettingsViewProps) {
                   </div>
                 </div>
                 <div className="settings-row">
-                  <div className="preference-copy"><strong>{t("Background opacity")}</strong><span>{t("Keep content clear over any desktop.")}</span></div>
-                  <label className="range-control"><input type="range" min="10" max="100" value={preferences.backgroundOpacity} aria-label={t("Background opacity")} onChange={(event) => onChange({ ...preferences, backgroundOpacity: Number(event.target.value) })} /><span className="range-value">{preferences.backgroundOpacity}%</span></label>
+                  <div className="preference-copy"><strong>{t("Prism highlights")}</strong></div>
+                  <button className={`switch ${preferences.prismHighlights ? "active" : ""}`} role="switch"
+                    aria-label={t("Prism highlights")} aria-checked={preferences.prismHighlights === true}
+                    onClick={() => onChange({ ...preferences, prismHighlights: !preferences.prismHighlights })}><span /></button>
                 </div>
                 <div className="settings-row">
-                  <div className="preference-copy"><strong>{t("Background blur")}</strong><span>{t("Blur background details while keeping their colors.")}</span></div>
-                  <label className="range-control"><input type="range" min="0" max={MAX_BACKGROUND_BLUR} step="1" value={preferences.backgroundBlur} aria-label={t("Background blur")} onChange={(event) => onChange({ ...preferences, backgroundBlur: Number(event.target.value) })} /><span className="range-value">{preferences.backgroundBlur}{nativeRuntime ? "" : "px"}</span></label>
+                  <div className="preference-copy"><strong>{t("Background opacity")}</strong></div>
+                  <label className="range-control"><SettingsSlider min="10" max="100" value={preferences.backgroundOpacity} aria-label={t("Background opacity")} onChange={(event) => onChange({ ...preferences, backgroundOpacity: Number(event.target.value) })} /><span className="range-value">{preferences.backgroundOpacity}%</span></label>
+                </div>
+                <div className="settings-row">
+                  <div className="preference-copy"><strong>{t("Background blur")}</strong></div>
+                  <label className="range-control"><SettingsSlider min="0" max={MAX_BACKGROUND_BLUR} step="1" value={preferences.backgroundBlur} aria-label={t("Background blur")} onChange={(event) => onChange({ ...preferences, backgroundBlur: Number(event.target.value) })} /><span className="range-value">{preferences.backgroundBlur}{nativeRuntime ? "" : "px"}</span></label>
                 </div>
               </div>
               <div className="settings-group" role="group" aria-label={t("Behavior")}>
                 <h3 className="settings-group-title">{t("Behavior")}</h3>
-                <div className="settings-row"><div className="preference-copy"><strong>{t("Application icons")}</strong><span>{t("Show recognizable native app icons in results.")}</span></div><button className={`switch ${preferences.showApplicationIcons ? "active" : ""}`} role="switch" aria-label={t("Show application icons")} aria-checked={preferences.showApplicationIcons} onClick={() => onChange({ ...preferences, showApplicationIcons: !preferences.showApplicationIcons })}><span /></button></div>
+                <div className="settings-row"><div className="preference-copy"><strong>{t("Application icons")}</strong></div><button className={`switch ${preferences.showApplicationIcons ? "active" : ""}`} role="switch" aria-label={t("Show application icons")} aria-checked={preferences.showApplicationIcons} onClick={() => onChange({ ...preferences, showApplicationIcons: !preferences.showApplicationIcons })}><span /></button></div>
                 <AnimationSettings preferences={preferences} onChange={onChange} />
               </div>
               {nativeRuntime ? (
@@ -756,8 +766,8 @@ export function SettingsView(props: SettingsViewProps) {
             <>
               <div className="settings-group" role="group" aria-label={t("Global hotkey")}>
                 <h3 className="settings-group-title">{t("Global hotkey")}</h3>
-                <div className="settings-row"><div className="preference-copy"><strong>{t("Open or hide Prism")}</strong><span>{t("Use one shortcut from anywhere on your desktop.")}</span></div><div className="shortcut-editor"><button className={`shortcut-recorder ${shortcutRecording ? "recording" : ""}`} aria-pressed={shortcutRecording} disabled={!nativeRuntime || shortcutBusy} onClick={(event) => { event.currentTarget.focus(); onShortcutRecordingChange(!shortcutRecording); }} title={t("조합 키를 누르거나 보조 키를 두 번 누르세요.")} onBlur={() => { shortcutCapture.current.reset(); onShortcutRecordingChange(false); }} onKeyUp={captureKeyUp} onKeyDown={recordLauncherShortcut}>{shortcutRecording ? <span>{t("키 조합 / 보조 키 두 번…")}</span> : <Shortcut keys={shortcutKeys} />}</button><span className={`shortcut-status ${nativeRuntime && shortcut.registered ? "ready" : ""}`}>{nativeRuntime ? shortcut.registered ? t("Active") : t("Unavailable") : t("Desktop only")}</span></div></div>
-                <div className="settings-row"><div className="preference-copy"><strong>{t("Shortcut")}</strong><span>{shortcut.isDefault ? t("Using the default shortcut.") : t("Using your custom shortcut.")}</span></div><div className="preference-actions"><button disabled={!nativeRuntime || shortcutBusy || shortcutRecording || shortcutDraft === shortcut.accelerator} onClick={onShortcutSave}><Check size={14} />{t("Save")}</button><button disabled={!nativeRuntime || shortcutBusy || (shortcut.isDefault && !shortcut.issue)} onClick={onShortcutReset}><RefreshCw size={14} />{t("Reset")}</button></div></div>
+                <div className="settings-row"><div className="preference-copy"><strong>{t("Open or hide Prism")}</strong></div><div className="shortcut-editor"><button className={`shortcut-recorder ${shortcutRecording ? "recording" : ""}`} aria-pressed={shortcutRecording} disabled={!nativeRuntime || shortcutBusy} onClick={(event) => { event.currentTarget.focus(); onShortcutRecordingChange(!shortcutRecording); }} title={t("조합 키를 누르거나 보조 키를 두 번 누르세요.")} onBlur={() => { shortcutCapture.current.reset(); onShortcutRecordingChange(false); }} onKeyUp={captureKeyUp} onKeyDown={recordLauncherShortcut}>{shortcutRecording ? <span>{t("키 조합 / 보조 키 두 번…")}</span> : <Shortcut keys={shortcutKeys} />}</button><span className={`shortcut-status ${nativeRuntime && shortcut.registered ? "ready" : ""}`}>{nativeRuntime ? shortcut.registered ? t("Active") : t("Unavailable") : t("Desktop only")}</span></div></div>
+                <div className="settings-row"><div className="preference-copy"><strong>{t("Shortcut")}</strong><span>{shortcut.isDefault ? t("Using the default shortcut.") : t("Using your custom shortcut.")}</span></div><div className="preference-actions"><button disabled={!nativeRuntime || shortcutBusy || (shortcut.isDefault && !shortcut.issue)} onClick={onShortcutReset}><RefreshCw size={14} />{t("Reset")}</button></div></div>
               </div>
               {shortcutError || shortcut.issue ? <div className="preference-alert" role="alert"><TriangleAlert size={15} /><span>{t(shortcutError || shortcut.issue?.message || "")}</span></div> : null}
             </>
@@ -792,11 +802,11 @@ export function SettingsView(props: SettingsViewProps) {
 
           {activeSection === "window-management" ? (
             <>
-              <div className="window-intro"><div><strong>{t("Move and resize")}</strong><span>{t("Every layout is available in the command palette and can have its own alias and global hotkey.")}</span></div><span className="settings-count">{windowCommands.length} {t("layouts")}</span></div>
+              <WindowOptions nativeRuntime={nativeRuntime} /><div className="window-command-title"><h3>{t("Layouts & shortcuts")}</h3><span className="settings-count">{windowCommands.length}</span><SettingsSelect label={t("Filter window commands")} value={windowGroup} onChange={setWindowGroup} options={[{value:"all",label:t("All layouts")},{value:"split",label:t("Split layouts")},{value:"position",label:t("Size & position")},{value:"display",label:t("Displays")}]} /></div>
               {accessibilityPermission.supported && !accessibilityPermission.granted ? <button className="settings-inline-permission" onClick={() => { setSettingsQuery(""); setSection("permissions"); stopRecorders(); }}><ShieldCheck size={16} /><span><strong>{t("Accessibility access required")}</strong><small>{t("Review permission before using window layouts.")}</small></span><span>{t("Open Permissions")}</span></button> : null}
               <div className="settings-command-table window-command-table">
                 <div className="settings-command-head"><span>{t("Layout")}</span><span>{t("Alias")}</span><span>{t("Hotkey")}</span></div>
-                {windowCommands.map((command) => renderCommandRow(command))}
+                {windowCommands.filter(command => windowGroup === "all" || (windowGroup === "split" ? /half|third|quarter|sixth|fourth/.test(command.id) : windowGroup === "display" ? command.id.endsWith("-display") : !/half|third|quarter|sixth|fourth|display/.test(command.id))).map((command) => renderCommandRow(command))}
               </div>
               {commandHotkeyError ? <div className="preference-alert" role="alert"><TriangleAlert size={15} /><span>{t(commandHotkeyError)}</span></div> : null}
             </>

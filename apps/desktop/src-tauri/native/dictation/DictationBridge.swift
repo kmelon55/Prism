@@ -24,6 +24,20 @@ struct DictationConfiguration: Decodable {
     var processingModel: ProcessingSelection?
     var enhancementMode: String?
     var processingPrompt: String?
+    var cleanupModel: ProcessingSelection?
+    var promptModel: ProcessingSelection?
+    var cleanupInstruction: String?
+    var promptInstruction: String?
+    var cleanupEnabled: Bool { enhancementMode == "cleanup" || enhancementMode == "both" || (enhancementMode == nil && (refineText ?? false)) }
+    var promptEnabled: Bool { enhancementMode == "prompt" || enhancementMode == "both" }
+    func selection(for mode: String) -> ProcessingSelection? {
+        if enhancementMode == nil { return processingModel }
+        return mode == "prompt" ? promptModel : cleanupModel
+    }
+    func instruction(for mode: String) -> String {
+        if enhancementMode == nil { return processingPrompt ?? "" }
+        return (mode == "prompt" ? promptInstruction : cleanupInstruction) ?? ""
+    }
     var effectivePrompt: String {
         guard !vocabulary.isEmpty else { return prompt }
         let hint = "Prefer these proper-name spellings: " + vocabulary.joined(separator: ", ")
@@ -130,7 +144,7 @@ final class DictationController: ObservableObject {
         guard session == generation, phase == "preparing" else { return }
         do {
             let config = try JSONDecoder().decode(DictationConfiguration.self, from: Data(json.utf8))
-            if processingMode != "prompt" { processingMode = (config.enhancementMode == "cleanup" || (config.enhancementMode == nil && (config.refineText ?? false))) ? "cleanup" : "none" }
+            if processingMode != "prompt" { processingMode = config.cleanupEnabled ? "cleanup" : "none" }
             configuration = config; language.english = config.uiLanguage == "en"
             overlaySettings = (try? JSONDecoder().decode(OverlaySettings.self, from: Data(json.utf8))) ?? OverlaySettings()
             controls.settings = overlaySettings; installCancel()
@@ -159,8 +173,8 @@ final class DictationController: ObservableObject {
     }
     func stop(pressEnter: Bool = false, paste: Bool? = nil, processAsPrompt: Bool? = nil) {
         guard phase == "recording", let config = configuration else { return }
-        if let processAsPrompt, config.enhancementMode == "prompt" {
-            processingMode = processAsPrompt ? "prompt" : "none"
+        if let processAsPrompt, config.promptEnabled {
+            processingMode = processAsPrompt ? "prompt" : (config.cleanupEnabled ? "cleanup" : "none")
         } else if processAsPrompt == true, config.enhancementMode != nil {
             // A stale registered prompt shortcut must not activate a disabled enhancement.
             return
@@ -206,13 +220,13 @@ final class DictationController: ObservableObject {
                     }
                     let result = await withCheckedContinuation { continuation in
                         processingContinuation = continuation
-                        guard let selection = config.processingModel,
+                        guard let selection = config.selection(for: processingMode),
                               let data = try? JSONEncoder().encode(selection),
                               let value = try? JSONSerialization.jsonObject(with: data) else {
                             processed(ProcessingResult(error: "Choose a text processing model."), session: session); return
                         }
                         if callback == nil { processed(ProcessingResult(error: "Text processing is unavailable."), session: session); return }
-                        sendInternal(["action":"process", "session":session, "processingMode":processingMode, "processingModel":value, "processingPrompt":config.processingPrompt ?? "", "transcript":text])
+                        sendInternal(["action":"process", "session":session, "processingMode":processingMode, "processingModel":value, "processingPrompt":config.instruction(for: processingMode), "transcript":text])
                     }
                     try Task.checkCancellation()
                     guard generation == session else { return }

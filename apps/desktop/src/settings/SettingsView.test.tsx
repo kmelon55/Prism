@@ -20,7 +20,7 @@ beforeEach(() => {
     onChange: vi.fn(), onClose: vi.fn(), nativeRuntime: false, commandKey: true,
     shortcut: { accelerator: "Super+Space", defaultAccelerator: "Super+Space", registered: true, isDefault: true, issue: null },
     shortcutDraft: "", shortcutError: "", shortcutBusy: false, shortcutRecording: false,
-    onShortcutRecordingChange: vi.fn(), onShortcutRecord: vi.fn(), onShortcutSave: vi.fn(), onShortcutReset: vi.fn(),
+    onShortcutRecordingChange: vi.fn(), onShortcutRecord: vi.fn(), onShortcutReset: vi.fn(),
     onToggleCommand: vi.fn(), onRefreshApplications: vi.fn(), onClearIconCache: vi.fn(),
     clipboardEnabled: false, clipboardBusy: false, clipboardError: "", onClipboardToggle: vi.fn(), onClipboardClear: vi.fn(),
     commandShortcuts: {}, commandHotkeyError: "", accessibilityPermission: { supported: false, granted: false, canRequest: false, message: "Desktop only" },

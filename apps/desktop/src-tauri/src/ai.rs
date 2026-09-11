@@ -68,21 +68,11 @@ pub struct AiRequests(Mutex<std::collections::HashMap<String, oneshot::Sender<()
 
 #[cfg(target_os = "macos")]
 fn read_key_storage(provider: Provider) -> Result<Option<Vec<u8>>, String> {
-    use security_framework::passwords::{generic_password, PasswordOptions};
-    match generic_password(PasswordOptions::new_generic_password(
-        SERVICE,
-        provider.account(),
-    )) {
-        Ok(key) => Ok(Some(key)),
-        Err(error) if error.code() == -25300 => Ok(None),
-        Err(_) => {
-            Err("키체인에 접근할 수 없습니다. macOS에서 접근을 허용한 뒤 다시 시도하세요.".into())
-        }
-    }
+    crate::keychain::read(SERVICE, provider.account(), false)
 }
 #[cfg(not(target_os = "macos"))]
-fn read_key_storage(_: Provider) -> Result<Option<Vec<u8>>, String> {
-    Err("AI 키 저장은 현재 macOS에서 지원합니다.".into())
+fn read_key_storage(provider: Provider) -> Result<Option<Vec<u8>>, String> {
+    prism_desktop_platform::credentials::read(SERVICE, provider.account())
 }
 
 #[derive(Serialize)]
@@ -143,7 +133,10 @@ fn inspect_key(provider: Provider) -> Result<KeyInfo, String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        Err("AI 키 저장은 현재 macOS에서 지원합니다.".into())
+        Ok(KeyInfo {
+            configured: prism_desktop_platform::credentials::exists(SERVICE, provider.account())?,
+            masked_key: None, unlocked: false,
+        })
     }
 }
 #[tauri::command]
@@ -159,7 +152,14 @@ pub async fn ai_key_status(provider: Provider) -> Result<bool, String> {
 #[tauri::command]
 pub async fn ai_unlock_key(provider: Provider) -> Result<KeyInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        read_key(provider).map(|key| key_info(key.as_ref().map(|key| key.as_slice())))
+        let mut sessions = key_sessions().lock().map_err(|_| "AI 키 상태를 읽지 못했습니다.")?;
+        let session = sessions.entry(provider.account()).or_default();
+        session.allow_retry();
+        #[cfg(target_os = "macos")]
+        let key = session.load(|| crate::keychain::read(SERVICE, provider.account(), true))?;
+        #[cfg(not(target_os = "macos"))]
+        let key = session.load(|| read_key_storage(provider))?;
+        Ok(key_info(key.as_ref().map(|key| key.as_slice())))
     })
     .await
     .map_err(|_| "키체인 작업을 완료하지 못했습니다.".to_string())?
@@ -192,8 +192,10 @@ pub async fn ai_save_key(provider: Provider, key: String) -> Result<KeyInfo, Str
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = (provider, key);
-            Err("AI 키 저장은 현재 macOS에서 지원합니다.".into())
+            let mut sessions = key_sessions().lock().map_err(|_| "Could not access API key state.")?;
+            prism_desktop_platform::credentials::save(SERVICE, provider.account(), key.as_bytes())?;
+            sessions.entry(provider.account()).or_default().replace(key.as_bytes().to_vec());
+            Ok(key_info(Some(key.as_bytes())))
         }
     })
     .await
@@ -224,8 +226,10 @@ pub async fn ai_delete_key(provider: Provider) -> Result<(), String> {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = provider;
-            Err("AI 키 저장은 현재 macOS에서 지원합니다.".into())
+            let mut sessions = key_sessions().lock().map_err(|_| "Could not access API key state.")?;
+            prism_desktop_platform::credentials::delete(SERVICE, provider.account())?;
+            sessions.remove(provider.account());
+            Ok(())
         }
     })
     .await

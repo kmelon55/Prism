@@ -5,6 +5,8 @@ mod ai;
 mod ai_history;
 mod ai_usage;
 mod ai_key_session;
+#[cfg(target_os = "macos")]
+mod keychain;
 mod ai_preferences;
 mod ai_stream;
 mod ai_tools;
@@ -25,8 +27,11 @@ mod script_commands;
 mod shortcut;
 mod snippet_expansion;
 mod system_commands;
+mod system_power;
 mod web;
 mod window_management;
+mod window_preferences;
+mod migration_journal;
 mod window_presentation;
 #[cfg(target_os = "macos")]
 mod window_glass;
@@ -439,6 +444,8 @@ pub fn run() {
         .manage(ai_preferences::AiPreferences::default())
         .manage(script_commands::ScriptCommandRegistry::default())
         .manage(window_management::WindowManager::default())
+        .manage(window_preferences::WindowPreferences::default())
+        .manage(migration_journal::MigrationJournal::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 let app = window.app_handle().clone();
@@ -559,6 +566,7 @@ pub fn run() {
             dictation::dictation_save_settings,
             dictation::dictation_key_status,
             dictation::dictation_key_info,
+            dictation::dictation_unlock_key,
             dictation::dictation_save_key,
             dictation::dictation_delete_key,
             dictation::dictation_toggle,
@@ -635,6 +643,11 @@ pub fn run() {
             clipboard_history::copy_clipboard_history_entry,
             clipboard_history::clear_clipboard_history,
             window_management::manage_window,
+            migration_journal::raycast_read_journal,
+            migration_journal::raycast_write_journal,
+            migration_journal::raycast_clear_journal,
+            window_preferences::get_window_options,
+            window_preferences::set_window_options,
             window_management::get_accessibility_permission_status,
             window_management::request_accessibility_permission,
             window_management::open_accessibility_settings,
@@ -645,8 +658,10 @@ pub fn run() {
             shortcut::set_command_shortcut,
             shortcut::remove_command_shortcut,
             system_commands::system_platform,
+            system_commands::desktop_capabilities,
             system_commands::open_system_setting,
             system_commands::lock_screen,
+            system_commands::run_system_action,
             arithmetic::calculate_arithmetic,
             web::open_web_url,
             web::search_web,

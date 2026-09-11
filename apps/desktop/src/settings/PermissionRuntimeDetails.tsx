@@ -1,3 +1,4 @@
+import { AnimatedDetails } from "./InterfaceMotion";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n";
@@ -20,7 +21,7 @@ export function PermissionRuntimeDetails({ nativeRuntime, granted }: { nativeRun
     </div>
     {runtime.adHoc && <p className="dictation-notice">{t("임시 서명 빌드라 네이티브 재빌드 후 권한을 다시 허용해야 할 수 있습니다. 화면 코드만 갱신하는 HMR과는 다릅니다.")}</p>}
     {runtime.adHoc && !granted && <p className="dictation-notice">{t("같은 경로가 이미 켜져 있어도 재빌드했다면 해당 항목을 제거하고 현재 실행 파일을 다시 추가해 허용하세요.")}</p>}
-    <details className="dictation-advanced"><summary>{t("실행 정보")}</summary><div className="dictation-field"><code>{runtime.identifier ?? "—"} · PID {runtime.pid}</code><code style={{ overflowWrap: "anywhere" }}>{runtime.codeHash ?? "—"}</code></div></details>
+    <AnimatedDetails className="dictation-advanced"><summary>{t("실행 정보")}</summary><div className="dictation-field"><code>{runtime.identifier ?? "—"} · PID {runtime.pid}</code><code style={{ overflowWrap: "anywhere" }}>{runtime.codeHash ?? "—"}</code></div></AnimatedDetails>
     {error && <p role="alert">{error}</p>}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { AnimatedDetails } from "../settings/InterfaceMotion";
 import { useEffect, useId, useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { t, useLocale } from "../i18n";
@@ -67,9 +68,11 @@ export function BackupSettings({ nativeRuntime, preferences, onRestorePreference
         setCategories(current => ({ ...current, [key]: event.target.checked })); setReview(null); setError(""); setRetry(null); setStatus("");
       }}/>{t(labels[key])}</label>)}
     </fieldset>
+    <AnimatedDetails><summary>{t("Backup contents & privacy")}</summary>
     <p className="backup-hint">{t("Safe preferences include appearance, language, and aliases. Keys, histories, permissions, script folders, and hotkeys are excluded.")}</p>
     <p className="backup-hint">{t("Path references are optional. They restore saved paths only; file search roots and AI access are never granted. Missing targets remain unavailable until repaired.")}</p>
     <p className="backup-hint">{t("Backup files are not encrypted. Keep them somewhere private. Maximum file size: 20 MB.")}</p>
+    </AnimatedDetails>
     <div className="preference-actions"><button disabled={disabled || empty} onClick={() => void execute("export")}><Download size={14}/>{t("Export backup")}</button>
       <button disabled={disabled || empty} onClick={() => void execute("review")}><Upload size={14}/>{t("Choose backup to review")}</button></div>
     {review ? <section className="backup-review" aria-labelledby={reviewId}>
@@ -77,8 +80,8 @@ export function BackupSettings({ nativeRuntime, preferences, onRestorePreference
       <p className="backup-hint">{t("Only new library items will be added. Missing library favorites are skipped. Review expires after 10 minutes or a library change.")}</p>
       {rows.length ? <table><caption>{t("Selected library categories")}</caption><thead><tr><th scope="col">{t("Category")}</th><th scope="col">{t("In file")}</th><th scope="col">{t("Add")}</th><th scope="col">{t("Conflicts kept")}</th><th scope="col">{t("Skipped")}</th></tr></thead>
         <tbody>{rows.map(key => <tr key={key}><th scope="row">{t(labels[key])}</th><td>{review.summary[key].total}</td><td>{review.summary[key].added}</td><td>{review.summary[key].conflicts}</td><td>{review.summary[key].skipped}</td></tr>)}</tbody></table> : null}
-      {review.pathReferences?.length ? <details><summary>{t("Review path targets")}</summary><ul className="backup-reference-list">{review.pathReferences.map(item => <li key={item.id}><strong>{item.title}</strong><code>{item.path}</code><span>{t(item.status === "existing" ? "Target exists" : item.status === "missing" ? "Target missing" : "Target could not be checked")}{item.conflict ? ` · ${t("Existing item kept")}` : ""}</span></li>)}</ul></details> : null}
-      {review.missingFavorites?.length ? <details><summary>{t("Favorites skipped because their library targets are missing")}</summary><ul>{review.missingFavorites.map(item => <li key={item.id}>{item.title} <code>{item.id}</code></li>)}</ul></details> : null}
+      {review.pathReferences?.length ? <AnimatedDetails><summary>{t("Review path targets")}</summary><ul className="backup-reference-list">{review.pathReferences.map(item => <li key={item.id}><strong>{item.title}</strong><code>{item.path}</code><span>{t(item.status === "existing" ? "Target exists" : item.status === "missing" ? "Target missing" : "Target could not be checked")}{item.conflict ? ` · ${t("Existing item kept")}` : ""}</span></li>)}</ul></AnimatedDetails> : null}
+      {review.missingFavorites?.length ? <AnimatedDetails><summary>{t("Favorites skipped because their library targets are missing")}</summary><ul>{review.missingFavorites.map(item => <li key={item.id}>{item.title} <code>{item.id}</code></li>)}</ul></AnimatedDetails> : null}
       {rows.length ? <div className="preference-actions"><button disabled={disabled || libraryApplied || additions === 0} onClick={() => void execute("apply")}>{t(libraryApplied ? "Library restored" : "Import new library items")}</button></div> : null}
       {rows.length > 0 && additions === 0 ? <p className="backup-hint">{t("No new library items to import.")}</p> : null}
       {categories.preferences ? review.preferences ? <div className="backup-preferences">
@@ -92,7 +95,7 @@ export function BackupSettings({ nativeRuntime, preferences, onRestorePreference
           <div><dt>{t("Application icons")}</dt><dd>{t(review.preferences.showApplicationIcons ? "On" : "Off")}</dd></div>
           <div><dt>{t("Aliases in backup")}</dt><dd>{aliasPreview?.total}</dd></div></dl>
         {aliasPreview ? <p className="backup-hint">{t("{0} aliases to add · {1} conflicts or capacity skips", { 0: aliasPreview.added, 1: aliasPreview.kept })}</p> : null}
-        {aliasPreview?.total ? <details><summary>{t("Review alias changes")}</summary><ul className="backup-reference-list">{reviewPreferenceAliases(preferences, review.preferences).map(item => <li key={item.id}><code>{item.id}</code><span>{item.alias}</span><span>{t(item.status === "add" ? "Add alias" : item.status === "id-conflict" ? "Existing command alias kept" : item.status === "value-conflict" ? "Alias already used; skipped" : "Alias limit reached; skipped")}{item.existingAlias ? `: ${item.existingAlias}` : ""}</span></li>)}</ul></details> : null}
+        {aliasPreview?.total ? <AnimatedDetails><summary>{t("Review alias changes")}</summary><ul className="backup-reference-list">{reviewPreferenceAliases(preferences, review.preferences).map(item => <li key={item.id}><code>{item.id}</code><span>{item.alias}</span><span>{t(item.status === "add" ? "Add alias" : item.status === "id-conflict" ? "Existing command alias kept" : item.status === "value-conflict" ? "Alias already used; skipped" : "Alias limit reached; skipped")}{item.existingAlias ? `: ${item.existingAlias}` : ""}</span></li>)}</ul></AnimatedDetails> : null}
         <div className="preference-actions"><button disabled={disabled || preferencesApplied} onClick={() => void execute("preferences")}>{t(preferencesApplied ? "Safe preferences restored" : "Restore appearance, language, and aliases")}</button></div>
       </div> : <p className="backup-hint">{t("This backup contains no safe preferences.")}</p> : null}
       <div className="preference-actions"><button disabled={Boolean(busy)} onClick={() => { setReview(null); setStatus(""); setError(""); setRetry(null); }}>{t("Close review")}</button></div>

@@ -220,16 +220,17 @@ and [GLM 5.3 Flash](https://vercel.com/ai-gateway/models/glm-5.3-flash/api).
 
 ## Keychain authorization during local development
 
-The local app currently uses ad-hoc signing. Its designated identity changes with native rebuilds,
-so macOS may request approval for a newly built executable even after an older build was allowed.
-The Vite development server and React hot reload do not themselves change that native signature.
-A stable signing certificate is required to retain identity across builds; no valid local code-signing
-identity was available during this check. Keychain access controls remain unchanged.
+Older local builds used ad-hoc signing, so native rebuilds changed their designated identity
+and could invalidate Keychain authorization. Packaged builds now require a persistent certificate;
+see [local signing and release setup](releases.md#signing). The first migration from an ad-hoc
+build may require authorization once. Keychain access controls remain unchanged.
 
 Status and focus checks now query attributes only, with password data disabled and authenticated
 items skipped. They never call the interactive password reader. Saved but not yet opened keys are
 shown as stored in Keychain; a masked suffix is shown once available in the native session. An explicit
-"Allow key use" action, or the first explicit chat request, may request macOS approval. OpenAI catalog
+"Allow key use" action may request macOS approval. Ordinary chat and dictation reads use
+`kSecUseAuthenticationUIFail`: they reuse authorized access or explain that authorization is needed,
+without opening a password dialog. OpenAI catalog
 loading uses only a key already opened in the current native session and cannot prompt by itself.
 Successful reads are serialized and retained in process memory with zeroizing buffers, shared across
 settings, chat rounds, and search calls. Replacement/deletion updates or clears that session value;

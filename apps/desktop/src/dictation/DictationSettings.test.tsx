@@ -116,7 +116,7 @@ it("flushes text on leaving settings and restores it when reopened", async () =>
   expect(container.querySelector<HTMLTextAreaElement>(".dictation-advanced textarea")!.value).toBe("Prism 한국어");
 });
 
-it("selects exactly one enhancement or neither while retaining both profiles", async () => {
+it("independently enables both enhancements and retains both profiles", async () => {
   settings = {...settings, cleanupModel:{provider:"vercel",model:"fixture/cleanup"},promptModel:{provider:"openai",model:"fixture/prompt"},cleanupInstruction:"Keep technical terms",promptInstruction:"Use short paragraphs"};
   await mount();
   const cleanup = container.querySelector<HTMLButtonElement>('[aria-label="Refine speech"]')!;
@@ -124,12 +124,16 @@ it("selects exactly one enhancement or neither while retaining both profiles", a
   await act(async () => cleanup.click());
   expect(cleanup.getAttribute("aria-checked")).toBe("true");
   await act(async () => prompt.click());
-  expect(cleanup.getAttribute("aria-checked")).toBe("false");
+  expect(cleanup.getAttribute("aria-checked")).toBe("true");
   expect(prompt.getAttribute("aria-checked")).toBe("true");
+  expect(invoke).toHaveBeenLastCalledWith("dictation_save_settings", { settings: expect.objectContaining({ enhancementMode: "both", refineText: true }) });
   expect(container.querySelector(".dictation-prompt-shortcut")).not.toBeNull();
   await act(async () => prompt.click());
   expect(prompt.getAttribute("aria-checked")).toBe("false");
   expect(container.querySelector(".dictation-prompt-shortcut")).toBeNull();
+  expect(cleanup.getAttribute("aria-checked")).toBe("true");
+  await act(async () => cleanup.click());
+  expect(cleanup.getAttribute("aria-checked")).toBe("false");
   expect(invoke).toHaveBeenLastCalledWith("dictation_save_settings", {settings:expect.objectContaining({enhancementMode:"off",refineText:false,cleanupModel:settings.cleanupModel,promptModel:settings.promptModel,cleanupInstruction:settings.cleanupInstruction,promptInstruction:settings.promptInstruction})});
   expect(invoke.mock.calls.some(([command])=>command === "ai_send" || command === "dictation_toggle")).toBe(false);
 });

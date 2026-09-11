@@ -27,9 +27,18 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
 - Native HOME activity, existing wallpaper backdrop, system insets, and a clock updated only while
   visible. Korean and English copy follow the app/device locale.
 - Favorites stay in the order chosen by the user. Long-press an app to add/remove a favorite or edit
-  a search alias. The home edit button exposes move-up/move-down controls.
-- Swipe up from the clock or bottom area to focus search. Swiping past the end of the favorites list
-  also opens search. The search button provides an accessible equivalent.
+  a search alias. Long-press the built-in clock, or choose Settings → Edit home, for move-up/move-down controls.
+- The home screen uses a small clock/date, text-only favorites, a quiet wallpaper scrim, and two small
+  search/browse controls. The permanent wordmark, edit toolbar, instructions, and large search button
+  are removed. Long-press empty home space to open settings.
+- Touch and hold the quiet handle on the right directly from home, then slide vertically to browse apps
+  without opening the keyboard. The alphabet unfolds into a broad curve, spreads neighboring letters vertically, and
+  places the selected letter to the left of the thumb. Pulling left deepens the curve; releasing folds
+  it back into the handle. Haptics fire once per letter change. Release to keep browsing, or select the star to return to favorites.
+  Korean and Latin alphabets share the rail; unavailable letters jump to the next available group
+  (or the last group at the end). The rail stays mounted during screen transitions.
+- Swipe upward past the end of the favorites list or tap the search icon to focus text search.
+  The all-apps button and per-letter accessibility actions provide alternatives to dragging.
 - Installed personal-profile apps appear in a Korean-first alphabetical list with an edge index.
   Search supports case/space normalization, Hangul initials, mixed Hangul and initials, composing
   syllables, user aliases, and lower-ranked abbreviated initials such as `ㅋㅌ` for `카카오톡`.
@@ -37,7 +46,7 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
   is needed. Launch history is updated only after the Android launch request succeeds.
 - Package callbacks refresh metadata after app installation/removal/update. Icons load lazily into a
   bounded cache. There is no background network connection, app-list polling timer, or Internet permission.
-- Settings can host one real Android widget. Binding uses Android consent, provider configuration is
+- Settings can host one real Android widget, replacing the built-in clock to avoid duplicate clocks. Binding uses Android consent, provider configuration is
   honored, cancellation keeps the old widget, and removal asks for confirmation. Widget ID and height
   survive restarts. The host listens only while the activity is started.
 - Optional double-tap locking applies to the clock and empty footer. A disclosure precedes opening
@@ -50,7 +59,7 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
 This is an initial launcher, not a complete Niagara replacement. Work/private profiles and Android
 Private Space are deliberately excluded until profile locking, visibility and lifecycle can be
 implemented together. Other follow-ups include icon packs, folders, app shortcuts, widget stacks,
-notification previews, finer appearance controls, and a draggable alphabet rail.
+notification previews, and finer appearance controls.
 
 Android owns the secure lock screen and system recent-apps gestures. This app does not replace the
 lock screen, unlock the device, or claim the same gesture animations as an OEM system launcher.
@@ -76,3 +85,9 @@ and remaining device checks.
 Platform references: [widget hosting](https://developer.android.com/develop/ui/views/appwidgets/host),
 [home role](https://developer.android.com/reference/android/app/role/RoleManager), and
 [system lock action](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService#GLOBAL_ACTION_LOCK_SCREEN).
+
+See [minimal home implementation and review](minimal-home.md) for design references, rights boundaries,
+S25 Edge viewport checks, and the remaining physical-device verification.
+
+The subsequent [dynamic alphabet wave and Android 16 verification](alphabet-wave.md) supersedes
+the first static-rail presentation.

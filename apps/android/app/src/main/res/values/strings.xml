@@ -61,4 +61,6 @@
     <string name="system_action_failed">This system screen is not available on your device.</string>
     <string name="edit_home">Edit favorites</string>
     <string name="empty_apps">No launchable apps found.</string>
+    <string name="choose_favorites">Choose your favorites</string>
+    <string name="jump_to_letter">Browse apps starting with %1$s</string>
 </resources>

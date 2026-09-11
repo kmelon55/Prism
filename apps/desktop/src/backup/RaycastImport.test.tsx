@@ -1,0 +1,31 @@
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { RaycastImport } from "./RaycastImport";
+const backend = vi.hoisted(() => ({ apply: vi.fn(), read: vi.fn() }));
+vi.mock("./raycastApply", () => ({ applyRaycastItems: backend.apply, readMigrationJournal: backend.read, clearMigrationJournal: vi.fn(), undoRaycastImport: vi.fn() }));
+let host: HTMLDivElement, root: Root;
+const access = { read: () => ({}), write: async () => {}, disabled: () => [] };
+beforeEach(() => { localStorage.clear(); localStorage.setItem("prism:preferences", JSON.stringify({ language: "en" })); host = document.createElement("div"); document.body.append(host); root = createRoot(host); backend.apply.mockReset(); backend.read.mockReset(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+it("allows real file preview in a browser, supports category selection, and prevents applying", async () => {
+  await act(async () => root.render(<RaycastImport nativeRuntime={false} aliases={access} onChanged={async () => {}} />));
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const file = new File(["fixture"], "snippets.json", { type: "application/json" });
+  Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(JSON.stringify([{ name: "Welcome", text: "Hello" }])).buffer });
+  Object.defineProperty(input, "files", { value: [file] });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  const apply = [...host.querySelectorAll("button")].find(button => button.textContent?.includes("Import 1 items"))!;
+  expect(apply.disabled).toBe(true);
+  const category = [...host.querySelectorAll("label")].find(label => label.textContent === "Snippets")!.querySelector("input")!;
+  await act(async () => category.click());
+  expect(host.textContent).toContain("Import 0 items");
+  expect(backend.apply).not.toHaveBeenCalled();
+  expect(backend.read).not.toHaveBeenCalled();
+});
+it("blocks new imports when recovery cannot be read", async () => {
+  backend.read.mockRejectedValue(new Error("Recovery is malformed"));
+  await act(async () => root.render(<RaycastImport nativeRuntime aliases={access} onChanged={async () => {}} />));
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Recovery is malformed");
+  expect([...host.querySelectorAll("button")].find(button => button.textContent === "Choose Raycast export")?.disabled).toBe(true);
+});

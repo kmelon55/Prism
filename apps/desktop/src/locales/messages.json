@@ -1,4 +1,93 @@
 [
+  ["Local", "로컬"],
+  ["Dictation enhancement", "받아쓰기 다듬기"],
+  ["Automatically polish every dictation.", "받아쓸 때마다 자동으로 다듬습니다."],
+  ["Use a shortcut when you want a polished prompt.", "원할 때 단축키로 프롬프트를 정리합니다."],
+  ["Off · Original transcription", "꺼짐 · 원문 그대로"],
+  ["Enable either or both", "각각 켜고 끌 수 있습니다"],
+  ["Processing prompt", "처리 프롬프트"],
+  ["Speech refinement prompt", "말 다듬기 처리 프롬프트"],
+  ["Prompt structuring instructions", "프롬프트 정리 지침"],
+  ["Reset prompt", "기본값으로"],
+  ["This shortcut structures and pastes a prompt. Your usual shortcut follows speech refinement settings.", "이 단축키는 프롬프트를 정리해 붙여넣습니다. 기본 단축키는 말 다듬기 설정을 따릅니다."],
+  ["Only dictated text is sent to the selected provider. One extra AI request per processed result.", "다듬을 때 받아쓴 텍스트를 선택한 제공업체에 보내며, AI 요청이 한 번 추가됩니다."],
+  ["Applies only to this enhancement.", "이 기능에만 적용됩니다."],
+  ["Use local model", "로컬 모델 사용"],
+  ["Enable prompt structuring first.", "먼저 프롬프트 정리를 켜세요."],
+  ["Choose a dictation enhancement.", "받아쓰기 다듬기 방식을 선택하세요."],
+  ["Processing prompt is too long.", "처리 프롬프트가 너무 깁니다."],
+  ["Daily usage", "일별 사용량"],
+  ["Chart metric", "그래프 기준"],
+  ["Daily AI usage chart", "일별 AI 사용량 그래프"],
+  ["Your usage will appear here", "사용량이 여기에 표시됩니다"],
+  ["No measured usage for this metric", "이 항목에 기록된 사용량이 없습니다"],
+  ["Group usage by", "사용량 분류"],
+  ["Feature", "기능"],
+  ["Known costs", "확인된 비용 기준"],
+  ["Reported tokens", "보고된 토큰 기준"],
+  ["Requests", "요청"],
+  ["Tokens", "토큰"],
+  ["Cost", "비용"],
+  ["Usage breakdown", "항목별 사용량"],
+  ["No usage yet", "아직 사용 내역이 없습니다"],
+  ["{0} requests have no reported cost.", "요청 {0}건의 비용이 제공되지 않았습니다."],
+  ["{0} tokens", "{0} 토큰"],
+  ["Correct punctuation, spelling and spacing. Remove redundant repetitions and fillers. Preserve the speaker's meaning and tone without summarizing or adding information.", "문장 부호, 맞춤법과 띄어쓰기를 교정합니다. 불필요한 반복과 추임새를 제거합니다. 요약하거나 정보를 추가하지 않고, 말한 사람의 뜻과 말투를 유지합니다."],
+  ["Rewrite as a clear prompt for another AI. Organize the stated goal, context, constraints and requested output. Do not add requirements or details that the speaker did not state. Do not answer the prompt.", "다른 AI에게 전달할 명확한 프롬프트로 정리합니다. 말한 목표, 맥락, 제약 조건과 원하는 결과물을 구조화합니다. 말하지 않은 요구사항이나 세부 내용은 추가하지 않습니다. 프롬프트에 직접 답하지 않습니다."],
+  ["Put this computer to sleep", "이 컴퓨터를 잠자기 상태로 전환"],
+  ["Restart this computer after confirmation", "확인 후 컴퓨터 재시동"],
+  ["Shut down this computer after confirmation", "확인 후 컴퓨터 종료"],
+  ["Log out of this session after confirmation", "확인 후 현재 세션에서 로그아웃"],
+  ["Refine speech", "말 다듬기"],
+  ["Structure prompt", "프롬프트 정리"],
+  ["Transcription", "음성 인식"],
+  ["Speak to create a clear prompt · Run again to insert", "말한 내용을 프롬프트로 정리 · 다시 실행하면 입력"],
+  ["Correct spelling and repetition while preserving your meaning.", "뜻을 유지하면서 오탈자와 반복을 정리합니다."],
+  ["Text processing model", "텍스트 처리 모델"],
+  ["Change text processing model", "텍스트 처리 모델 변경"],
+  ["Shared by speech refinement and prompt structuring.", "말 다듬기와 프롬프트 정리에 함께 사용합니다."],
+  ["Text is sent to this provider for processing, including with local transcription. One extra AI request per use.", "로컬 음성 인식을 사용해도 텍스트는 이 제공업체로 전송됩니다. 사용할 때마다 AI 요청이 한 번 추가됩니다."],
+  ["Choose a text processing model to enable these features.", "텍스트 처리 모델을 선택하면 사용할 수 있습니다."],
+  ["Choose a text processing model.", "텍스트 처리 모델을 선택하세요."],
+  ["Copy original text", "원문 복사"],
+  ["AI usage", "AI 사용량"],
+  ["This device · USD", "이 기기 · USD"],
+  ["Refresh AI usage", "AI 사용량 새로고침"],
+  ["Usage appears after using AI in the desktop app.", "데스크톱 앱에서 AI를 사용하면 사용량이 표시됩니다."],
+  ["This month", "이번 달"],
+  ["Last request", "최근 사용"],
+  ["Usage details", "사용량 자세히"],
+  ["All time", "전체 누적"],
+  ["Latest 12 requests", "최근 요청 12건"],
+  ["Cost unavailable", "비용 미제공"],
+  ["Tokens unavailable", "토큰 미제공"],
+  ["Some tokens unavailable", "일부 토큰 미제공"],
+  ["Unconfirmed", "확인되지 않음"],
+  ["tokens", "토큰"],
+  ["{0} requests · {1} tokens", "요청 {0}회 · {1}토큰"],
+  ["{0} requests", "요청 {0}회"],
+  ["{0} in / {1} out", "입력 {0} / 출력 {1}"],
+  ["Could not read AI usage.", "AI 사용량을 읽지 못했습니다."],
+  ["Could not save AI usage.", "AI 사용량을 저장하지 못했습니다."],
+  ["Could not watch AI usage. Refresh to update.", "사용량 자동 갱신에 연결하지 못했습니다. 새로고침으로 확인하세요."],
+  ["Recorded on this device from now on. ≈ is a base-rate estimate; + ? means some costs are unavailable. Interrupted requests may still be billed. Provider invoices may differ.", "이 기능 추가 이후 이 기기에서 기록한 사용량입니다. ≈는 기본 단가로 계산한 예상 비용, + ?는 일부 비용 미제공을 뜻합니다. 중단된 요청에도 요금이 발생할 수 있으며, 실제 청구액과 다를 수 있습니다."],
+  ["Only usage metadata is saved. No audio or dictated text is stored in usage history.", "사용량 숫자만 저장합니다. 사용 내역에는 음성과 받아쓴 문장을 보관하지 않습니다."],
+  ["Dictation is too long to refine. The original text is available.", "다듬기에는 너무 긴 문장입니다. 원문을 사용할 수 있습니다."],
+  ["Text processing timed out. Used the original text.", "다듬기 시간이 초과되어 원문을 사용했습니다."],
+  ["Text processing was incomplete. Used the original text.", "다듬기가 완료되지 않아 원문을 사용했습니다."],
+  ["Sleep", "잠자기"],
+  ["Sleep Displays", "디스플레이 잠자기"],
+  ["Restart", "재시동"],
+  ["Shut Down", "시스템 종료"],
+  ["Log Out", "로그아웃"],
+  ["Put this Mac to sleep", "이 Mac을 잠자기 상태로 전환"],
+  ["Turn off displays until the next input", "다음 입력까지 디스플레이 끄기"],
+  ["Restart this Mac after confirmation", "확인 후 이 Mac 재시동"],
+  ["Shut down this Mac after confirmation", "확인 후 이 Mac 종료"],
+  ["Log out of this Mac after confirmation", "확인 후 이 Mac에서 로그아웃"],
+  ["Command is unavailable on this platform", "이 운영체제에서 사용할 수 없는 명령입니다"],
+  ["A system action is already pending.", "시스템 명령을 처리하고 있습니다."],
+  ["Prism highlights", "프리즘 하이라이트"],
   [
     "Click Record Hotkey first, then press and release Ctrl and quickly press it again. A registered shortcut shows ⌃ ⌃. For Paste and Enter below, choose Custom, click its recorder, then press and release Ctrl once.",
     "먼저 단축키 기록 버튼을 클릭한 뒤 Ctrl을 눌렀다 떼고 빠르게 다시 누르세요. 등록되면 ⌃ ⌃가 표시됩니다. 아래 붙여넣고 Enter는 사용자 지정으로 바꾸고 기록 버튼을 클릭한 뒤 Ctrl을 한 번 눌렀다 떼세요."
@@ -660,8 +749,8 @@
     "변경"
   ],
   [
-    "Your saved key is preserved. macOS may ask for approval when you unlock it or send your first message.",
-    "저장된 키는 유지됩니다. 키 사용을 허용하거나 첫 메시지를 보낼 때 macOS에서 한 번 승인을 요청할 수 있습니다."
+    "Your saved key is preserved. If authorization is needed, choose Allow key use. Chat and dictation do not open password dialogs automatically.",
+    "저장된 키는 유지됩니다. 승인이 필요하면 ‘키 사용 허용’을 눌러 주세요. 채팅이나 받아쓰기가 비밀번호 창을 자동으로 열지 않습니다."
   ],
   [
     "Checking saved key…",
@@ -5523,67 +5612,376 @@
     "Error details",
     "오류 상세 정보"
   ],
-  ["Local", "로컬"],
-  ["Dictation enhancement", "받아쓰기 다듬기"],
-  ["Automatically polish every dictation.", "받아쓸 때마다 자동으로 다듬습니다."],
-  ["Use a shortcut when you want a polished prompt.", "원할 때 단축키로 프롬프트를 정리합니다."],
-  ["Off · Original transcription", "꺼짐 · 원문 그대로"],
-  ["Choose one · Click again to turn off", "하나만 선택 · 다시 누르면 꺼짐"],
-  ["Processing prompt", "처리 프롬프트"],
-  ["Speech refinement prompt", "말 다듬기 처리 프롬프트"],
-  ["Prompt structuring instructions", "프롬프트 정리 지침"],
-  ["Reset prompt", "기본값으로"],
-  ["During recording: your usual shortcut pastes the original; this shortcut structures and pastes it.", "녹음 중 기본 단축키는 원문을, 이 단축키는 정리한 프롬프트를 입력합니다."],
-  ["Only dictated text is sent to the selected provider. One extra AI request per processed result.", "다듬을 때 받아쓴 텍스트를 선택한 제공업체에 보내며, AI 요청이 한 번 추가됩니다."],
-  ["Applies only to this enhancement.", "이 기능에만 적용됩니다."],
-  ["Use local model", "로컬 모델 사용"],
-  ["Daily usage", "일별 사용량"],
-  ["Chart metric", "그래프 기준"],
-  ["Daily AI usage chart", "일별 AI 사용량 그래프"],
-  ["Your usage will appear here", "사용량이 여기에 표시됩니다"],
-  ["Group usage by", "사용량 분류"],
-  ["Feature", "기능"],
-  ["Known costs", "확인된 비용 기준"],
-  ["Reported tokens", "보고된 토큰 기준"],
-  ["Requests", "요청"],
-  ["Tokens", "토큰"],
-  ["Cost", "비용"],
-  ["Usage breakdown", "항목별 사용량"],
-  ["No usage yet", "아직 사용 내역이 없습니다"],
-  ["{0} requests have no reported cost.", "요청 {0}건의 비용이 제공되지 않았습니다."],
-  ["{0} tokens", "{0} 토큰"],
-  ["Correct punctuation, spelling and spacing. Remove redundant repetitions and fillers. Preserve the speaker's meaning and tone without summarizing or adding information.", "문장 부호, 맞춤법과 띄어쓰기를 교정합니다. 불필요한 반복과 추임새를 제거합니다. 요약하거나 정보를 추가하지 않고, 말한 사람의 뜻과 말투를 유지합니다."],
-  ["Rewrite as a clear prompt for another AI. Organize the stated goal, context, constraints and requested output. Do not add requirements or details that the speaker did not state. Do not answer the prompt.", "다른 AI에게 전달할 명확한 프롬프트로 정리합니다. 말한 목표, 맥락, 제약 조건과 원하는 결과물을 구조화합니다. 말하지 않은 요구사항이나 세부 내용은 추가하지 않습니다. 프롬프트에 직접 답하지 않습니다."],
-  ["Refine speech", "말 다듬기"],
-  ["Structure prompt", "프롬프트 정리"],
-  ["Transcription", "음성 인식"],
-  ["Speak to create a clear prompt · Run again to insert", "말한 내용을 프롬프트로 정리 · 다시 실행하면 입력"],
-  ["Text processing model", "텍스트 처리 모델"],
-  ["Change text processing model", "텍스트 처리 모델 변경"],
-  ["Choose a text processing model.", "텍스트 처리 모델을 선택하세요."],
-  ["Copy original text", "원문 복사"],
-  ["AI usage", "AI 사용량"],
-  ["This device · USD", "이 기기 · USD"],
-  ["Refresh AI usage", "AI 사용량 새로고침"],
-  ["Usage appears after using AI in the desktop app.", "데스크톱 앱에서 AI를 사용하면 사용량이 표시됩니다."],
-  ["This month", "이번 달"],
-  ["Usage details", "사용량 자세히"],
-  ["All time", "전체 누적"],
-  ["Latest 12 requests", "최근 요청 12건"],
-  ["Cost unavailable", "비용 미제공"],
-  ["Tokens unavailable", "토큰 미제공"],
-  ["Some tokens unavailable", "일부 토큰 미제공"],
-  ["Unconfirmed", "확인되지 않음"],
-  ["tokens", "토큰"],
-  ["{0} requests", "요청 {0}회"],
-  ["{0} in / {1} out", "입력 {0} / 출력 {1}"],
-  ["Could not read AI usage.", "AI 사용량을 읽지 못했습니다."],
-  ["Could not save AI usage.", "AI 사용량을 저장하지 못했습니다."],
-  ["Could not watch AI usage. Refresh to update.", "사용량 자동 갱신에 연결하지 못했습니다. 새로고침으로 확인하세요."],
-  ["Recorded on this device from now on. ≈ is a base-rate estimate; + ? means some costs are unavailable. Interrupted requests may still be billed. Provider invoices may differ.", "이 기능 추가 이후 이 기기에서 기록한 사용량입니다. ≈는 기본 단가로 계산한 예상 비용, + ?는 일부 비용 미제공을 뜻합니다. 중단된 요청에도 요금이 발생할 수 있으며, 실제 청구액과 다를 수 있습니다."],
-  ["Only usage metadata is saved. No audio or dictated text is stored in usage history.", "사용량 숫자만 저장합니다. 사용 내역에는 음성과 받아쓴 문장을 보관하지 않습니다."],
-  ["Changes are saved automatically.", "변경 사항이 자동으로 저장됩니다."],
-  ["Dictation is too long to refine. The original text is available.", "다듬기에는 너무 긴 문장입니다. 원문을 사용할 수 있습니다."],
-  ["Text processing timed out. Used the original text.", "다듬기 시간이 초과되어 원문을 사용했습니다."],
-  ["Text processing was incomplete. Used the original text.", "다듬기가 완료되지 않아 원문을 사용했습니다."]
+  [
+    "Changes are saved automatically.",
+    "변경 사항이 자동으로 저장됩니다."
+  ],
+  [
+    "To use the saved key, choose Allow key use in settings.",
+    "저장된 키를 사용하려면 설정에서 ‘키 사용 허용’을 눌러 주세요."
+  ],
+  [
+    "This update changes Prism's signing identity and would reset macOS permissions. The installed app was not changed.",
+    "이 업데이트는 Prism의 서명을 변경하여 macOS 권한을 초기화할 수 있습니다. 설치된 앱은 변경하지 않았습니다."
+  ],
+  [
+    "Window behavior",
+    "창 배치 동작"
+  ],
+  [
+    "Window layout preview",
+    "창 배치 미리보기"
+  ],
+  [
+    "Try repeating a command",
+    "버튼을 반복해서 눌러보세요"
+  ],
+  [
+    "Cycle window sizes",
+    "반복 입력으로 크기 순환"
+  ],
+  [
+    "Repeat Left or Right Half to change size.",
+    "왼쪽·오른쪽 절반 단축키를 다시 누르면 크기가 바뀝니다."
+  ],
+  [
+    "Cycle order",
+    "순환 순서"
+  ],
+  [
+    "Window gap",
+    "창 사이 간격"
+  ],
+  [
+    "Screen edge gap",
+    "화면 가장자리 간격"
+  ],
+  [
+    "Almost Maximize size",
+    "거의 최대화 크기"
+  ],
+  [
+    "Preview only. Window options are saved in the desktop app.",
+    "미리보기입니다. 창 배치 설정은 데스크톱 앱에서 저장됩니다."
+  ],
+  [
+    "Layouts & shortcuts",
+    "배치와 단축키"
+  ],
+  [
+    "Bring your Raycast setup",
+    "Raycast 설정 가져오기"
+  ],
+  [
+    "Your shortcuts, snippets, and quicklinks. Ready for Prism.",
+    "익숙한 단축키, 스니펫, 퀵링크를 그대로."
+  ],
+  [
+    "Import from Raycast",
+    "Raycast에서 가져오기"
+  ],
+  [
+    "Raycast export file",
+    "Raycast 내보내기 파일"
+  ],
+  [
+    "Choose Raycast export",
+    "Raycast 파일 선택"
+  ],
+  [
+    "How to export from Raycast",
+    "Raycast에서 내보내는 방법"
+  ],
+  [
+    "Run Export Settings & Data in Raycast.",
+    "Raycast에서 Export Settings & Data를 실행하세요."
+  ],
+  [
+    "Save the .rayconfig file and remember its export password.",
+    ".rayconfig 파일을 저장하고 내보내기 암호를 기억하세요."
+  ],
+  [
+    "Choose the file here, then review what to bring over.",
+    "여기에서 파일을 선택하고 가져올 항목을 확인하세요."
+  ],
+  [
+    "Export password",
+    "내보내기 암호"
+  ],
+  [
+    "Unlock",
+    "열기"
+  ],
+  [
+    "Ready",
+    "가져오기 가능"
+  ],
+  [
+    "Conflicts",
+    "충돌"
+  ],
+  [
+    "Unsupported",
+    "미지원"
+  ],
+  [
+    "Bring over",
+    "가져올 항목"
+  ],
+  [
+    "Hotkeys",
+    "단축키"
+  ],
+  [
+    "Aliases",
+    "별칭"
+  ],
+  [
+    "Import preview",
+    "가져오기 미리보기"
+  ],
+  [
+    "Replace existing setting",
+    "기존 설정 교체"
+  ],
+  [
+    "Keep existing",
+    "기존 항목 유지"
+  ],
+  [
+    "Existing settings stay unless you select a replacement. Unsupported items are skipped.",
+    "직접 선택한 충돌 항목만 교체합니다. 미지원 항목은 건너뜁니다."
+  ],
+  [
+    "Import {0} items",
+    "{0}개 가져오기"
+  ],
+  [
+    "A local recovery copy is saved before import. Quit Raycast before activating the same hotkeys.",
+    "적용 전에 복구 사본을 저장합니다. 같은 단축키를 사용하려면 Raycast를 종료하세요."
+  ],
+  [
+    "Import recovery",
+    "가져오기 복구"
+  ],
+  [
+    "{0} imported · {1} failed · {2} undone",
+    "{0}개 가져옴 · {1}개 실패 · {2}개 되돌림"
+  ],
+  [
+    "An import was interrupted. Undo can recover changes already written.",
+    "가져오기가 중단되었습니다. 이미 적용된 변경은 되돌릴 수 있습니다."
+  ],
+  [
+    "View results",
+    "결과 보기"
+  ],
+  [
+    "Undo import",
+    "가져오기 되돌리기"
+  ],
+  [
+    "Confirm discard recovery",
+    "복구 사본 삭제 확인"
+  ],
+  [
+    "Discard recovery",
+    "복구 사본 삭제"
+  ],
+  [
+    "Undo keeps anything you changed after importing.",
+    "가져온 뒤 직접 수정한 항목은 유지합니다."
+  ],
+  [
+    "Preview files here. Apply them in the desktop app.",
+    "여기서 파일을 미리 볼 수 있습니다. 실제 적용은 데스크톱 앱에서 가능합니다."
+  ],
+  [
+    "Backup contents & privacy",
+    "백업 내용과 보관 안내"
+  ],
+  [
+    "File exceeds 20 MB.",
+    "파일 또는 압축 해제한 내용이 20 MB를 초과합니다."
+  ],
+  [
+    "Incorrect password or damaged file.",
+    "암호가 다르거나 파일이 손상되었습니다."
+  ],
+  [
+    "This Raycast export version is not supported yet.",
+    "아직 지원하지 않는 Raycast 내보내기 버전입니다."
+  ],
+  [
+    "This file is not a valid Raycast export.",
+    "올바른 Raycast 내보내기 파일이 아닙니다."
+  ],
+  [
+    "Unsupported Raycast data.",
+    "지원하지 않는 Raycast 데이터입니다."
+  ],
+  [
+    "Too many import items.",
+    "가져올 항목이 너무 많습니다."
+  ],
+  [
+    "Invalid or oversized item",
+    "내용이 잘못되었거나 너무 큼"
+  ],
+  [
+    "Unsupported placeholder",
+    "지원하지 않는 치환 문법"
+  ],
+  [
+    "Unsupported link",
+    "지원하지 않는 링크"
+  ],
+  [
+    "Expansion keyword needs a prefix (: ; ! /)",
+    "자동 확장 단축어에 접두사(: ; ! /) 필요"
+  ],
+  [
+    "No matching Prism command or installed app",
+    "대응되는 명령 또는 설치된 앱 없음"
+  ],
+  [
+    "Command is disabled in Prism",
+    "Prism에서 꺼진 명령"
+  ],
+  [
+    "Unsupported shortcut",
+    "지원하지 않는 단축키"
+  ],
+  [
+    "Unsupported alias",
+    "지원하지 않는 별칭"
+  ],
+  [
+    "This category is not supported yet",
+    "아직 지원하지 않는 항목"
+  ],
+  [
+    "Shortcut changed or is already in use",
+    "단축키가 변경되었거나 이미 사용 중입니다"
+  ],
+  [
+    "Alias changed or is already in use",
+    "별칭이 변경되었거나 이미 사용 중입니다"
+  ],
+  [
+    "Changed after import; kept",
+    "가져온 뒤 변경되어 유지했습니다"
+  ],
+  [
+    "Review expired. Choose the file again.",
+    "미리보기가 만료되었습니다. 파일을 다시 선택하세요."
+  ],
+  [
+    "applied",
+    "가져옴"
+  ],
+  [
+    "failed",
+    "실패"
+  ],
+  [
+    "pending",
+    "대기"
+  ],
+  [
+    "undone",
+    "되돌림"
+  ],
+  [
+    "Next Display",
+    "다음 디스플레이"
+  ],
+  [
+    "Previous Display",
+    "이전 디스플레이"
+  ],
+  [
+    "Maximize Width",
+    "가로 최대화"
+  ],
+  [
+    "Maximize Height",
+    "세로 최대화"
+  ],
+  [
+    "Reasonable Size",
+    "적당한 크기"
+  ],
+  [
+    "First Fourth",
+    "첫 번째 4분할"
+  ],
+  [
+    "Second Fourth",
+    "두 번째 4분할"
+  ],
+  [
+    "Third Fourth",
+    "세 번째 4분할"
+  ],
+  [
+    "Last Fourth",
+    "마지막 4분할"
+  ],
+  [
+    "Move Left",
+    "왼쪽 끝으로 이동"
+  ],
+  [
+    "Move Right",
+    "오른쪽 끝으로 이동"
+  ],
+  [
+    "Move Up",
+    "위쪽 끝으로 이동"
+  ],
+  [
+    "Move Down",
+    "아래쪽 끝으로 이동"
+  ],
+  [
+    "Filter window commands",
+    "창 배치 명령 필터"
+  ],
+  [
+    "All layouts",
+    "전체 배치"
+  ],
+  [
+    "Split layouts",
+    "분할 배치"
+  ],
+  [
+    "Size & position",
+    "크기와 위치"
+  ],
+  [
+    "An import is already running.",
+    "가져오기가 이미 진행 중입니다."
+  ],
+  [
+    "Invalid window management options.",
+    "창 배치 설정 값이 올바르지 않습니다."
+  ],
+  [
+    "Could not read window management options.",
+    "창 배치 설정을 읽지 못했습니다."
+  ],
+  [
+    "Invalid saved window management options.",
+    "저장된 창 배치 설정이 올바르지 않습니다."
+  ],
+  [
+    "Could not save window options.",
+    "창 배치 설정을 저장하지 못했습니다."
+  ],
+  [
+    "Connect another display to move this window.",
+    "창을 옮기려면 다른 디스플레이를 연결하세요."
+  ]
 ]
