@@ -110,6 +110,41 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             preconditionFailure("Expected invalid response")
         } catch {}
         print("PASS: provider error redaction and invalid transcript response")
+        let isolatedClipboard = NSPasteboard.withUniqueName()
+        defer { isolatedClipboard.releaseGlobally() }
+        precondition(TextInjector.copy("복구할 받아쓰기 👋", to: isolatedClipboard))
+        precondition(isolatedClipboard.string(forType: .string) == "복구할 받아쓰기 👋")
+        precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) == true)
+        print("PASS: native clipboard write/readback and transient history marker (isolated pasteboard; user clipboard unchanged)")
+        var clipboardWrites: [String] = []
+        let noTargetResult = await TextInjector.deliver("recoverable transcript", paste: true, pressEnterAfterPaste: false, target: nil, copyText: {
+            clipboardWrites.append($0); return true
+        })
+        precondition(clipboardWrites == ["recoverable transcript"])
+        precondition(noTargetResult == .copied || noTargetResult == .permissionRequired)
+        let failedCopy = await TextInjector.deliver("recoverable transcript", paste: true, pressEnterAfterPaste: true, target: nil, copyText: { _ in false })
+        precondition(failedCopy == .copyFailed)
+        let copyOnly = await TextInjector.deliver("copy only", paste: false, pressEnterAfterPaste: false, target: nil, copyText: {
+            clipboardWrites.append($0); return true
+        })
+        precondition(copyOnly == .copied && clipboardWrites.last == "copy only")
+        let cancelledDelivery = Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await TextInjector.deliver("cancelled", paste: false, pressEnterAfterPaste: false, target: nil, copyText: {
+                clipboardWrites.append($0); return true
+            })
+        }
+        _ = await cancelledDelivery.value
+        precondition(!clipboardWrites.contains("cancelled"))
+        let expectation = TextInsertionExpectation(value: "안녕 👋 world", range: CFRange(location: 6, length: 5), text: "Prism")!
+        precondition(expectation.confirms("안녕 👋 Prism"))
+        precondition(!expectation.confirms("안녕 👋 world") && !expectation.confirms(nil))
+        precondition(!expectation.confirms("Prism"))
+        precondition(TextInsertionExpectation(value: "same", range: CFRange(location: 0, length: 4), text: "same")?.confirms("same") == false)
+        precondition(TextInsertionExpectation(value: "a", range: CFRange(location: 2, length: 0), text: "b") == nil)
+        precondition(TextInsertionExpectation(value: "a", range: CFRange(location: 0, length: Int.max), text: "b") == nil)
+        precondition(!TextDeliveryResult.unverified.enteredInTargetApp && !TextDeliveryResult.sendFailed.enteredInTargetApp)
+        print("PASS: clipboard backup without a target, copy failure, cancellation, and verified UTF-16 insertion (spies; no clipboard changes or external insertion)")
         precondition(TextPostProcessor.clean("  prism  한글  ", vocabulary: ["Prism"]) == "Prism 한글")
         let json = """
         {"provider":"local","model":"","baseURL":"","language":"auto","prompt":"","vocabulary":[],"whisperPath":"/fixture","modelPath":"/fixture.bin","uiLanguage":"en","apiKey":""}
@@ -173,6 +208,24 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             controller.cancel()
         }
         print("PASS: default copy/paste and explicit paste/send route independently (local process + delivery spy; no external insertion)")
+        for outcome in [TextDeliveryResult.copied, .permissionRequired, .copyFailed, .unverified, .sendFailed] {
+            let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
+            let recorder = FakeRecorder(); recorder.outputURL = audio
+            var deliveries = 0
+            let controller = DictationController(recorder: recorder, presentsOverlay: false, deliver: { _, _, _, _ in
+                deliveries += 1; return outcome
+            })
+            var value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+            value["whisperPath"] = executable.path; value["defaultDelivery"] = "paste"
+            controller.toggle(fallbackPID: 0)
+            controller.configure(String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8)!, session: 1)
+            try await Task.sleep(for: .milliseconds(30)); controller.stop()
+            for _ in 0..<100 { if deliveries > 0 { break }; try await Task.sleep(for: .milliseconds(20)) }
+            precondition(deliveries == 1 && controller.phase == "error")
+            precondition(controller.message == outcome.fallbackMessage(controller.language) && !controller.message.isEmpty)
+            controller.cancel()
+        }
+        print("PASS: missing target, denied permission, clipboard failure, unconfirmed insertion and send failure retain explicit error messages")
         for (refine, prompt, failure, cancel) in [(false,false,false,false), (true,false,false,false), (false,true,false,false), (true,true,false,false), (true,false,true,false), (true,true,false,true)] {
             let audio = temp.appendingPathComponent(UUID().uuidString + ".wav"); try Data([1,2,3]).write(to: audio)
             let recorder = FakeRecorder(); recorder.outputURL = audio

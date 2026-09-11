@@ -1,12 +1,11 @@
-Prism 0.1.5 makes updates easier and fixes saved-key access and dictation error languages.
+Prism 0.1.6 fixes dictation completion and makes failed text delivery recoverable.
 
-- Show available updates in the launcher automatically, with direct install and restart actions. Background checks run after startup and every six hours.
-- Add Install updates automatically in Settings → General. It is off by default. When enabled, Prism downloads and verifies new versions in the background; changes take effect on the next restart without interrupting current work.
-- Request required Keychain authorization when starting dictation or an AI request, without a detour through Settings. Keep settings checks silent, reuse authorized keys, and distinguish canceled authorization from other failures.
-- Make native dictation errors follow the app language, including saved-key failures on the first recording attempt. Language changes apply without editing dictation settings.
-- Keep the launcher running when its window is closed. Cmd+Q closes the current window instead of quitting Prism. Add explicit Quit Prism actions in the launcher and settings. Escape closes the settings window.
+- Dismiss the dictation overlay before text delivery begins, preventing the waveform from briefly reappearing after transcription.
+- Copy each completed transcript to the clipboard before attempting insertion, and verify that the clipboard contains the text. Dictated text remains excluded from clipboard history.
+- Use the current focused element for insertion and check the resulting text before treating delivery as confirmed. Sending a paste shortcut alone no longer counts as confirmed insertion.
+- Show the reason and clipboard status when the insertion point is missing, Accessibility permission is unavailable, insertion cannot be confirmed, or automatic sending fails. Show a separate message if clipboard copying fails. Failure notices remain visible for three seconds.
 
-Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can install this release through Settings → General → Check for updates. The new launcher notifications and automatic-install setting become available after upgrading to 0.1.5.
+Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can update through the launcher notification or Settings → General → Check for updates.
 
 The macOS app uses the existing Prism Local Signing certificate and updater key. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway. Local-signed updates can still require renewed macOS Keychain approval.
 

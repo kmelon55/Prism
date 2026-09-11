@@ -248,6 +248,9 @@ final class DictationController: ObservableObject {
                 }
                 timer?.cancel()
                 lastTranscript = text
+                // Dismiss before publishing inserting: the live overlay would otherwise
+                // switch from transcription status to its default waveform during delivery.
+                if presentsOverlay { overlay.hide() }
                 phase = "inserting"; emit()
                 let result = await deliver(text, shouldPaste, pressEnter, target)
                 try Task.checkCancellation()
@@ -260,9 +263,9 @@ final class DictationController: ObservableObject {
                     }
                     emit()
                 } else {
-                    phase = result == .copyFailed ? "error" : "success"
+                    phase = "error"
                     message = result.fallbackMessage(language)
-                    show(); emit(); dismissLater(after: 1.4, session: session)
+                    show(); emit(); dismissLater(after: 3, session: session)
                 }
             } catch {
                 guard !Task.isCancelled, generation == session else { return }
@@ -284,7 +287,7 @@ final class DictationController: ObservableObject {
         configuration = nil; target = nil; removeCancel(); overlayPreviewPhase = nil; if presentsOverlay { overlay.hide() }
     }
     func fail(_ text: String) {
-        clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: 5, session: generation)
+        clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: 3, session: generation)
     }
     private func dismissLater(after seconds: Double, session: UInt64) {
         timer = Task {
@@ -357,6 +360,8 @@ final class DictationController: ObservableObject {
     }
     private func show() {
         guard presentsOverlay else { return }
+        // Language updates can request a refresh while asynchronous delivery is pending.
+        guard phase != "inserting" else { return }
         if message.isEmpty { overlay.show() } else { overlay.showToast(message) }
     }
 }

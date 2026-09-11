@@ -9,12 +9,33 @@ struct TextInsertionTarget {
     let application: NSRunningApplication
 }
 
+struct TextInsertionExpectation {
+    let original: String
+    let expected: String
+
+    init?(value: String, range: CFRange, text: String) {
+        let original = value as NSString
+        guard range.location >= 0, range.length >= 0,
+              range.location <= original.length,
+              range.length <= original.length - range.location else { return nil }
+        self.original = value
+        expected = original.replacingCharacters(in: NSRange(location: range.location, length: range.length), with: text)
+    }
+
+    func confirms(_ value: String?) -> Bool {
+        // An unchanged AX value is not evidence that the app accepted an insertion.
+        expected != original && value == expected
+    }
+}
+
 enum TextDeliveryResult: Equatable {
     case inserted
     case pasted
     case copied
     case permissionRequired
     case copyFailed
+    case unverified
+    case sendFailed
 
     var enteredInTargetApp: Bool {
         self == .inserted || self == .pasted
@@ -28,6 +49,16 @@ enum TextDeliveryResult: Equatable {
             return language.text(
                 "손쉬운 사용 권한이 꺼져 있어 클립보드에 복사했어요",
                 "Accessibility permission is off, so the text was copied"
+            )
+        case .unverified:
+            return language.text(
+                "입력 완료를 확인하지 못했어요. 텍스트는 클립보드에 복사했어요.",
+                "Could not confirm insertion. The text is on the clipboard."
+            )
+        case .sendFailed:
+            return language.text(
+                "자동 전송에 실패했어요. 텍스트는 클립보드에 복사했어요.",
+                "Could not send automatically. The text is on the clipboard."
             )
         default:
             return language.text(
@@ -47,13 +78,17 @@ enum TextInjector {
 
     @discardableResult
     static func copy(_ text: String) -> Bool {
-        let pasteboard = NSPasteboard.general
+        copy(text, to: .general)
+    }
+
+    @discardableResult
+    static func copy(_ text: String, to pasteboard: NSPasteboard) -> Bool {
         let item = NSPasteboardItem()
         guard item.setString(text, forType: .string),
               item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) else { return false }
         pasteboard.clearContents()
         // Respect Prism's transient clipboard filter; do not persist dictated text in history.
-        return pasteboard.writeObjects([item])
+        return pasteboard.writeObjects([item]) && pasteboard.string(forType: .string) == text
     }
 
     static func captureTarget(fallbackPID: pid_t = 0) -> TextInsertionTarget? {
@@ -84,41 +119,37 @@ enum TextInjector {
         _ text: String,
         paste: Bool,
         pressEnterAfterPaste: Bool,
-        target: TextInsertionTarget?
+        target: TextInsertionTarget?,
+        copyText: @MainActor (String) -> Bool = TextInjector.copy
     ) async -> TextDeliveryResult {
         guard !Task.isCancelled else { return .copied }
+        // Preserve every result before trying AX or keyboard delivery. An app can
+        // acknowledge an AX write or receive Command-V without accepting the text.
+        guard copyText(text) else { return .copyFailed }
         guard paste else {
             logger.notice("Delivery copied: auto-paste disabled")
-            return copy(text) ? .copied : .copyFailed
+            return .copied
         }
 
         guard hasAccessibilityPermission else {
             logger.error("Delivery copied: accessibility permission unavailable")
-            return copy(text) ? .permissionRequired : .copyFailed
+            return .permissionRequired
         }
 
         guard let target, !target.application.isTerminated else {
             logger.error("Delivery copied: recording target missing")
-            return copy(text) ? .copied : .copyFailed
+            return .copied
         }
 
         // Orca's terminal exposes a hidden textarea through AX. Setting its value
         // reports success but does not emit terminal input; use its paste handler.
         let usePasteShortcut = target.application.bundleIdentifier == "com.stablyai.orca"
-        // 녹음 시작 때 저장한 요소와 현재 앱이 보고하는 포커스 요소를 모두 확인합니다.
-        if !usePasteShortcut, let element = target.focusedElement, insertDirectly(text, into: element) {
-            logger.notice("Delivery inserted into captured AX element")
-            return await finishDelivery(
-                .inserted,
-                pressEnter: pressEnterAfterPaste,
-                processIdentifier: target.processIdentifier
-            )
-        }
+        // Use the current insertion point; a captured element may no longer be focused.
         if !usePasteShortcut, let element = focusedElement(for: target.processIdentifier),
-           insertDirectly(text, into: element) {
-            logger.notice("Delivery inserted into current AX element")
+           let result = insertDirectly(text, into: element) {
+            logger.notice("Delivery wrote to current AX element; confirmed=\(result.enteredInTargetApp, privacy: .public)")
             return await finishDelivery(
-                .inserted,
+                result,
                 pressEnter: pressEnterAfterPaste,
                 processIdentifier: target.processIdentifier
             )
@@ -126,7 +157,7 @@ enum TextInjector {
 
         guard let application = NSRunningApplication(processIdentifier: target.processIdentifier) else {
             logger.error("Delivery copied: target pid=\(target.processIdentifier, privacy: .public) is not running")
-            return copy(text) ? .copied : .copyFailed
+            return .copied
         }
 
         let targetWasFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
@@ -145,11 +176,14 @@ enum TextInjector {
                 application.activate()
                 continue
             }
-            if !usePasteShortcut, let element = focusedElement(for: target.processIdentifier),
-               insertDirectly(text, into: element) {
-                logger.notice("Delivery inserted after target activation")
+            guard let element = focusedElement(for: target.processIdentifier) else {
+                logger.error("Delivery copied: no focused element")
+                return .copied
+            }
+            if !usePasteShortcut, let result = insertDirectly(text, into: element) {
+                logger.notice("Delivery wrote after target activation; confirmed=\(result.enteredInTargetApp, privacy: .public)")
                 return await finishDelivery(
-                    .inserted,
+                    result,
                     pressEnter: pressEnterAfterPaste,
                     processIdentifier: target.processIdentifier
                 )
@@ -157,25 +191,30 @@ enum TextInjector {
 
             // Whisp fallback: Electron/WebView inputs need not expose an AX text role.
             // The saved target must still be frontmost before posting Command-V.
-            guard copy(text) else { return .copyFailed }
+            guard copyText(text) else { return .copyFailed }
+            let expectation = insertionExpectation(text, in: element)
             let revision = NSPasteboard.general.changeCount
             try? await Task.sleep(for: .milliseconds(35))
-            guard !Task.isCancelled, NSPasteboard.general.changeCount == revision,
+            guard !Task.isCancelled else { return .copied }
+            guard NSPasteboard.general.changeCount == revision,
                   NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
                   postPasteShortcut(to: target.processIdentifier) else {
                 logger.error("Delivery copied: could not create paste events")
-                return .copied
+                return copyText(text) ? .copied : .copyFailed
             }
             logger.notice("Delivery sent Command-V to pid=\(target.processIdentifier, privacy: .public)")
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return .copied }
+            let confirmed = expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) ?? false
             return await finishDelivery(
-                .pasted,
+                confirmed ? .pasted : .unverified,
                 pressEnter: pressEnterAfterPaste,
                 processIdentifier: target.processIdentifier
             )
         }
 
         logger.error("Delivery copied: target application did not become frontmost")
-        return copy(text) ? .copied : .copyFailed
+        return copyText(text) ? .copied : .copyFailed
     }
 
     private static func finishDelivery(
@@ -187,10 +226,13 @@ enum TextInjector {
 
         // 붙여넣기를 처리할 짧은 여유를 준 뒤 Enter를 보냅니다.
         try? await Task.sleep(for: .milliseconds(80))
-        if postEnterKey(to: processIdentifier) {
+        guard !Task.isCancelled else { return result }
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier,
+           postEnterKey(to: processIdentifier) {
             logger.notice("Delivery sent Enter to pid=\(processIdentifier, privacy: .public)")
         } else {
             logger.error("Delivery could not create Enter events")
+            return .sendFailed
         }
         return result
     }
@@ -233,17 +275,30 @@ enum TextInjector {
         belongsToProcess(element, ProcessInfo.processInfo.processIdentifier)
     }
 
-    private static func insertDirectly(_ text: String, into element: AXUIElement) -> Bool {
+    private static func insertDirectly(_ text: String, into element: AXUIElement) -> TextDeliveryResult? {
+        let expectation = insertionExpectation(text, in: element)
         if isAttributeSettable(kAXSelectedTextAttribute, on: element),
            AXUIElementSetAttributeValue(
                element,
                kAXSelectedTextAttribute as CFString,
                text as CFString
            ) == .success {
-            return true
+            return expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) == true ? .inserted : .unverified
         }
 
-        return replaceValueAtSelectedRange(text, in: element)
+        guard replaceValueAtSelectedRange(text, in: element) else { return nil }
+        return expectation?.confirms(attribute(kAXValueAttribute, from: element) as? String) == true ? .inserted : .unverified
+    }
+
+    private static func insertionExpectation(_ text: String, in element: AXUIElement) -> TextInsertionExpectation? {
+        guard let value = attribute(kAXValueAttribute, from: element) as? String,
+              let reference = attribute(kAXSelectedTextRangeAttribute, from: element),
+              CFGetTypeID(reference) == AXValueGetTypeID() else { return nil }
+        let rangeValue = unsafeBitCast(reference, to: AXValue.self)
+        var range = CFRange()
+        guard AXValueGetType(rangeValue) == .cfRange,
+              AXValueGetValue(rangeValue, .cfRange, &range) else { return nil }
+        return TextInsertionExpectation(value: value, range: range, text: text)
     }
 
     private static func replaceValueAtSelectedRange(_ text: String, in element: AXUIElement) -> Bool {
