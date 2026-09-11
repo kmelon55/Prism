@@ -1,6 +1,6 @@
 [package]
 name = "prism-desktop"
-version = "0.1.7"
+version = "0.1.8"
 description = "Prism desktop command palette"
 authors = ["Prism contributors"]
 edition = "2021"

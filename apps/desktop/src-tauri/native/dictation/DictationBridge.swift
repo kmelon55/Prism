@@ -100,7 +100,6 @@ final class DictationController: ObservableObject {
     var processingMode = "none"
     private var processingContinuation: CheckedContinuation<ProcessingResult, Never>?
     private var receipt = UsageReceipt()
-    private var refinementWarning = ""
 
 
     init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?) async -> TextDeliveryResult = { text, paste, enter, target in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target) }) {
@@ -151,7 +150,7 @@ final class DictationController: ObservableObject {
         clear()
         generation &+= 1
         recoveryEntry = nil; recoveryWarning = ""
-        processingMode = promptMode ? "prompt" : "none"; receipt = UsageReceipt(); refinementWarning = ""
+        processingMode = promptMode ? "prompt" : "none"; receipt = UsageReceipt()
         target = TextInjector.captureTarget(fallbackPID: fallbackPID)
         phase = "preparing"; message = ""
         show(); installCancel(); emit(action: "configure")
@@ -258,9 +257,8 @@ final class DictationController: ObservableObject {
                     guard generation == session else { return }
                     if let refined = result.text?.trimmingCharacters(in: .whitespacesAndNewlines), !refined.isEmpty, refined.utf8.count <= 1_048_576 {
                         text = refined
-                    } else {
-                        refinementWarning = language.text("다듬지 못해 원문을 사용했습니다.", "Could not refine. Used the original text.")
                     }
+                    // If refinement fails, deliver the saved original without a completion notice.
                 }
                 timer?.cancel()
                 lastTranscript = text
@@ -278,11 +276,8 @@ final class DictationController: ObservableObject {
                 guard generation == session else { return }
                 timer?.cancel(); configuration = nil; target = nil; removeCancel()
                 if result.enteredInTargetApp || result == .pasteSent || (!shouldPaste && result == .copied) {
-                    phase = "idle"; message = result == .pasteSent
-                        ? language.text("붙여넣기 요청을 보냈어요. 결과는 받아쓰기 복구 폴더에 보관됩니다.", "Paste requested. The result is saved in Dictation Recovery.") : refinementWarning
-                    if presentsOverlay {
-                        if message.isEmpty { overlay.hide() } else { overlay.showToast(message); dismissLater(after: 2.2, session: session) }
-                    }
+                    phase = "idle"; message = ""
+                    if presentsOverlay { overlay.hide() }
                     emit()
                 } else {
                     phase = "error"

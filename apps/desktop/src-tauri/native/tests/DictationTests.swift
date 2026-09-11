@@ -310,7 +310,9 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
             try await Task.sleep(for: .milliseconds(30)); controller.stop()
             for _ in 0..<100 { if deliveries > 0 { break }; try await Task.sleep(for: .milliseconds(20)) }
             precondition(deliveries == 1 && controller.phase == (outcome == .pasteSent ? "idle" : "error"))
-            if outcome != .pasteSent { precondition(controller.message == outcome.fallbackMessage(controller.language) && !controller.message.isEmpty) }
+            if outcome == .pasteSent {
+                precondition(controller.message.isEmpty, "Opaque paste delivery must dismiss without a completion or recovery notice")
+            } else { precondition(controller.message == outcome.fallbackMessage(controller.language) && !controller.message.isEmpty) }
             controller.cancel()
         }
         print("PASS: missing target, denied permission, clipboard failure, unconfirmed insertion and send failure retain explicit error messages")
@@ -338,7 +340,7 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
                 precondition(delivered.isEmpty && controller.phase == "idle")
             } else {
                 precondition(delivered == [(!refine && !prompt) || failure ? "local fixture transcript" : "refined fixture"])
-                if failure { precondition(!controller.message.isEmpty) }
+                precondition(controller.phase == "idle" && controller.message.isEmpty, "Delivered original or refined text must dismiss silently")
                 controller.cancel()
             }
         }
