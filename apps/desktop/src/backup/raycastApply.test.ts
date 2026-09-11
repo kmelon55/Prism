@@ -20,6 +20,20 @@ let aliases: Record<string, string>;
 const access: AliasAccess = { read: () => aliases, write: async next => { aliases = next; }, disabled: () => [] };
 const hotkey: ImportItem = { id: "1", category: "hotkeys", title: "Left Half", commandId: "window:left-half", value: "Control+Alt+Left" };
 beforeEach(() => { aliases = {}; state.shortcuts = {}; state.entries = []; state.failJournal = false; state.failShortcut = false; state.calls = []; });
+it("registers and undoes Raycast X window shortcuts and aliases through Prism commands", async () => {
+  const rows = buildRaycastPlan({ settings: { commands: [
+    { id: "c:r:window-management::-::leftHalf", hotkey: "option-18", alias: "left" },
+    { id: "c:r:window-management::-::moveNextDisplay", hotkey: "control-command-14" },
+  ] } }, { apps: [], entries: [], aliases: {}, hotkeys: {}, disabled: [] });
+  expect(rows.every(row => !row.reason)).toBe(true);
+  const journal = await applyRaycastItems(rows, access, () => {});
+  expect(state.shortcuts).toEqual({ "window:left-half": "Alt+1", "window:next-display": "Control+Super+E" });
+  expect(aliases).toEqual({ "window:left-half": "left" });
+  expect(journal.changes.every(change => change.state === "applied")).toBe(true);
+  await undoRaycastImport(journal, access, () => {});
+  expect(state.shortcuts).toEqual({});
+  expect(aliases).toEqual({});
+});
 it("imports and undoes power shortcuts and aliases without executing them", async () => {
   const rows = buildRaycastPlan({ settings: { commands: [{ id: "c:r:system::*::restart", alias: "reboot", hotkey: "control-option-0" }] } }, { apps: [], entries: [], aliases: {}, hotkeys: {}, disabled: [], platform: "macos" });
   const journal = await applyRaycastItems(rows, access, () => {});

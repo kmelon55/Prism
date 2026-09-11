@@ -9,7 +9,7 @@ Dictation settings offer two side-by-side enhancements: **Refine speech** and **
 - Both ordinary and prompt double-modifier shortcuts retain priority over single-modifier recording actions.
 - Local STT model and executable paths are selected inside **Change model → Local**. Settings dropdowns use the same custom keyboard-accessible menu in browser and native WebView.
 - Processing is instructed to preserve intent, negation, uncertainty, names and constraints. It must not answer the dictated prompt or add requirements. These are model instructions, not a guarantee of semantic fidelity.
-- The native overlay distinguishes transcription from processing and briefly shows tokens/cost after successful delivery. **Copy original text** retains access to the last unrefined transcript in memory.
+- The native overlay distinguishes transcription from processing and dismisses after successful delivery. Refinement failures still show a brief warning. Tokens and cost are available only in Settings → AI. **Copy original text** retains access to the last unrefined transcript in memory.
 - Processing has a 20-second deadline and an independent native recovery timer. Missing configuration, errors, empty/truncated results and timeouts fall back to the original transcript. Cancellation prevents late results from reaching the target app.
 - Local STT plus remote processing sends the transcript to the selected text provider; the settings disclose this before enabling refinement. No screen or surrounding document context is collected.
 

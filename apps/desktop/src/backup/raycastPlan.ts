@@ -58,6 +58,8 @@ export function raycastHotkey(value: unknown): string | undefined {
 const windows = new Map(prismCommandDefinitions.filter(command => command.id.startsWith("window:")).map(command => [command.id.slice(7).replaceAll("-", "").toLowerCase(), command.id]));
 windows.set("firsttwothirds", "window:left-two-thirds"); windows.set("lasttwothirds", "window:right-two-thirds");
 windows.set("restore", "window:restore-previous-layout");
+windows.set("movenextdisplay", "window:next-display");
+windows.set("movepreviousdisplay", "window:previous-display");
 const builtins: Record<string, string> = {
   clipboardHistory: "clipboard:open-history", searchEmoji: "prism:emoji", fileSearch: "prism:files", searchFiles: "prism:files",
   searchSnippets: "prism:snippets", searchQuicklinks: "prism:links", lockScreen: "system:lock-screen",
@@ -89,10 +91,10 @@ export function resolveRaycastCommand(key: string, path: string, apps: NativeApp
     const windowName = name.replace(/^windowManagement[_-]?/i, "").replace(/[-_]/g, "").toLowerCase();
     return windows.get(windowName);
   }
-  const match = /^c:r:([^:]+)::\*::([^:]+)$/.exec(key);
+  const match = /^c:r:([^:]+)::(?:\*|-)::([^:]+)$/.exec(key);
   if (!match) return;
   const [, packageName, name] = match;
-  if (packageName === "windowManagement") return windows.get(name.replace(/[-_]/g, "").toLowerCase());
+  if (packageName === "windowManagement" || packageName === "window-management") return windows.get(name.replace(/[-_]/g, "").toLowerCase());
   const commands = Object.hasOwn(packageBuiltins, packageName) ? packageBuiltins[packageName] : undefined;
   return commands && Object.hasOwn(commands, name) ? commands[name] : undefined;
 }

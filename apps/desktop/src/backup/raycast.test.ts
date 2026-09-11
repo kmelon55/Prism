@@ -17,8 +17,52 @@ const classic = {
 };
 const context: ImportContext = { apps: [{ id: "example", name: "Example", path: "/Applications/Example.app", platform: "macos", rankingBoost: 0 }], entries: [], aliases: {}, hotkeys: {}, disabled: [] };
 const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+function container(header: unknown, payload: Uint8Array): Uint8Array<ArrayBuffer> {
+  const compressed = gzipSync(encode(header));
+  const prefix = Buffer.alloc(12);
+  prefix.write("RAYCFG3\n");
+  prefix.writeUInt32LE(compressed.length, 8);
+  return new Uint8Array(Buffer.concat([prefix, compressed, payload]));
+}
 beforeAll(() => { vi.stubGlobal("crypto", webcrypto); vi.stubGlobal("Blob", NodeBlob); });
 describe("Raycast export decoding", () => {
+  it("reads an unencrypted Raycast X schema 3 container and builds its review", async () => {
+    const data = { snippets: { snippets: [{ title: "Sample", text: "Content" }] }, settings: { commands: [{ id: "c:r:windowManagement::*::leftHalf", alias: "left" }] } };
+    const file = container({ schemaVersion: 3, appVersion: "test" }, gzipSync(encode(data)));
+    // File views may start inside a larger ArrayBuffer.
+    const padded = new Uint8Array(file.length + 7); padded.set(file, 7);
+    const decoded = await decodeRaycastFile(padded.subarray(7));
+    expect(decoded).toEqual(data);
+    expect(buildRaycastPlan(decoded, context)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "snippets", title: "Sample" }),
+      expect.objectContaining({ category: "aliases", commandId: "window:left-half", value: "left" }),
+    ]));
+  });
+  it("prompts for the schema 3 password and authenticates the trailing GCM tag", async () => {
+    const password = " Raycast X export ";
+    const iv = Buffer.alloc(16, 43), salt = Buffer.alloc(16, 29);
+    const cipher = createCipheriv("aes-256-gcm", scryptSync(password, salt, 32), iv);
+    const encrypted = Buffer.concat([cipher.update(gzipSync(encode(classic))), cipher.final(), cipher.getAuthTag()]);
+    const file = container({ schemaVersion: 3, encryption: { iv: iv.toString("hex"), salt: salt.toString("hex") } }, encrypted);
+    await expect(decodeRaycastFile(file)).rejects.toMatchObject({ code: "password" });
+    await expect(decodeRaycastFile(file, password.trim())).rejects.toMatchObject({ code: "decrypt" });
+    expect(await decodeRaycastFile(file, password)).toEqual(classic);
+    const corrupted = file.slice(); corrupted[corrupted.length - 1] ^= 1;
+    await expect(decodeRaycastFile(corrupted, password)).rejects.toMatchObject({ code: "decrypt" });
+  });
+  it("rejects malformed schema 3 framing, metadata and oversized decompressed data", async () => {
+    const file = container({ schemaVersion: 3 }, gzipSync(encode(classic)));
+    for (const length of [8, 11, 13]) await expect(decodeRaycastFile(file.slice(0, length))).rejects.toMatchObject({ code: "invalid" });
+    for (const length of [0, file.length, 1024 * 1024 + 1]) {
+      const invalid = file.slice(); new DataView(invalid.buffer).setUint32(8, length, true);
+      await expect(decodeRaycastFile(invalid)).rejects.toMatchObject({ code: "invalid" });
+    }
+    await expect(decodeRaycastFile(container({ schemaVersion: 4 }, gzipSync(encode(classic))))).rejects.toMatchObject({ code: "version" });
+    await expect(decodeRaycastFile(container({ schemaVersion: 3, encryption: { iv: "bad", salt: "00".repeat(16) } }, new Uint8Array(32)))).rejects.toMatchObject({ code: "invalid" });
+    await expect(decodeRaycastFile(container({ schemaVersion: 3, encryption: {} }, new Uint8Array(16)))).rejects.toMatchObject({ code: "invalid" });
+    await expect(decodeRaycastFile(container({ schemaVersion: 3, padding: "x".repeat(1024 * 1024) }, gzipSync(encode(classic))))).rejects.toMatchObject({ code: "size" });
+    await expect(decodeRaycastFile(container({ schemaVersion: 3 }, gzipSync(Buffer.alloc(21 * 1024 * 1024))))).rejects.toMatchObject({ code: "size" });
+  });
   it("reads plain and gzipped classic exports", async () => {
     expect(await decodeRaycastFile(encode(classic))).toEqual(classic);
     expect(await decodeRaycastFile(new Uint8Array(gzipSync(encode(classic))))).toEqual(classic);
@@ -50,6 +94,29 @@ describe("Raycast export decoding", () => {
   });
 });
 describe("Raycast migration review", () => {
+  it.each([
+    ["leftHalf", "window:left-half"], ["rightHalf", "window:right-half"],
+    ["maximize", "window:maximize"], ["centerThird", "window:center-third"],
+    ["moveNextDisplay", "window:next-display"], ["movePreviousDisplay", "window:previous-display"],
+    ["bottomCenterSixth", "window:bottom-center-sixth"], ["bottomLeftSixth", "window:bottom-left-sixth"],
+    ["bottomRightSixth", "window:bottom-right-sixth"], ["topCenterSixth", "window:top-center-sixth"],
+    ["topLeftSixth", "window:top-left-sixth"], ["topRightSixth", "window:top-right-sixth"],
+  ])("maps Raycast X %s hotkeys and aliases to an existing window command", (source, target) => {
+    const macosHotkey = { kind: { type: "SingleStep", shortcut: { modifiers: [{ modifier: "Alt" }], key: { type: "LayoutIndependent", code: 18 } } } };
+    const data = { settings: { commands: [{ id: `c:r:window-management::-::${source}`, macosHotkey, alias: "layout" }] } };
+    const rows = buildRaycastPlan(data, context);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ commandId: target, category: "hotkeys", value: "Alt+1" });
+    expect(rows[1]).toMatchObject({ commandId: target, category: "aliases", value: "layout" });
+    expect(rows.every(row => !row.reason && !row.conflict && !row.title.startsWith("c:r:"))).toBe(true);
+    expect(buildRaycastPlan(data, { ...context, disabled: [target] }).every(row => row.reason === "Command is disabled in Prism")).toBe(true);
+    expect(buildRaycastPlan(data, { ...context, hotkeys: { [target]: "Super+K" }, aliases: { [target]: "existing" } }).every(row => row.conflict && row.before)).toBe(true);
+  });
+  it("does not map extension commands or custom window layouts by their leaf names", () => {
+    for (const id of ["c:e:window-management::-::leftHalf", "c:r:other::-::leftHalf", "c:r:window-management::-::customLayout::=::leftHalf", "c:r:window-management::-::unknownLayout"]) {
+      expect(resolveRaycastCommand(id, "", [])).toBeUndefined();
+    }
+  });
   it.each([
     ["sleep", "system:sleep"], ["sleepDisplays", "system:sleep-displays"],
     ["restart", "system:restart"], ["shutDown", "system:shutdown"], ["logOut", "system:log-out"],

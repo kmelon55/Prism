@@ -13,6 +13,7 @@ apps/desktop/src-tauri/gen/
 !.env.example
 *.key
 *.pem
+*.rayconfig
 artifacts/
 apps/android/evidence/
 docs/evidence/

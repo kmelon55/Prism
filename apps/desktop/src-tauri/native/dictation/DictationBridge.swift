@@ -246,8 +246,7 @@ final class DictationController: ObservableObject {
                 if result.enteredInTargetApp || (!shouldPaste && result == .copied) {
                     phase = "idle"; message = refinementWarning
                     if presentsOverlay {
-                        let summary = [refinementWarning, receipt.label(language)].filter { !$0.isEmpty }.joined(separator: " · ")
-                        if summary.isEmpty { overlay.hide() } else { overlay.showToast(summary); dismissLater(after: 2.2, session: session) }
+                        if message.isEmpty { overlay.hide() } else { overlay.showToast(message); dismissLater(after: 2.2, session: session) }
                     }
                     emit()
                 } else {
