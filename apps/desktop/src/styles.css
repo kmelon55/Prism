@@ -88,6 +88,10 @@ button { color: inherit; }
   isolation: isolate;
 }
 
+/* macOS paints the shell tint with its window, so a delayed web frame cannot
+   expose an untinted glass strip while the native bounds change. */
+:root[data-native-tint="true"] .prism-shell { background: transparent; }
+
 .prism-shell.browser-preview {
   width: min(760px, calc(100% - 32px));
   height: min(500px, calc(100% - 32px));
@@ -2312,10 +2316,12 @@ kbd {
 .prism-shell.browser-preview.ai-expanded { transition-duration: 420ms; }
 .ai-conversation-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .ai-conversation-stage > .ai-conversation { position: absolute; inset: 0; }
-.ai-phase-opening .ai-session-sidebar { animation: ai-sidebar-arrive 340ms var(--ai-ease) 50ms both; }
-.ai-phase-opening .ai-header { animation: ai-content-arrive 320ms var(--ai-ease) 90ms both; }
-.ai-phase-opening .ai-messages { animation: ai-content-arrive 340ms var(--ai-ease) 120ms both; }
-.ai-phase-opening .ai-composer { animation: ai-content-arrive 320ms var(--ai-ease) 150ms both; }
+/* Keep pane backgrounds and borders attached to the expanding shell. Animate
+   their contents immediately so the window never leads an empty, faded panel. */
+.ai-phase-opening .ai-session-sidebar > * { animation: ai-sidebar-arrive 340ms var(--ai-ease) both; }
+.ai-phase-opening .ai-header > * { animation: ai-content-arrive 320ms var(--ai-ease) both; }
+.ai-phase-opening .ai-messages { animation: ai-content-arrive 340ms var(--ai-ease) both; }
+.ai-phase-opening .ai-composer > * { animation: ai-content-arrive 320ms var(--ai-ease) both; }
 .ai-phase-closing .ai-session-sidebar { animation: ai-sidebar-leave 120ms ease-in both; }
 .ai-phase-closing .ai-conversation-stage { animation: ai-content-leave 100ms ease-in both; }
 .ai-phase-returning .search-zone { animation: ai-content-arrive 250ms var(--ai-ease) 40ms both; }

@@ -41,6 +41,7 @@ pub enum Provider {
     Openai,
     Openrouter,
     Vercel,
+    Compatible,
 }
 impl Provider {
     pub(crate) fn account(self) -> &'static str {
@@ -48,6 +49,7 @@ impl Provider {
             Self::Openai => "openai",
             Self::Openrouter => "openrouter",
             Self::Vercel => "vercel",
+            Self::Compatible => "compatible",
         }
     }
     fn endpoint(self) -> &'static str {
@@ -55,6 +57,7 @@ impl Provider {
             Self::Openai => "https://api.openai.com/v1/responses",
             Self::Openrouter => "https://openrouter.ai/api/v1/chat/completions",
             Self::Vercel => "https://ai-gateway.vercel.sh/v1/chat/completions",
+            Self::Compatible => unreachable!("custom endpoints are resolved from saved configuration"),
         }
     }
 }
@@ -62,6 +65,8 @@ impl Provider {
 pub struct Message {
     role: String,
     content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    image: Option<crate::ai_capture::ChatImage>,
 }
 #[derive(Default)]
 pub struct AiRequests(Mutex<std::collections::HashMap<String, oneshot::Sender<()>>>);
@@ -127,16 +132,19 @@ fn inspect_key(provider: Provider) -> Result<KeyInfo, String> {
 }
 #[tauri::command]
 pub async fn ai_key_info(provider: Provider) -> Result<KeyInfo, String> {
+    if provider == Provider::Compatible { return Err("Manage this server connection in AI settings.".into()); }
     tauri::async_runtime::spawn_blocking(move || inspect_key(provider))
         .await
         .map_err(|_| "키체인 작업을 완료하지 못했습니다.".to_string())?
 }
 #[tauri::command]
-pub async fn ai_key_status(provider: Provider) -> Result<bool, String> {
+pub async fn ai_key_status(app: tauri::AppHandle, provider: Provider) -> Result<bool, String> {
+    if provider == Provider::Compatible { return crate::ai_compatible::ai_get_compatible(app).map(|value| !value.base_url.is_empty()); }
     ai_key_info(provider).await.map(|info| info.configured)
 }
 #[tauri::command]
 pub async fn ai_unlock_key(provider: Provider) -> Result<KeyInfo, String> {
+    if provider == Provider::Compatible { return Err("Manage this server connection in AI settings.".into()); }
     tauri::async_runtime::spawn_blocking(move || {
         let mut sessions = key_sessions().lock().map_err(|_| "AI 키 상태를 읽지 못했습니다.")?;
         let session = sessions.entry(provider.account()).or_default();
@@ -152,6 +160,7 @@ pub async fn ai_unlock_key(provider: Provider) -> Result<KeyInfo, String> {
 }
 #[tauri::command]
 pub async fn ai_save_key(provider: Provider, key: String) -> Result<KeyInfo, String> {
+    if provider == Provider::Compatible { return Err("Manage this server connection in AI settings.".into()); }
     let key = key.trim().to_owned();
     if key.is_empty() || key.len() > 4096 || !key.bytes().all(|b| b.is_ascii_graphic()) {
         return Err("공백이나 줄바꿈이 없는 API 키를 입력하세요.".into());
@@ -189,6 +198,7 @@ pub async fn ai_save_key(provider: Provider, key: String) -> Result<KeyInfo, Str
 }
 #[tauri::command]
 pub async fn ai_delete_key(provider: Provider) -> Result<(), String> {
+    if provider == Provider::Compatible { return Err("Manage this server connection in AI settings.".into()); }
     tauri::async_runtime::spawn_blocking(move || {
         #[cfg(target_os = "macos")]
         {
@@ -239,14 +249,28 @@ fn validate(model: &str, messages: &[Message]) -> Result<(), String> {
             "대화가 너무 길거나 올바르지 않습니다. 새 대화를 시작하거나 내용을 줄여 주세요.".into(),
         );
     }
+    let images: Vec<_> = messages.iter().filter_map(|message| message.image.as_ref()).collect();
+    if images.len() > crate::ai_capture::MAX_SESSION_IMAGES || messages.iter().any(|message| message.role != "user" && message.image.is_some()) {
+        return Err("대화마다 화면 캡처를 최대 4개까지 사용할 수 있습니다.".into());
+    }
+    for image in images { crate::ai_capture::validate_image(image)?; }
     Ok(())
 }
 fn request_body(provider: Provider, model: &str, messages: &[Message]) -> Value {
+    let messages: Vec<Value> = messages.iter().map(|message| {
+        let Some(image) = &message.image else { return json!({"role":message.role,"content":message.content}); };
+        let content = if provider == Provider::Openai {
+            json!([{"type":"input_text","text":message.content},{"type":"input_image","image_url":image.data_url}])
+        } else {
+            json!([{"type":"text","text":message.content},{"type":"image_url","image_url":{"url":image.data_url}}])
+        };
+        json!({"role":message.role,"content":content})
+    }).collect();
     match provider {
         Provider::Openai => {
             json!({"model": model, "input": messages, "store": false, "max_output_tokens": 4096})
         }
-        Provider::Openrouter | Provider::Vercel => {
+        Provider::Openrouter | Provider::Vercel | Provider::Compatible => {
             json!({"model": model, "messages": messages, "max_tokens": 4096})
         }
     }
@@ -271,7 +295,7 @@ pub(crate) fn response_text(provider: Provider, value: &Value) -> Result<String,
                 .collect::<Vec<_>>()
                 .join("\n")
         }
-        Provider::Openrouter | Provider::Vercel => {
+        Provider::Openrouter | Provider::Vercel | Provider::Compatible => {
             if value["choices"][0]["finish_reason"] == "length" {
                 let content = value["choices"][0]["message"]["content"]
                     .as_str()
@@ -398,6 +422,7 @@ fn http_error(
     };
     let name = match provider {
         Provider::Vercel => "Vercel AI Gateway",
+        Provider::Compatible => "OpenAI-compatible API",
         Provider::Openrouter => "OpenRouter",
         Provider::Openai => "OpenAI",
     };
@@ -423,15 +448,18 @@ async fn request_json(
     model: &str,
     body: &Value,
     updates: Option<tauri::ipc::Channel<StreamUpdate>>,
+    custom_target: Option<(String, Option<reqwest::header::HeaderValue>)>,
 ) -> Result<Value, String> {
-    let key = tauri::async_runtime::spawn_blocking(move || read_key(provider))
-        .await
-        .map_err(|_| "키체인 작업을 완료하지 못했습니다.".to_string())??
-        .ok_or("먼저 API 키를 등록하세요.")?;
-    let mut authorization =
-        reqwest::header::HeaderValue::from_bytes(&[b"Bearer ".as_slice(), key.as_slice()].concat())
+    let (endpoint, authorization) = if provider == Provider::Compatible {
+        match custom_target { Some(target) => target, None => crate::ai_compatible::target(app, "chat/completions", true).await? }
+    } else {
+        let key = tauri::async_runtime::spawn_blocking(move || read_key(provider)).await
+            .map_err(|_| "키체인 작업을 완료하지 못했습니다.".to_string())??.ok_or("먼저 API 키를 등록하세요.")?;
+        let mut authorization = reqwest::header::HeaderValue::from_bytes(&[b"Bearer ".as_slice(), key.as_slice()].concat())
             .map_err(|_| "API 키 형식을 확인하세요.".to_string())?;
-    authorization.set_sensitive(true);
+        authorization.set_sensitive(true);
+        (provider.endpoint().to_owned(), Some(authorization))
+    };
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_secs(10))
@@ -444,11 +472,9 @@ async fn request_json(
         if provider != Provider::Openai { body["stream_options"] = json!({"include_usage":true}); }
     }
     let ticket = crate::ai_usage::Ticket::start(app, feature, provider.account(), model)?;
-    let mut response = client
-        .post(provider.endpoint())
-        .header(reqwest::header::AUTHORIZATION, authorization)
-        .json(&body)
-        .send()
+    let mut request = client.post(endpoint).json(&body);
+    if let Some(authorization) = authorization { request = request.header(reqwest::header::AUTHORIZATION, authorization); }
+    let mut response = request.send()
         .await
         .map_err(|_| {
             "AI 서버에 연결하지 못했거나 시간이 초과되었습니다. 연결 상태를 확인하세요.".to_string()
@@ -594,8 +620,9 @@ async fn send(
     use crate::ai_tools;
     let mut settings = ai_tools::current(&app)?;
     settings.web_search &= use_web;
+    if provider == Provider::Compatible && settings.web_search { return Err("Web search is not available for custom API servers. Turn off Web to continue.".into()); }
     settings.local_files &= use_files;
-    if provider != Provider::Openai {
+    if provider != Provider::Openai && provider != Provider::Compatible {
         let cached = MODEL_CACHE
             .get_or_init(Default::default)
             .lock()
@@ -624,6 +651,7 @@ async fn send(
             }
         }
     }
+    let custom_target = if provider == Provider::Compatible { Some(crate::ai_compatible::target(&app, "chat/completions", true).await?) } else { None };
     let main_model = model.clone();
     run_turn(
         provider,
@@ -638,7 +666,8 @@ async fn send(
                 None
             };
             let app = app.clone();
-            async move { request_json(&app, "chat", provider, &model, &body, updates).await }
+            let custom_target = custom_target.clone();
+            async move { request_json(&app, "chat", provider, &model, &body, updates, custom_target).await }
         },
     )
     .await
@@ -651,12 +680,12 @@ pub(crate) fn cached_prices(provider: Provider, model: &str) -> Option<(f64, f64
     Some((entry.input_price?, entry.output_price?))
 }
 pub(crate) async fn rewrite(app: &tauri::AppHandle, provider: Provider, model: &str, feature: &str, instruction: &str, text: &str) -> Result<(String, crate::ai_usage::Measurement), String> {
-    if cached_prices(provider, model).is_none() {
+    if provider != Provider::Compatible && cached_prices(provider, model).is_none() {
         // Catalog discovery is free and bounded; missing prices never prevent processing.
         let _ = tokio::time::timeout(Duration::from_secs(2), ai_list_models(provider)).await;
     }
-    let messages = vec![Message { role: "system".into(), content: instruction.into() }, Message { role: "user".into(), content: text.into() }];
-    let value = request_json(app, feature, provider, model, &request_body(provider, model, &messages), None).await?;
+    let messages = vec![Message { image: None, role: "system".into(), content: instruction.into() }, Message { image: None, role: "user".into(), content: text.into() }];
+    let value = request_json(app, feature, provider, model, &request_body(provider, model, &messages), None, None).await?;
     if provider != Provider::Openai && value["choices"][0]["finish_reason"] != "stop" { return Err("Text processing was incomplete. Used the original text.".into()); }
     Ok((response_text(provider, &value)?, crate::ai_usage::measure(&value, cached_prices(provider, model))))
 }
@@ -1006,9 +1035,26 @@ mod tests {
         .contains("bad\nheader"));
     }
     #[test]
+    fn maps_capture_to_each_provider_and_keeps_followup_context() {
+        let image = crate::ai_capture::tests::fixture();
+        let mut messages = vec![Message {role:"user".into(),content:"Explain this".into(),image:Some(image.clone())}, Message {role:"assistant".into(),content:"Explanation".into(),image:None}, Message {role:"user".into(),content:"And this number?".into(),image:None}];
+        validate("vision-model", &messages).unwrap();
+        let body = request_body(Provider::Openai, "vision-model", &messages);
+        assert_eq!(body["input"][0]["content"][1]["type"], "input_image");
+        assert_eq!(body["input"][0]["content"][1]["image_url"], image.data_url);
+        assert_eq!(body["input"][2]["content"], "And this number?");
+        for provider in [Provider::Vercel, Provider::Openrouter, Provider::Compatible] {
+            let body = request_body(provider, "vision-model", &messages);
+            assert_eq!(body["messages"][0]["content"][1]["image_url"]["url"], image.data_url);
+            assert_eq!(body["messages"][0]["content"][0]["text"], "Explain this");
+        }
+        messages[1].image = Some(image);
+        assert!(validate("vision-model", &messages).is_err());
+    }
+    #[test]
     fn validates_roles_and_limits() {
         let message = |role: &str, content: String| Message {
-            role: role.into(),
+            image: None, role: role.into(),
             content,
         };
         assert!(validate("model", &[message("user", "안녕".into())]).is_ok());
@@ -1092,7 +1138,7 @@ fn openai_text_candidate(id: &str) -> bool {
         .iter()
         .any(|part| base.contains(part))
 }
-fn parse_models(provider: Provider, value: &Value) -> Result<Vec<AiModel>, String> {
+pub(crate) fn parse_models(provider: Provider, value: &Value) -> Result<Vec<AiModel>, String> {
     let rows = value["data"]
         .as_array()
         .ok_or("모델 목록 형식이 올바르지 않습니다.")?;
@@ -1120,6 +1166,7 @@ fn parse_models(provider: Provider, value: &Value) -> Result<Vec<AiModel>, Strin
                     && has_text(&row["architecture"]["output_modalities"])
             }
             Provider::Openai => openai_text_candidate(id),
+            Provider::Compatible => true,
         };
         if !supported {
             continue;
@@ -1145,20 +1192,20 @@ fn parse_models(provider: Provider, value: &Value) -> Result<Vec<AiModel>, Strin
             context_window: row["context_window"]
                 .as_u64()
                 .or_else(|| row["context_length"].as_u64()),
-            input_price: million_token_price(
+            input_price: if provider == Provider::Compatible { None } else { million_token_price(
                 &row["pricing"][if provider == Provider::Openrouter {
                     "prompt"
                 } else {
                     "input"
                 }],
-            ),
-            output_price: million_token_price(
+            ) },
+            output_price: if provider == Provider::Compatible { None } else { million_token_price(
                 &row["pricing"][if provider == Provider::Openrouter {
                     "completion"
                 } else {
                     "output"
                 }],
-            ),
+            ) },
             pricing_variable: ["overrides", "input_tiers", "output_tiers"]
                 .iter()
                 .any(|field| {
@@ -1182,6 +1229,7 @@ pub async fn ai_list_models(provider: Provider) -> Result<Vec<AiModel>, String> 
         Provider::Openai => "https://api.openai.com/v1/models",
         Provider::Openrouter => "https://openrouter.ai/api/v1/models",
         Provider::Vercel => "https://ai-gateway.vercel.sh/v1/models",
+        Provider::Compatible => return Err("Use the custom server model catalog.".into()),
     };
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -1235,6 +1283,22 @@ pub async fn ai_list_models(provider: Provider) -> Result<Vec<AiModel>, String> 
 
 #[cfg(test)]
 mod model_tests {
+    #[test]
+    fn compatible_models_use_chat_completions_without_guessing_price_units() {
+        let model = "local/llama-fixture";
+        let rows = super::parse_models(super::Provider::Compatible, &serde_json::json!({"data":[
+            {"id":model,"pricing":{"input":10,"output":20}}, {"id":model}, {"id":""}
+        ]})).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, model);
+        assert_eq!(rows[0].input_price, None);
+        assert_eq!(rows[0].output_price, None);
+        let body = super::request_body(super::Provider::Compatible, model, &[super::Message {image: None, role:"user".into(),content:"hello".into()}]);
+        assert_eq!(body["messages"][0]["content"], "hello");
+        assert!(body.get("input").is_none());
+        let answer = super::response_text(super::Provider::Compatible, &serde_json::json!({"choices":[{"finish_reason":"stop","message":{"content":"fixture answer"}}]})).unwrap();
+        assert_eq!(answer, "fixture answer");
+    }
     use super::*;
     #[test]
     fn vercel_uses_gateway_key_account_and_chat_contract() {
@@ -1247,7 +1311,7 @@ mod model_tests {
             Provider::Vercel,
             "creator/model",
             &[Message {
-                role: "user".into(),
+                image: None, role: "user".into(),
                 content: "hello".into(),
             }],
         );
@@ -1396,7 +1460,7 @@ mod tool_loop_tests {
     };
     fn messages() -> Vec<Message> {
         vec![Message {
-            role: "user".into(),
+            image: None, role: "user".into(),
             content: "Read my notes and find public documentation".into(),
         }]
     }

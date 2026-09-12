@@ -40,6 +40,41 @@ async function type(selector: string, value: string) {
   });
 }
 describe("AI connection settings", () => {
+  it("saves a keyless compatible server and accepts a manual model when its catalog fails", async () => {
+    Object.defineProperty(navigator, "language", {configurable:true, value:"en-US"});
+    native.invoke.mockImplementation(async (command, args) => {
+      if (command === "ai_get_compatible") return {baseUrl:"", hasKey:false};
+      if (command === "ai_save_compatible") return {baseUrl:"http://localhost:11434/v1/", hasKey:false};
+      if (command === "ai_list_compatible_models") throw "No catalog";
+      return handle(command,args);
+    });
+    await mount(); await click("OpenAI-compatible");
+    await type('[aria-label="API base URL"]', "http://localhost:11434/v1");
+    await click("Save connection");
+    expect(native.invoke).toHaveBeenCalledWith("ai_save_compatible", {baseUrl:"http://localhost:11434/v1", key:null});
+    await type('[aria-label="Model ID"]', "local/fixture-model"); await click("Use model");
+    expect(persisted).toEqual({provider:"compatible", model:"local/fixture-model", modelName:"local/fixture-model"});
+    expect(native.invoke.mock.calls.some(([command]) => command === "ai_chat")).toBe(false);
+  });
+
+  it("keeps custom credentials out of browser storage and blocks model selection for unsaved address edits", async () => {
+    Object.defineProperty(navigator, "language", {configurable:true, value:"en-US"});
+    native.invoke.mockImplementation(async (command,args) => {
+      if (command === "ai_get_compatible") return {baseUrl:"https://fixture.test/v1/", hasKey:true};
+      if (command === "ai_list_compatible_models") return [];
+      if (command === "ai_save_compatible") return {baseUrl:args.baseUrl + "/", hasKey:true};
+      return handle(command,args);
+    });
+    await mount(); await click("OpenAI-compatible");
+    await type('[aria-label="API base URL"]', "https://other.test/v1");
+    await type('[aria-label="Model ID"]', "fixture");
+    expect(button("Use model").disabled).toBe(true);
+    await type('[aria-label="API key (optional)"]', "fixture-secret-custom");
+    await click("Save connection");
+    expect(container.querySelector<HTMLInputElement>('[type="password"]')?.value).toBe("");
+    expect(JSON.stringify(localStorage)).not.toContain("fixture-secret-custom");
+    expect(native.invoke.mock.calls.filter(([command,args]) => command === "ai_save_key" && args?.provider === "compatible")).toHaveLength(0);
+  });
   it("shows prices, filters locally, saves on click and restores the native selection after storage is cleared", async () => {
     await mount();
     expect(native.invoke).toHaveBeenCalledWith("ai_list_models", { provider: "vercel" });

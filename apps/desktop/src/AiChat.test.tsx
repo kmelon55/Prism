@@ -2,7 +2,7 @@ import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveAiSelection } from "./providers/ai";
-import type { ChatSession } from "./providers/aiHistory";
+import type { ChatImage, ChatSession } from "./providers/aiHistory";
 import { AiChat } from "./AiChat";
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke, Channel: class { onmessage?: (event: {text:string})=>void } }));
@@ -27,7 +27,7 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-async function mount(nativeRuntime = true, visible = true, entryDraft?: { id: number; text: string }, reduceMotion = true) { await act(async () => root.render(<StrictMode><AiChat reduceMotion={reduceMotion} visible={visible} nativeRuntime={nativeRuntime} entryDraft={entryDraft} onClose={close} onOpenSettings={openSettings} /></StrictMode>)); }
+async function mount(nativeRuntime = true, visible = true, entryDraft?: { id: number; text: string; image?: ChatImage }, reduceMotion = true) { await act(async () => root.render(<StrictMode><AiChat reduceMotion={reduceMotion} visible={visible} nativeRuntime={nativeRuntime} entryDraft={entryDraft} onClose={close} onOpenSettings={openSettings} /></StrictMode>)); }
 function button(label: string) { return [...container.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === label || b.textContent === label)!; }
 async function click(label: string) { await act(async () => button(label).click()); }
 async function type(target: HTMLInputElement | HTMLTextAreaElement, value: string) {
@@ -465,4 +465,51 @@ it("keeps failed background completion saves recoverable in their own conversati
   await click("기록 저장·조회 다시 시도");
   expect([...history.values()].find(session => session.title === "Background save")?.messages[1].content).toBe("Unsaved final");
   expect(chatCalls()).toHaveLength(1);
+});
+
+const captureFixture = {dataUrl:"data:image/jpeg;base64,fixture"};
+it("keeps captures unsent, retains images in followups and restores the image when editing", async () => {
+  await mount(true, true, {id: 9, text: "", image: captureFixture});
+  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')?.getAttribute("src")).toBe(captureFixture.dataUrl);
+  expect(chatCalls()).toHaveLength(0);
+  await type(composer(), "이 화면 설명해 줘"); await click("메시지 전송");
+  expect(chatCalls()[0][1].messages[0].image).toEqual(captureFixture);
+  expect([...history.values()].find(session=>session.messages.length)?.messages[0].image).toEqual(captureFixture);
+  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).toBeNull();
+  await type(composer(), "그 숫자는?"); await click("메시지 전송");
+  expect(chatCalls()[1][1].messages[0].image).toEqual(captureFixture);
+  expect(chatCalls()[1][1].messages[2].image).toBeUndefined();
+  await click("질문 수정");
+  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).not.toBeNull();
+  await click("화면 캡처 제거"); expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).toBeNull();
+});
+it("preserves a capture on failed send and keeps the previous draft on canceled selection", async () => {
+  native.invoke.mockImplementation(async(command,args)=> {
+    if (command === "ai_capture_region") return null;
+    if (command === "ai_chat") throw "server unavailable";
+    return base(command,args);
+  });
+  await mount(true,true,{id:4,text:"keep me",image:captureFixture});
+  await click("화면 영역 캡처");
+  expect(composer().value).toBe("keep me");
+  expect(chatCalls()).toHaveLength(0);
+  await click("메시지 전송");
+  expect([...history.values()][0].draftImage).toEqual(captureFixture);
+  expect(composer().value).toBe("keep me");
+  await click("다시 보내기");
+  expect(chatCalls()[1][1].messages[0].image).toEqual(captureFixture);
+});
+
+it("keeps a captured entry available when saving the previous conversation fails", async () => {
+  await mount(); await type(composer(), "previous draft");
+  let fail = true;
+  native.invoke.mockImplementation(async(command,args)=> { if(command === "ai_save_session" && fail) throw "disk full"; return base(command,args); });
+  await mount(true,true,{id:8,text:"new question",image:captureFixture});
+  expect(composer().value).toBe("previous draft");
+  expect(container.textContent).toContain("새 초안을 보관");
+  fail = false; await click("새 초안 열기");
+  expect(composer().value).toBe("new question");
+  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).not.toBeNull();
+  expect([...history.values()].some(session=>session.draft === "previous draft")).toBe(true);
+  expect(chatCalls()).toHaveLength(0);
 });

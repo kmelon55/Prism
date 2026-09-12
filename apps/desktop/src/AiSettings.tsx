@@ -1,3 +1,4 @@
+import { CompatibleApiSettings } from "./ai/CompatibleApiSettings";
 import { AiUsage } from "./AiUsage";
 import { AnimatePresence } from "motion/react";
 import { AnimatedPanel } from "./settings/InterfaceMotion";
@@ -12,6 +13,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
   useLocale();
   const [saved, setSaved] = useState(readAiSelection);
   const [provider, setProvider] = useState<AiProvider>(saved.provider);
+  const [compatibleReady, setCompatibleReady] = useState(false);
   const [ready, setReady] = useState(!nativeRuntime);
   const [keyInfo, setKeyInfo] = useState<AiKeyInfo | null>(null);
   const [key, setKey] = useState("");
@@ -58,7 +60,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
   }, [nativeRuntime]);
 
   useEffect(() => {
-    if (!nativeRuntime || !ready) return;
+    if (!nativeRuntime || !ready || provider === "compatible") { setChecking(false); return; }
     let active = true;
     setChecking(true); setKeyError("");
     void invoke<AiKeyInfo>("ai_key_info", { provider }).then((info) => {
@@ -69,7 +71,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
   }, [provider, nativeRuntime, ready, keyRevision]);
 
   // Public catalogs are independent of Keychain status. Refresh never clears the key editor.
-  const canLoad = nativeRuntime && ready && (provider !== "openai" || keyInfo?.configured === true && keyInfo.unlocked !== false);
+  const canLoad = nativeRuntime && ready && (provider !== "compatible" || compatibleReady) && (provider !== "openai" || keyInfo?.configured === true && keyInfo.unlocked !== false);
   useEffect(() => {
     if (!canLoad) { setLoading(false); return; }
     let active = true;
@@ -135,7 +137,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
     mutation.current = true; setSavingModel(entry.id); setError(""); setNotice("");
     try {
       const selection = await saveAiSelection({ provider, model: entry.id, modelName: entry.name }, true);
-      if (mounted.current) { setSaved(selection); closeModels(); setNotice(t("{0} 모델을 저장했습니다.{1}", {"0": entry.name,"1": keyInfo?.configured ? t(" AI Chat에서 사용할 수 있습니다.") : t(" API 키를 저장하면 사용할 수 있습니다.")})); }
+      if (mounted.current) { setSaved(selection); closeModels(); setNotice(t("{0} 모델을 저장했습니다.{1}", {"0": entry.name,"1": (provider === "compatible" || keyInfo?.configured) ? t(" AI Chat에서 사용할 수 있습니다.") : t(" API 키를 저장하면 사용할 수 있습니다.")})); }
     } catch (error) { if (mounted.current) setError(aiErrorText(error)); }
     finally { mutation.current = false; if (mounted.current) setSavingModel(""); }
   }
@@ -199,7 +201,10 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       <div className="ai-provider-options" role="group" aria-label={t("AI 제공업체")}>
         {(Object.keys(aiProviders) as AiProvider[]).map((id) => <button key={id} type="button" aria-pressed={provider === id} disabled={busy || !ready} onClick={() => changeProvider(id)}>{aiProviders[id].name}{provider === id && <Check size={14} />}</button>)}
       </div>
-      <div className="ai-key-heading"><span>{providerInfo.description}</span><button type="button" onClick={() => openUrl(providerInfo.keyUrl)}>{t("키 발급")}<ExternalLink size={12} /></button></div>
+      {provider === "compatible" ? <CompatibleApiSettings nativeRuntime={nativeRuntime} disabled={busy}
+        onConnection={ready => { setCompatibleReady(ready); setCatalogRevision(value => value + 1); }}
+        onModel={id => selectModel({ id, name: id, contextWindow: null })} /> : <>
+      <div className="ai-key-heading"><span>{providerInfo.description}</span>{providerInfo.keyUrl && <button type="button" onClick={() => openUrl(providerInfo.keyUrl!)}>{t("키 발급")}<ExternalLink size={12} /></button>}</div>
       {keyInfo?.configured && <div className="ai-saved-key"><Check size={15} /><strong>{t("키 저장됨")}</strong><code aria-label={t("저장된 API 키")}>{keyInfo.maskedKey || t("macOS 키체인에 보관됨")}</code>{keyInfo.unlocked === false && <button type="button" disabled={busy || checking} onClick={() => void unlockKey()}>{t("키 사용 허용")}</button>}<button type="button" disabled={busy || checking} onClick={() => { setEditing(true); setNotice(""); }}>{t("변경")}</button><button type="button" disabled={busy || checking} onClick={() => void updateKey(true)}>{t("삭제")}</button></div>}
       {keyInfo?.configured && keyInfo.unlocked === false && <p className="ai-settings-note">{t("In the macOS password dialog, choose Always Allow to remember access when restarting Prism. An update may require approval again.")}</p>}
       {checking && <p className="ai-settings-note" role="status">{t("저장된 키 확인 중…")}</p>}
@@ -210,6 +215,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
         {keyInfo && !keyInfo.configured && <small className="ai-settings-note">{t("저장된 키 없음 · 키는 macOS 키체인에 보관합니다.")}</small>}
       </form>}
       {(keyError || unlockError) && <p className="ai-settings-error" role="alert">{t(keyError || unlockError)}</p>}
+      </>}
     </section>
     <AiToolSettings nativeRuntime={nativeRuntime} />
     <AiUsage nativeRuntime={nativeRuntime} />

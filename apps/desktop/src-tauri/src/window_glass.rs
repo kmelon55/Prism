@@ -1,5 +1,5 @@
 //! Native glass lives below the webview; blur radius and CSS tint are independent.
-//! The CSS background is the only tint/opacity layer; there is no opaque material.
+//! The native shell tint resizes with the glass; web content stays transparent.
 
 use objc2::{
     msg_send,
@@ -15,7 +15,7 @@ use objc2_app_kit::{
 use objc2_foundation::{
     ns_string, NSArray, NSNumber, NSObject, NSObjectNSKeyValueCoding, NSObjectProtocol, NSString,
 };
-use objc2_quartz_core::CALayer;
+use objc2_quartz_core::{CALayer, CATransaction};
 use std::{
     collections::HashMap,
     sync::{LazyLock, Mutex},
@@ -23,9 +23,25 @@ use std::{
 };
 
 const GLASS_ID: &str = "dev.prism.clear-glass:";
+const TINT_ID: &str = "dev.prism.shell-tint";
 // Keep in sync with settings/appearance.ts; legacy callers cannot exceed this.
 const MAX_BACKGROUND_BLUR: u8 = 32;
 static REFRESH_REQUESTS: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Mutex::default);
+
+// Geometry and backdrop changes must reach the compositor together, without
+// Core Animation interpolating the filters through a sharp/transparent frame.
+pub fn without_implicit_animations<T>(update: impl FnOnce() -> T) -> T {
+    struct Transaction;
+    impl Drop for Transaction {
+        fn drop(&mut self) {
+            CATransaction::commit();
+        }
+    }
+    CATransaction::begin();
+    CATransaction::setDisableActions(true);
+    let _transaction = Transaction;
+    update()
+}
 
 // AppKit owns the backdrop and its lifecycle. Radius is an internal CAFilter
 // input: feature-detect it and catch KVC exceptions so future macOS versions
@@ -52,6 +68,14 @@ fn set_radius(layer: &CALayer, radius: f64) -> bool {
                 } else {
                     continue;
                 };
+                // Resize/focus retries usually encounter the same filter. Keep
+                // its render cache intact unless AppKit reset the actual radius.
+                let current = object.valueForKey(key);
+                if let Some(current) = current.and_then(|value| value.downcast::<NSNumber>().ok()) {
+                    if (current.doubleValue() - radius).abs() < f64::EPSILON {
+                        continue;
+                    }
+                }
                 // Mutating the existing filter does not invalidate Core Animation's
                 // render cache. Copy it, update the radius, then replace the array.
                 let copy: Retained<NSObject> = msg_send![object, copy];
@@ -83,12 +107,35 @@ fn refresh(view: &NSView) {
     else {
         return;
     };
-    let _ = objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
-        view.layoutSubtreeIfNeeded();
-        if let Some(layer) = view.layer() {
-            set_radius(&layer, radius);
+    without_implicit_animations(|| {
+        let _ = objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
+            view.layoutSubtreeIfNeeded();
+            if let Some(layer) = view.layer() {
+                set_radius(&layer, radius);
+            }
+        }));
+    });
+}
+
+// A resize can rebuild AppKit's backdrop filters. Repair them before displaying
+// that frame; the deferred refresh below only catches later-created layers.
+pub fn refresh_before_display(window: &NSWindow) {
+    fn visit(view: &NSView) {
+        if view
+            .identifier()
+            .is_some_and(|id| id.to_string().starts_with(GLASS_ID))
+        {
+            refresh(view);
+            return;
         }
-    }));
+        for child in view.subviews() {
+            visit(&child);
+        }
+    }
+    if let Some(content) = window.contentView() {
+        content.layoutSubtreeIfNeeded();
+        visit(&content);
+    }
 }
 
 // SwiftUI-backed glass creates its filters after attaching to a visible window.
@@ -178,7 +225,7 @@ pub async fn apply(window: &tauri::WebviewWindow, strength: u8) -> Result<(), St
                         let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), view.frame());
                         glass.setStyle(NSGlassEffectViewStyle::Clear);
                         glass.setTintColor(None);
-                        glass.setCornerRadius(18.0);
+                        glass.setCornerRadius(26.0);
                         let content = NSView::initWithFrame(mtm.alloc(), glass.bounds());
                         content.setAutoresizingMask(
                             NSAutoresizingMaskOptions::ViewWidthSizable
@@ -225,6 +272,71 @@ pub async fn apply(window: &tauri::WebviewWindow, strength: u8) -> Result<(), St
     Ok(())
 }
 
+// Paint the shell color in the same process as its bounds. Keeping this tint in
+// CSS exposes bare gray glass whenever WKWebView delivers a resize frame late.
+pub async fn apply_tint(
+    window: &tauri::WebviewWindow,
+    dark: bool,
+    opacity: u8,
+) -> Result<(), String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    window
+        .with_webview(move |webview| {
+            let result = (|| {
+                let mtm = MainThreadMarker::new().ok_or("Tint requires the main thread")?;
+                let view = unsafe { &*webview.inner().cast::<NSView>() };
+                let parent = unsafe { view.superview() }.ok_or("Missing webview container")?;
+                without_implicit_animations(|| {
+                    let tint = parent
+                        .subviews()
+                        .into_iter()
+                        .find(|child| {
+                            child
+                                .identifier()
+                                .is_some_and(|id| id.to_string() == TINT_ID)
+                        })
+                        .unwrap_or_else(|| NSView::initWithFrame(mtm.alloc(), view.frame()));
+                    tint.setIdentifier(Some(&NSString::from_str(TINT_ID)));
+                    tint.setFrame(view.frame());
+                    tint.setAutoresizingMask(
+                        NSAutoresizingMaskOptions::ViewWidthSizable
+                            | NSAutoresizingMaskOptions::ViewHeightSizable,
+                    );
+                    tint.setWantsLayer(true);
+                    if let Some(layer) = tint.layer() {
+                        let (red, green, blue) = if dark {
+                            (19.0, 20.0, 24.0)
+                        } else {
+                            (246.0, 247.0, 250.0)
+                        };
+                        let color = NSColor::colorWithSRGBRed_green_blue_alpha(
+                            red / 255.0,
+                            green / 255.0,
+                            blue / 255.0,
+                            f64::from(opacity.min(100)) / 100.0,
+                        );
+                        layer.setBackgroundColor(Some(&color.CGColor()));
+                        layer.setCornerRadius(26.0);
+                        layer.setMasksToBounds(true);
+                    }
+                    // Reinsert above glass even when blur was disabled then enabled.
+                    tint.removeFromSuperview();
+                    parent.addSubview_positioned_relativeTo(
+                        &tint,
+                        NSWindowOrderingMode::Below,
+                        Some(view),
+                    );
+                });
+                Ok(())
+            })();
+            let _ = send.send(result);
+        })
+        .map_err(|error| error.to_string())?;
+    receive
+        .await
+        .map_err(|_| "Native tint setup was interrupted".to_string())?
+}
+
 /// Whisp-style screen-space lighting, without a global input monitor or AX access.
 pub async fn lighting(window: tauri::WebviewWindow) -> Result<Option<[f64; 2]>, String> {
     if !window.is_visible().unwrap_or(false) {
@@ -262,4 +374,49 @@ pub async fn lighting(window: tauri::WebviewWindow) -> Result<Option<[f64; 2]>, 
     receive
         .await
         .map_err(|_| "Glass lighting was interrupted".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_refresh_preserves_filters_and_repairs_a_reset_radius() {
+        unsafe {
+            let class = AnyClass::get(c"CAFilter").expect("Core Animation filter class");
+            let filter: Retained<AnyObject> =
+                msg_send![class, filterWithType: ns_string!("gaussianBlur")];
+            let child = CALayer::layer();
+            child.setFilters(Some(&NSArray::from_retained_slice(&[filter])));
+            let root = CALayer::layer();
+            root.addSublayer(&child);
+
+            without_implicit_animations(|| {
+                assert!(set_radius(&root, 12.0));
+                let original = child.filters().unwrap().objectAtIndex(0);
+                for _ in 0..30 {
+                    assert!(!set_radius(&root, 12.0));
+                    let current = child.filters().unwrap().objectAtIndex(0);
+                    assert!(std::ptr::eq(&*original, &*current));
+                }
+                // Simulate AppKit rebuilding the backdrop during a resize.
+                assert!(set_radius(&root, 3.0));
+                assert!(set_radius(&root, 12.0));
+                assert!(!set_radius(&root, 12.0));
+            });
+        }
+    }
+
+    #[test]
+    fn atomic_updates_restore_the_enclosing_animation_policy() {
+        CATransaction::begin();
+        CATransaction::setDisableActions(false);
+        without_implicit_animations(|| {
+            assert!(CATransaction::disableActions());
+            without_implicit_animations(|| assert!(CATransaction::disableActions()));
+            assert!(CATransaction::disableActions());
+        });
+        assert!(!CATransaction::disableActions());
+        CATransaction::commit();
+    }
 }

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /** Keep native windows hidden until their theme and first rendered frame are ready. */
-export function prepareWindowPresentation(dark: boolean, blur: number): () => void {
+export function prepareWindowPresentation(dark: boolean, blur: number, opacity = 64): () => void {
   let cancelled = false;
   let frame = 0;
   let fallback = 0;
@@ -14,7 +14,10 @@ export function prepareWindowPresentation(dark: boolean, blur: number): () => vo
     void invoke("window_render_ready")
       .catch((error) => console.error("Prism could not present its window", error));
   };
-  void invoke("prepare_window_appearance", { dark, blur })
+  void invoke<boolean>("prepare_window_appearance", { dark, blur, opacity })
+    .then((nativeTint) => {
+      if (!cancelled) document.documentElement.dataset.nativeTint = String(nativeTint === true);
+    })
     .catch((error) => console.error("Prism could not prepare its native appearance", error))
     .then(() => {
       if (cancelled) return;

@@ -14,6 +14,7 @@ export const prismCommandIds = {
   files: "prism:files",
   emoji: "prism:emoji",
   aiChat: "prism:ai-chat",
+  captureAi: "prism:capture-ai",
   dictation: "prism:dictation",
   dictationPrompt: "prism:dictation-prompt",
   preferences: "prism:preferences",
@@ -57,6 +58,7 @@ export const prismActionIds = {
   openFiles: "open-files",
   openEmoji: "open-emoji",
   openAiChat: "open-ai-chat",
+  captureAi: "capture-ai",
   toggleDictation: "toggle-dictation",
   toggleDictationPrompt: "toggle-dictation-prompt",
   openPreferences: "open-settings",
@@ -108,6 +110,7 @@ const manageableBuiltInManagement: CommandManagement = {
 };
 
 const commonDefinitions: readonly CommandDefinition[] = [
+  { id: prismCommandIds.captureAi, get title() { return t("Capture and Ask AI"); }, get subtitle() { return t("Select a screen region and start a conversation"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["screenshot", "screen", "capture", "region", "quick ai", "캡처", "화면", "영역", "스크린샷"], icon: "scan", accent: "violet", actions: [{ id: prismActionIds.captureAi, get title() { return t("Capture screen region"); } }], management: manageableBuiltInManagement },
   { id: prismCommandIds.dictation, get title() { return t("음성 받아쓰기"); }, get subtitle() { return t("녹음 시작 · 다시 실행하면 전사 후 입력"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "whisp", "voice", "speech", "transcribe", "음성", "받아쓰기", "녹음", "전사"], icon: "mic", actions: [{ id: prismActionIds.toggleDictation, get title() { return t("받아쓰기 시작 / 종료"); } }], management: manageableBuiltInManagement },
   { id: prismCommandIds.dictationPrompt, get title() { return t("Structure prompt"); }, get subtitle() { return t("Speak to create a clear prompt · Run again to insert"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "prompt", "프롬프트", "정리", "음성"], icon: "mic", actions: [{ id: prismActionIds.toggleDictationPrompt, get title() { return t("Structure prompt"); } }], management: manageableBuiltInManagement },
   {id:prismCommandIds.emoji,get title() { return t("이모지"); },get subtitle() { return t("이모지를 찾아 복사하거나 붙여넣으세요"); },get section() { return t("Productivity"); },kind:"command",keywords:["emoji","emojis","이모지","이모티콘","표정","symbols"],icon:"smile",actions:[{id:prismActionIds.openEmoji,get title() { return t("열기"); }}],management:manageableBuiltInManagement},

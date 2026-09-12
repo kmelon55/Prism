@@ -67,7 +67,8 @@ pub async fn prepare_window_appearance(
     window: WebviewWindow,
     dark: bool,
     blur: u8,
-) -> Result<(), String> {
+    opacity: Option<u8>,
+) -> Result<bool, String> {
     window
         .set_theme(Some(if dark {
             tauri::Theme::Dark
@@ -78,7 +79,17 @@ pub async fn prepare_window_appearance(
     window
         .set_background_color(Some(tauri::window::Color(0, 0, 0, 0)))
         .map_err(|error| error.to_string())?;
-    super::set_window_blur(window, blur).await
+    super::set_window_blur(window.clone(), blur).await?;
+    #[cfg(target_os = "macos")]
+    {
+        super::window_glass::apply_tint(&window, dark, opacity.unwrap_or(64)).await?;
+        Ok(true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = opacity;
+        Ok(false)
+    }
 }
 
 #[tauri::command]

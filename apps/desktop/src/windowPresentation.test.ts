@@ -9,6 +9,7 @@ beforeEach(() => {
   invoke.mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => {
+  delete document.documentElement.dataset.nativeTint;
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -22,7 +23,7 @@ it("waits for native appearance even when preparing it takes longer than the pai
   expect(invoke).not.toHaveBeenCalledWith("window_render_ready");
   prepared();
   await vi.advanceTimersByTimeAsync(150);
-  expect(invoke).toHaveBeenCalledWith("prepare_window_appearance", { dark: true, blur: 44 });
+  expect(invoke).toHaveBeenCalledWith("prepare_window_appearance", { dark: true, blur: 44, opacity: 64 });
   expect(invoke.mock.calls.filter(([command]) => command === "window_render_ready")).toHaveLength(1);
   cancel();
 });
@@ -40,4 +41,25 @@ it("cancels obsolete appearance work before it can reveal an unmounted window", 
   cancel();
   await vi.advanceTimersByTimeAsync(500);
   expect(invoke).not.toHaveBeenCalledWith("window_render_ready");
+});
+
+it("transfers shell tint to native only after native appearance succeeds", async () => {
+  let prepared!: (nativeTint: boolean) => void;
+  invoke.mockImplementation((command) => command === "prepare_window_appearance"
+    ? new Promise<boolean>((resolve) => { prepared = resolve; }) : Promise.resolve());
+  const cancel = prepareWindowPresentation(false, 0, 37);
+  expect(document.documentElement.dataset.nativeTint).toBeUndefined();
+  prepared(true);
+  await vi.advanceTimersByTimeAsync(150);
+  expect(document.documentElement.dataset.nativeTint).toBe("true");
+  expect(invoke).toHaveBeenCalledWith("prepare_window_appearance", { dark: false, blur: 0, opacity: 37 });
+  cancel();
+});
+
+it("keeps the CSS tint on platforms without a native tint", async () => {
+  invoke.mockResolvedValue(false);
+  const cancel = prepareWindowPresentation(true, 12);
+  await vi.advanceTimersByTimeAsync(150);
+  expect(document.documentElement.dataset.nativeTint).toBe("false");
+  cancel();
 });

@@ -16,6 +16,8 @@ pub struct Turn {
     model_name: Option<String>,
     role: String,
     content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    image: Option<crate::ai_capture::ChatImage>,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +29,8 @@ pub struct Session {
     title: String,
     messages: Vec<Turn>,
     draft: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    draft_image: Option<crate::ai_capture::ChatImage>,
     updated_at: u64,
     #[serde(default)]
     pinned: bool,
@@ -64,6 +68,11 @@ fn validate(session: &Session) -> Result<(), String> {
     {
         return Err("대화 기록이 너무 크거나 올바르지 않습니다.".into());
     }
+    let images: Vec<_> = session.messages.iter().filter_map(|message| message.image.as_ref()).chain(session.draft_image.as_ref()).collect();
+    if images.len() > crate::ai_capture::MAX_SESSION_IMAGES || session.messages.iter().any(|message| message.role != "user" && message.image.is_some()) {
+        return Err("대화마다 화면 캡처를 최대 4개까지 사용할 수 있습니다.".into());
+    }
+    for image in images { crate::ai_capture::validate_image(image)?; }
     Ok(())
 }
 fn database(path: &Path) -> Result<Connection, String> {
@@ -125,7 +134,7 @@ pub fn ai_load_history(
         .map_err(|_| "대화 기록을 읽지 못했습니다.")?;
     rows.map(|row| {
         let text = row.map_err(|_| "대화 기록을 읽지 못했습니다.")?;
-        if text.len() > 3_000_000 {
+        if text.len() > 9_000_000 {
             return Err("대화 기록이 너무 큽니다.".into());
         }
         let session =
@@ -195,6 +204,7 @@ pub async fn ai_export_session(session: Session, locale: Option<String>) -> Resu
     };
     let mut text = format!("# {}\n\n", session.title.replace(['\r', '\n'], " "));
     for message in session.messages {
+        if let Some(image) = &message.image { text.push_str(&format!("![Screen capture]({})\n\n", image.data_url)); }
         text.push_str(&format!(
             "## {}\n\n{}\n\n",
             if message.role == "user" {
@@ -205,6 +215,7 @@ pub async fn ai_export_session(session: Session, locale: Option<String>) -> Resu
             message.content
         ));
     }
+    if let Some(image) = &session.draft_image { text.push_str(&format!("![Draft screen capture]({})\n\n", image.data_url)); }
     if !session.draft.is_empty() {
         text.push_str(&format!(
             "## {}\n\n{}\n",
@@ -239,6 +250,25 @@ pub async fn ai_export_session(session: Session, locale: Option<String>) -> Resu
 mod tests {
     use super::*;
     #[test]
+    fn preserves_capture_drafts_turns_and_old_text_sessions() {
+        let mut value = serde_json::json!({"id":"12345678-1234-1234-1234-123456789012","provider":"compatible","model":"vision","title":"Capture","messages":[],"draft":"","updatedAt":0});
+        let legacy: Session = serde_json::from_value(value.clone()).unwrap();
+        validate(&legacy).unwrap(); assert!(legacy.draft_image.is_none());
+        let image = crate::ai_capture::tests::fixture();
+        value["draftImage"] = serde_json::to_value(&image).unwrap();
+        let draft: Session = serde_json::from_value(value.clone()).unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE conversations (id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, content TEXT NOT NULL);").unwrap();
+        save(&db, draft).unwrap();
+        let stored: String = db.query_row("SELECT content FROM conversations", [], |r| r.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Session>(&stored).unwrap().draft_image.unwrap().data_url, image.data_url);
+        value["draftImage"] = serde_json::Value::Null;
+        value["messages"] = serde_json::json!([{"role":"user","content":"Explain","image":image},{"role":"assistant","content":"Answer"}]);
+        validate(&serde_json::from_value(value.clone()).unwrap()).unwrap();
+        value["messages"][1]["image"] = value["messages"][0]["image"].clone();
+        assert!(validate(&serde_json::from_value(value).unwrap()).is_err());
+    }
+    #[test]
     fn persists_complete_turns_and_drafts_without_overwriting_other_sessions() {
         let path =
             std::env::temp_dir().join(format!("prism-history-test-{}.sqlite3", std::process::id()));
@@ -250,6 +280,7 @@ mod tests {
             model_name: None,
             title: "Question".into(),
             draft: "Retry me".into(),
+            draft_image: None,
             messages: vec![],
             updated_at: 0,
             pinned: false,
@@ -267,6 +298,7 @@ mod tests {
             &db,
             Session {
                 messages: vec![Turn {
+                    image: None,
                     model_name: None,
                     role: "assistant".into(),
                     content: "bad".into()

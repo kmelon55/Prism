@@ -3,11 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { isTauriRuntime } from "./native";
 
-export type AiProvider = "vercel" | "openai" | "openrouter";
+export type AiProvider = "vercel" | "openai" | "openrouter" | "compatible";
 export interface AiSelection { provider: AiProvider; model: string; modelName?: string | null }
 export interface AiModel { supportsTools?: boolean | null; maxOutputTokens?: number | null; id: string; name: string; contextWindow: number | null; inputPrice?: number | null; outputPrice?: number | null; pricingVariable?: boolean }
 export interface AiKeyInfo { configured: boolean; maskedKey: string | null; unlocked?: boolean }
-export const aiProviders: Record<AiProvider, { name: string; description: string; keyUrl: string }> = {
+export const aiProviders: Record<AiProvider, { name: string; description: string; keyUrl?: string }> = {
+  compatible: { name: "OpenAI-compatible", get description() { return t("Connect a local model or your own API server"); } },
   vercel: { name: "Vercel AI Gateway", get description() { return t("Gateway 키 하나로 여러 회사의 모델 사용"); }, keyUrl: "https://vercel.com/d?title=AI+Gateway+API+Keys&to=%2F%5Bteam%5D%2F~%2Fai-gateway%2Fapi-keys" },
   openai: { name: "OpenAI", get description() { return t("OpenAI 계정으로 직접 연결"); }, keyUrl: "https://platform.openai.com/api-keys" },
   openrouter: { name: "OpenRouter", get description() { return t("OpenRouter 키 하나로 여러 회사의 모델 사용"); }, keyUrl: "https://openrouter.ai/settings/keys" },
@@ -17,7 +18,7 @@ const changeEvent = "prism:ai-settings-changed";
 export function readAiSelection(): AiSelection {
   try {
     const value = JSON.parse(localStorage.getItem(aiSelectionKey) ?? "null");
-    if (["vercel", "openai", "openrouter"].includes(value?.provider) && typeof value.model === "string" && value.model.length <= 200) {
+    if (["vercel", "openai", "openrouter", "compatible"].includes(value?.provider) && typeof value.model === "string" && value.model.length <= 200) {
       return { provider: value.provider, model: value.model, ...(typeof value.modelName === "string" ? { modelName: value.modelName } : {}) };
     }
   } catch { /* Optional preference; credentials live in Keychain. */ }
@@ -69,5 +70,5 @@ export function watchAiSettings(callback: () => void): () => void {
     window.removeEventListener("focus", callback);
   };
 }
-export const listAiModels = (provider: AiProvider) => invoke<AiModel[]>("ai_list_models", { provider });
+export const listAiModels = (provider: AiProvider) => provider === "compatible" ? invoke<AiModel[]>("ai_list_compatible_models") : invoke<AiModel[]>("ai_list_models", { provider });
 export const aiErrorText = (error: unknown) => typeof error === "string" ? t(error) : t("작업을 완료하지 못했습니다. 다시 시도하세요.");

@@ -4,6 +4,8 @@ mod app_menu;
 #[cfg(target_os = "macos")]
 mod update_signature;
 mod ai;
+mod ai_compatible;
+mod ai_capture;
 mod ai_history;
 mod ai_usage;
 mod ai_key_session;
@@ -74,6 +76,7 @@ async fn paste_plain_text(app: AppHandle, text: String) -> Result<(), String> {
 }
 
 fn show_palette(app: &AppHandle) {
+    if ai_capture::is_capturing() { return; }
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -214,7 +217,7 @@ fn command_hotkey_needs_palette(command_id: &str) -> bool {
     !(command_id.starts_with("window:")
         || command_id.starts_with("native:")
         || command_id.starts_with("system:")
-        || matches!(command_id, "prism:preferences" | "prism:hide" | "prism:quit"))
+        || matches!(command_id, "prism:preferences" | "prism:hide" | "prism:quit" | "prism:capture-ai"))
 }
 
 #[tauri::command]
@@ -650,6 +653,10 @@ pub fn run() {
             clipboard_history::delete_clipboard_history_entry,
             clipboard_history::paste_clipboard_history_entry,
             ai::ai_list_models,
+            ai_compatible::ai_get_compatible,
+            ai_compatible::ai_unlock_compatible,
+            ai_compatible::ai_save_compatible,
+            ai_compatible::ai_list_compatible_models,
             ai::ai_key_status,
             ai::ai_key_info,
             ai::ai_unlock_key,
@@ -658,6 +665,7 @@ pub fn run() {
             ai::ai_save_key,
             ai::ai_delete_key,
             ai::ai_chat,
+            ai_capture::ai_capture_region,
             ai_tools::ai_get_tools,
             ai_tools::ai_set_tools,
             ai_tools::ai_add_folder,

@@ -1,3 +1,5 @@
+import type { ChatImage } from "./providers/aiHistory";
+import { CommandPreferencesDialog } from "./settings/CommandPreferencesDialog";
 import { watchPermissionChanges } from "./settings/permissionRefresh";
 import { DEFAULT_BACKGROUND_BLUR, normalizeBackgroundBlur } from "./settings/appearance";
 import { PrismMark } from "./PrismMark";
@@ -644,6 +646,7 @@ export function App() {
   const reloadLibrary = useCallback(() => { if(nativeRuntime) void loadLibrary().then(value => { if(value && Array.isArray(value.entries) && Array.isArray(value.favorites)) setLibraryData(value); }).catch(() => {}); }, [nativeRuntime]);
   useEffect(() => { reloadLibrary(); let disposed=false; let stop:(()=>void)|undefined; void watchLibrary(reloadLibrary).then(value=>{if(disposed)value();else stop=value;}); window.addEventListener("focus",reloadLibrary); return ()=>{disposed=true;stop?.();window.removeEventListener("focus",reloadLibrary);}; }, [reloadLibrary]);
   const closeLibrary = () => {setLibraryOpen(false);setLibraryEntry(undefined);reloadLibrary();requestAnimationFrame(()=>inputRef.current?.focus());};
+  const [commandEditor, setCommandEditor] = useState<{ item: CommandItem; mode: "alias" | "shortcut" }>();
   const [actionItem, setActionItem] = useState<CommandItem>();
   const actionsOpen = Boolean(actionItem);
   const closeActions = useCallback(() => setActionItem(undefined), []);
@@ -652,11 +655,12 @@ export function App() {
   const filteredActions = actionItem ? rankCommands(actionItem.actions.map((action): CommandItem => ({
     id: action.id, title: action.title, keywords: bilingual(action.title), section: "", kind: "command", providerId: "actions", actions: [action],
   })), actionQuery).map((item) => item.actions[0]) : [];
+  const captureLock = useRef(false);
   const { open: aiOpen, phase: aiPhase, reducedMotion: aiReducedMotion, change: setAiOpen } = useAiSurface(preferences.reduceMotion);
   const glassRef = useGlassRefraction(aiReducedMotion, !settingsWindow && preferences.openingLightAnimation !== false);
   const [aiVisited, setAiVisited] = useState(false);
   useEffect(() => { if (aiOpen) setAiVisited(true); }, [aiOpen]);
-  const [aiEntry, setAiEntry] = useState({ id: 0, text: "" });
+  const [aiEntry, setAiEntry] = useState<{id: number; text: string; image?: ChatImage}>({ id: 0, text: "" });
   useEffect(() => {
     if (!nativeRuntime || settingsWindow) return;
     void invoke("set_ai_workspace", { expanded: aiOpen || libraryOpen || emojiOpen || Boolean(libraryRun), reduceMotion: aiReducedMotion })
@@ -938,7 +942,7 @@ export function App() {
     const applyAppearance = () => {
       cancelPresentation?.();
       const dark = preferences.theme === "system" ? media.matches : preferences.theme === "dark";
-      cancelPresentation = prepareWindowPresentation(dark, preferences.backgroundBlur);
+      cancelPresentation = prepareWindowPresentation(dark, preferences.backgroundBlur, preferences.backgroundOpacity);
     };
     applyAppearance();
     media.addEventListener("change", applyAppearance);
@@ -946,7 +950,7 @@ export function App() {
       cancelPresentation?.();
       media.removeEventListener("change", applyAppearance);
     };
-  }, [preferences.theme, preferences.backgroundBlur, nativeRuntime]);
+  }, [preferences.theme, preferences.backgroundBlur, preferences.backgroundOpacity, nativeRuntime]);
 
   useEffect(() => {
     if (!nativeRuntime) return;
@@ -1178,6 +1182,7 @@ export function App() {
   }, [toast]);
 
   const resetPaletteState = useCallback(() => {
+    setCommandEditor(undefined);
     navigatePalette({ type: "reset" });
     closeActions();
     setActionIndex(0);
@@ -1212,7 +1217,7 @@ export function App() {
     }
     const focusSearch = () => {
       setPointerActive(false);
-      if (!actionsOpen && !preferencesOpen && !aiOpen && !libraryOpen && !emojiOpen && !scriptView && !libraryRun) inputRef.current?.focus();
+      if (!commandEditor && !actionsOpen && !preferencesOpen && !aiOpen && !libraryOpen && !emojiOpen && !scriptView && !libraryRun) inputRef.current?.focus();
     };
     const resetAfterFocusLoss = () => {
       setPointerActive(false);
@@ -1227,13 +1232,13 @@ export function App() {
       window.removeEventListener("focus", focusSearch);
       window.removeEventListener("blur", resetAfterFocusLoss);
     };
-  }, [actionsOpen, aiOpen, libraryOpen, emojiOpen, scriptView, libraryRun, nativeRuntime, preferencesOpen, resetPaletteState, settingsWindow, shortcut.registered]);
+  }, [commandEditor, actionsOpen, aiOpen, libraryOpen, emojiOpen, scriptView, libraryRun, nativeRuntime, preferencesOpen, resetPaletteState, settingsWindow, shortcut.registered]);
 
   useEffect(() => {
-    if (settingsWindow || actionsOpen || preferencesOpen || aiOpen || libraryOpen || emojiOpen || Boolean(scriptView) || Boolean(libraryRun)) return;
+    if (commandEditor || settingsWindow || actionsOpen || preferencesOpen || aiOpen || libraryOpen || emojiOpen || Boolean(scriptView) || Boolean(libraryRun)) return;
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(frame);
-  }, [actionsOpen, aiOpen, libraryOpen, emojiOpen, scriptView, libraryRun, preferencesOpen, settingsWindow, paletteView]);
+  }, [commandEditor, actionsOpen, aiOpen, libraryOpen, emojiOpen, scriptView, libraryRun, preferencesOpen, settingsWindow, paletteView]);
 
   const clearQuery = () => {
     setQuery("");
@@ -1254,7 +1259,11 @@ export function App() {
     setActionQuery("");
     setActionIndex(0);
     const canFavorite=nativeRuntime && !selectedItem.answer && !selectedItem.matchedQuery && ["prism","native-applications","library"].includes(selectedItem.providerId);
-    setActionItem(canFavorite ? {...selectedItem,actions:[...selectedItem.actions,{id:"toggle-favorite",title:libraryData.favorites.some(f=>f.id===selectedItem.id)?t("즐겨찾기 해제"):t("즐겨찾기 추가")}]} : selectedItem);
+    const configurationActions: CommandAction[] = isAliasCommandId(selectedItem.id) ? [
+      {id: "edit-command-alias", title: t("Edit alias")}, {id: "edit-command-shortcut", title: t("Edit shortcut")},
+    ] : [];
+    const configuredItem = {...selectedItem, actions: [...selectedItem.actions, ...configurationActions]};
+    setActionItem(canFavorite ? {...selectedItem,actions:[...configuredItem.actions,{id:"toggle-favorite",title:libraryData.favorites.some(f=>f.id===selectedItem.id)?t("즐겨찾기 해제"):t("즐겨찾기 추가")}]} : configuredItem);
   };
 
   const cycleTheme = () => {
@@ -1483,13 +1492,13 @@ export function App() {
       : undefined;
     if (duplicate) {
       setCommandHotkeyError(t("Alias \"{0}\" is already assigned to another command.", {"0": storedAlias.trim()}));
-      return;
+      return false;
     }
     setCommandHotkeyError("");
     const commandAliases = { ...currentPreferences.commandAliases };
     if (normalized) commandAliases[commandId] = storedAlias;
     else delete commandAliases[commandId];
-    updatePreferences({
+    return updatePreferences({
       ...currentPreferences,
       commandAliases,
     });
@@ -1588,7 +1597,11 @@ export function App() {
     closeActions();
     if (document.hasFocus()) inputRef.current?.focus();
     try {
-      if (action.id === "prism-update:run") { await paletteUpdate.run(); }
+      if (action.id === "edit-command-alias" || action.id === "edit-command-shortcut") {
+        setCommandHotkeyError(""); setCommandHotkeyRecording(undefined);
+        setCommandEditor({item, mode: action.id === "edit-command-alias" ? "alias" : "shortcut"});
+      }
+      else if (action.id === "prism-update:run") { await paletteUpdate.run(); }
       else if (action.id === prismActionIds.openEmoji) { setEmojiOpen(true); }
       else if (action.id === "files-search-broader") { setLibraryTab("files"); setFileEntryQuery(String(item.data?.query ?? query)); setFileEntrySystem(true); setLibraryEntry(undefined); setLibraryOpen(true); }
       else if([prismActionIds.openLibrary,prismActionIds.openLinks,prismActionIds.openSnippets,prismActionIds.openFiles].includes(action.id as never)){setLibraryTab(action.id===prismActionIds.openSnippets?"snippets":action.id===prismActionIds.openFiles?"files":"links");setFileEntryQuery("");setFileEntrySystem(false);setLibraryEntry(undefined);setLibraryOpen(true);}
@@ -1625,6 +1638,18 @@ export function App() {
       else if (action.id === prismActionIds.toggleDictation || action.id === prismActionIds.toggleDictationPrompt) {
         if (!nativeRuntime) { setToast(t("받아쓰기는 macOS용 Prism 앱에서 사용할 수 있습니다.")); return; }
         await invoke(action.id === prismActionIds.toggleDictationPrompt ? "dictation_prompt_toggle" : "dictation_toggle"); resetPaletteState();
+      }
+      else if (action.id === prismActionIds.captureAi) {
+        if (!nativeRuntime) { setToast(t("Screen region capture is available in the macOS app.")); return; }
+        if (captureLock.current) return;
+        captureLock.current = true; closeActions();
+        try {
+          const image = await invoke<ChatImage | null>("ai_capture_region");
+          if (image) {
+            setLibraryOpen(false); setEmojiOpen(false); setScriptView(undefined); setLibraryRun(undefined);
+            setAiEntry(entry => ({id: entry.id + 1, text: "", image})); setAiOpen(true);
+          }
+        } finally { captureLock.current = false; }
       }
       else if (action.id === prismActionIds.openAiChat) { closeActions(); setAiOpen(true); }
       else if (action.id === prismActionIds.openPreferences) await openPreferences();
@@ -1777,7 +1802,7 @@ export function App() {
   usePaletteKeyboard({
     query,
     view: paletteView,
-    settings: preferencesOpen || aiOpen || libraryOpen || emojiOpen || Boolean(scriptView) || Boolean(libraryRun),
+    settings: Boolean(commandEditor) || preferencesOpen || aiOpen || libraryOpen || emojiOpen || Boolean(scriptView) || Boolean(libraryRun),
     recording: shortcutRecording || Boolean(commandHotkeyRecording),
     selectedItem: loading ? undefined : selectedItem,
     actionItem: actionItem ? { ...actionItem, actions: filteredActions } : undefined,
@@ -1819,6 +1844,14 @@ export function App() {
         }
       }}
     >
+      {commandEditor && <CommandPreferencesDialog item={commandEditor.item} mode={commandEditor.mode}
+        alias={preferences.commandAliases[commandEditor.item.id] ?? ""} shortcut={commandShortcuts[commandEditor.item.id]}
+        nativeRuntime={nativeRuntime} recording={commandHotkeyRecording === commandEditor.item.id} busy={commandHotkeyBusy === commandEditor.item.id}
+        error={commandHotkeyError} onRecording={active => setCommandHotkeyRecording(active ? commandEditor.item.id : undefined)}
+        onAlias={value => changeCommandAlias(commandEditor.item.id, value)}
+        onShortcut={value => saveCommandHotkey(commandEditor.item.id, value)}
+        onRemoveShortcut={() => deleteCommandHotkey(commandEditor.item.id)}
+        onClose={() => { setCommandEditor(undefined); setCommandHotkeyRecording(undefined); inputRef.current?.focus(); }} />}
       <div className="drag-handle" data-tauri-drag-region aria-hidden="true" />
 
       {(aiVisited || aiOpen) && <Suspense fallback={<div className="workspace-loading" role="status">{t("Loading…")}</div>}><AiChat visible={aiOpen && !preferencesOpen && !libraryOpen && !emojiOpen && !scriptView && !libraryRun} closing={aiPhase === "closing"} reduceMotion={aiReducedMotion} entryDraft={aiEntry} nativeRuntime={nativeRuntime} onClose={() => setAiOpen(false)} onOpenSettings={() => void openAiSettings()} /></Suspense>}
@@ -1939,7 +1972,7 @@ export function App() {
               autoComplete="off"
             />
             <div className="search-tools">
-              <button className="ai-icon-button" aria-label={t("Open AI Chat")} aria-keyshortcuts="Tab" onClick={() => setAiOpen(true)}><Sparkles size={16} /><span>AI</span></button>
+              <button className="ai-icon-button" aria-label={t("Open AI Chat")} aria-keyshortcuts="Tab" onClick={() => { setAiOpen(true); }}><Sparkles size={16} /><span>AI</span></button>
               {query ? (
                 <button className="clear-search" onClick={clearQuery} aria-label={t("Clear search")}>{t("Clear")}</button>
               ) : null}

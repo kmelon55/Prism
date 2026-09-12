@@ -1063,7 +1063,35 @@ it("lands directly on AI settings in the separate settings window", async () => 
 });
 
 
-it("uses plain Tab from root search to expand AI with a draft and restores query on Escape", async () => {
+it("edits an alias from root actions and retains the query without opening Settings", async () => {
+  await mount(); await type("clipboard"); await key("k", {ctrlKey:true}); await click(button("Edit alias"));
+  const editor = container.querySelector<HTMLInputElement>('.command-preferences-dialog input')!;
+  expect(editor).not.toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(editor, "clips");
+    editor.dispatchEvent(new Event("input", {bubbles:true}));
+  });
+  await click(button("Save"));
+  expect(container.querySelector('.command-preferences-dialog')).toBeNull();
+  expect(input().value).toBe("clipboard");
+  expect(Object.values(JSON.parse(localStorage.getItem("prism:preferences")!).commandAliases)).toContain("clips");
+  expect(native.invoke.mock.calls.some(([command]) => command === "open_settings_window")).toBe(false);
+});
+
+it("records an inline command shortcut and keeps a failed replacement visible", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args: any) => command === "set_command_shortcut"
+    ? Promise.reject("This shortcut is already in use") : original(command,args));
+  await mount(); await type("clipboard"); await key("k", {ctrlKey:true}); await click(button("Edit shortcut"));
+  const recorder = container.querySelector<HTMLButtonElement>('[data-record]')!;
+  await click(recorder); await settle();
+  await key("j", {code:"KeyJ",ctrlKey:true,altKey:true}, recorder);
+  expect(native.invoke).toHaveBeenCalledWith("set_command_shortcut", expect.objectContaining({shortcut:"Control+Alt+KeyJ"}));
+  expect(container.querySelector('.command-preferences-dialog')?.textContent).toContain("This shortcut is already in use");
+  expect(input().value).toBe("clipboard");
+});
+
+it("uses plain Tab from root search to open AI Chat with a draft and restores query on Escape", async () => {
   localStorage.setItem("prism.ai.selection.v1", JSON.stringify({ provider: "openai", model: "fixture-model" }));
   const original = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args: unknown) => command === "ai_key_status" ? Promise.resolve(true) : command === "ai_get_selection" ? Promise.resolve(JSON.parse(localStorage.getItem("prism.ai.selection.v1")!)) : original(command, args));
@@ -1073,7 +1101,7 @@ it("uses plain Tab from root search to expand AI with a draft and restores query
   await key("Tab");
   expect(container.querySelector("main")?.classList.contains("ai-expanded")).toBe(true);
   expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("한국어로 설명해 줘");
-  expect(native.invoke).toHaveBeenCalledWith("set_ai_workspace", {expanded:true,reduceMotion:false});
+  expect(container.querySelector('.ai-session-sidebar')).not.toBeNull();
   expect(native.invoke.mock.calls.some(([command])=>command === "ai_chat")).toBe(false);
   await act(async () => window.dispatchEvent(new Event("blur")));
   await key("Escape", {}, container.querySelector("textarea")!);
@@ -1217,7 +1245,7 @@ it.each([36, 44, 240])("limits legacy blur %s without changing the chosen opacit
   await mount(true);
   expect(container.querySelector<HTMLInputElement>('[aria-label="Background blur"]')!.value).toBe("32");
   expect(container.querySelector<HTMLInputElement>('[aria-label="Background opacity"]')!.value).toBe(backgroundBlur === 36 ? "94" : "97");
-  expect(native.invoke).toHaveBeenCalledWith("prepare_window_appearance", { dark: false, blur: 32 });
+  expect(native.invoke).toHaveBeenCalledWith("prepare_window_appearance", { dark: false, blur: 32, opacity: backgroundBlur === 36 ? 94 : 97 });
 });
 
 
@@ -1381,4 +1409,17 @@ it("selects clipboard rows without copying and shows complete multiline text in 
   expect(native.invoke.mock.calls.some(([name]) => name === "copy_clipboard_history_entry")).toBe(false);
   await key("Enter");
   expect(native.invoke).toHaveBeenCalledWith("copy_clipboard_history_entry", { id: 2 });
+});
+
+it("opens captured regions from the command hotkey without sending and leaves search intact on cancel", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let capture: {dataUrl:string} | null = null;
+  native.invoke.mockImplementation((command,args)=>command === "ai_capture_region" ? Promise.resolve(capture) : command === "ai_get_selection" ? Promise.resolve({provider:"openai",model:"fixture-model"}) : command === "ai_key_status" ? Promise.resolve(true) : original(command,args));
+  await mount(); await type("existing query");
+  const trigger = async () => { await act(async()=> {native.listeners.get("prism:command-hotkey")!({payload:{commandId:"prism:capture-ai",background:true}});}); await settle(); };
+  await trigger(); expect(container.querySelector(".ai-chat")).toBeNull(); expect(input().value).toBe("existing query");
+  capture = {dataUrl:"data:image/jpeg;base64,fixture"};
+  await trigger();
+  expect(container.querySelector('.ai-chat img')?.getAttribute("src")).toBe(capture.dataUrl);
+  expect(native.invoke.mock.calls.some(([command])=>command === "ai_chat")).toBe(false);
 });

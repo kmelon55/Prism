@@ -1,3 +1,4 @@
+import { settingsTargets, searchSettingsTargets, type SettingsTarget } from "./settingsTargets";
 import { SettingsSelect } from "./SettingsSelect";
 import { InterfaceMotion } from "./InterfaceMotion";
 import { SettingsSlider } from "./SettingsSlider";
@@ -218,6 +219,7 @@ export function SettingsView(props: SettingsViewProps) {
     onScriptRegistryRefresh,
   } = props;
   const headingId = useId();
+  const [focusTarget, setFocusTarget] = useState<SettingsTarget>();
   const [settingsQuery, setSettingsQuery] = useState("");
   const [searchSelection, setSearchSelection] = useState<PreferencesSection>();
   const [section, setSection] = useState<PreferencesSection>("general");
@@ -265,6 +267,28 @@ export function SettingsView(props: SettingsViewProps) {
   const preferredSection = normalizedQuery ? searchSelection : section;
   const activeSection = filteredSections.some((entry) => entry.id === preferredSection) ? preferredSection : bestSection?.id;
   const currentSection = filteredSections.find((entry) => entry.id === activeSection);
+  const directTargets = searchSettingsTargets([
+    ...settingsTargets.filter(target => target.section !== "clipboard" || Boolean(clipboardDetails)),
+    ...[...windowCommands, ...otherCommands].map(command => ({id: command.id, commandId: command.id,
+      section: (command.id.startsWith("window:") ? "window-management" : "commands") as PreferencesSection,
+      label: command.title, control: command.title, keywords: ["alias shortcut hotkey", "별칭 단축키"]})),
+  ], settingsQuery);
+  function openSearchTarget(target: SettingsTarget) {
+    stopRecorders(); setWindowGroup("all"); setSettingsQuery(""); setSection(target.section); setFocusTarget(target);
+  }
+  useLayoutEffect(() => {
+    if (!focusTarget || settingsQuery || activeSection !== focusTarget.section) return;
+    const target = focusTarget.commandId
+      ? [...(settingsRef.current?.querySelectorAll<HTMLElement>("[data-command-id]") ?? [])].find(node => node.dataset.commandId === focusTarget.commandId)
+      : [...(settingsRef.current?.querySelectorAll<HTMLElement>(".settings-scroll [aria-label]") ?? [])].find(node => node.getAttribute("aria-label") === t(focusTarget.control));
+    if (!target) return;
+    const focusable = target.matches("input,button,select,textarea") ? target : target.querySelector<HTMLElement>("input:not(:disabled),button:not(:disabled)");
+    target.setAttribute("data-search-target", "true");
+    target.scrollIntoView?.({block: "center", behavior: "instant"});
+    if (focusable && !focusable.matches(":disabled")) focusable.focus();
+    else { const row = target.closest<HTMLElement>(".settings-row,.preference-section,.ai-current-model") ?? target; row.tabIndex = -1; row.focus(); }
+    return () => { target.removeAttribute("data-search-target"); };
+  }, [focusTarget, activeSection, settingsQuery]);
   const shortcutKeys = acceleratorKeys(shortcutDraft || shortcut.accelerator, commandKey);
 
   const stopRecorders = () => {
@@ -364,7 +388,7 @@ export function SettingsView(props: SettingsViewProps) {
     };
 
     return (
-      <div className="settings-command-row" key={command.id} role="group" aria-label={t(command.title)}>
+      <div className="settings-command-row" data-command-id={command.id} key={command.id} role="group" aria-label={t(command.title)}>
         <CommandGlyph
           item={item}
           showApplicationIcons={preferences.showApplicationIcons}
@@ -542,6 +566,7 @@ export function SettingsView(props: SettingsViewProps) {
             onChange={(event) => { setSettingsQuery(event.target.value); setSearchSelection(undefined); stopRecorders(); }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+              if (event.key === "Enter" && directTargets[0] && !event.repeat) { event.preventDefault(); openSearchTarget(directTargets[0]); }
               if (event.key === "Escape" && settingsQuery) {
                 event.preventDefault(); event.stopPropagation(); setSettingsQuery("");
               }
@@ -580,6 +605,11 @@ export function SettingsView(props: SettingsViewProps) {
         </header>
 
         <div className="settings-scroll" role="region" aria-labelledby={headingId}>
+          {directTargets.length > 0 && <div className="settings-direct-results" role="group" aria-label={t("Matching settings")}>
+            {directTargets.map(target => <button type="button" key={target.id} onClick={() => openSearchTarget(target)}>
+              <span>{t(target.label)}</span><small>{t(preferenceSections.find(section => section.id === target.section)?.label ?? target.section)}</small>
+            </button>)}
+          </div>}
           {captureLease.error && <div className="preference-alert" role="alert"><TriangleAlert size={15} /><span>{t(captureLease.error)}</span></div>}
           {activeSection === "snippets" ? snippetDetails ?? <p className="preference-note">{t("자동 확장은 데스크톱 앱에서 설정할 수 있습니다.")}</p> : null}
           {activeSection === "backup" ? backupDetails ?? <p className="preference-note">{t("Backup and restore are available in the desktop app.")}</p> : null}

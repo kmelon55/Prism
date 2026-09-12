@@ -48,6 +48,23 @@ async function clickSection(label: string) {
 }
 
 describe("Settings discovery", () => {
+  it("opens the exact matched control from keyboard search without changing its value", async () => {
+    await mount(); await search("background blur");
+    expect(container.querySelector('.settings-direct-results')?.textContent).toContain("Background blur");
+    await act(async () => searchInput().dispatchEvent(new KeyboardEvent("keydown", {key:"Enter", bubbles:true, cancelable:true})));
+    expect(searchInput().value).toBe("");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Background blur");
+    expect(document.activeElement?.getAttribute("data-search-target")).toBe("true");
+    expect(props.onChange).not.toHaveBeenCalled();
+  });
+
+  it("opens a matching window command and focuses its alias without executing it", async () => {
+    await mount(); await search("left half");
+    const result = [...container.querySelectorAll<HTMLButtonElement>('.settings-direct-results button')].find(button => button.textContent?.startsWith("Left Half"))!;
+    await act(async () => result.click());
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Alias for Left Half");
+    expect(props.onCommandHotkeyRecord).not.toHaveBeenCalled();
+  });
   it("finds explicit quit in Korean and keeps it unavailable in browser previews", async () => {
     await mount();
     await search("종료");

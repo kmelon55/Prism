@@ -1,7 +1,7 @@
 import { t, useLocale, currentLocale } from "./i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { Pencil, Pin, Download, RotateCcw, ArrowDown, ArrowLeft, ArrowUp, Globe, FolderOpen, SlidersHorizontal, Copy, KeyRound, MessageSquare, Plus, Search, Square, Sparkles, Trash2 } from "lucide-react";
+import { Pencil, Pin, Download, RotateCcw, ArrowDown, ArrowLeft, ArrowUp, Scan, X, Globe, FolderOpen, SlidersHorizontal, Copy, KeyRound, MessageSquare, Plus, Search, Square, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "react-markdown";
 import { AnimatePresence, motion } from "motion/react";
 import { AiConversationTransition } from "./interaction/AiConversationTransition";
@@ -9,10 +9,11 @@ import { AiModelPicker } from "./AiModelPicker";
 import { defaultAiTools, getAiTools, setAiTools } from "./providers/aiTools";
 import remarkGfm from "remark-gfm";
 import { aiErrorText, aiProviders, loadAiSelection, readAiSelection, notifyAiSettingsChanged, watchAiSettings, type AiSelection } from "./providers/ai";
-import { downloadChat, forkChatSession, sortChatSessions, deleteChatSession, loadChatHistory, newChatSession, saveChatSession, type ChatMessage, type ChatSession } from "./providers/aiHistory";
+import { downloadChat, forkChatSession, sortChatSessions, deleteChatSession, loadChatHistory, newChatSession, saveChatSession, type ChatImage, type ChatMessage, type ChatSession } from "./providers/aiHistory";
 import { queueHistoryOperation } from "./ai/historyQueue";
 import { isCompositionKey } from "./interaction/usePaletteKeyboard";
 
+export interface AiChatEntry { id: number; text: string; image?: ChatImage }
 const MAX_CONCURRENT_REQUESTS = 3;
 interface ConversationRequest { id: string | null; pending: string; streamed: string; question: string; error: string; cancelled?: boolean }
 const idleRequest: ConversationRequest = { id: null, pending: "", streamed: "", question: "", error: "", cancelled: false };
@@ -24,7 +25,7 @@ const presets = [
   { get label() { return t("문장 다듬기"); }, get prompt() { return t("다음 글의 의미를 유지하면서 자연스럽고 명확하게 다듬어 줘:\n\n"); } },
 ];
 export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, reduceMotion = false, onClose, onOpenSettings }: {
-  visible: boolean; nativeRuntime: boolean; closing?: boolean; reduceMotion?: boolean; entryDraft?: { id: number; text: string }; onClose(): void; onOpenSettings(): void;
+  visible: boolean; nativeRuntime: boolean; closing?: boolean; reduceMotion?: boolean; entryDraft?: AiChatEntry; onClose(): void; onOpenSettings(): void;
 }) {
   useLocale();
   const [selection, setSelection] = useState<AiSelection>(readAiSelection);
@@ -32,6 +33,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyReady, setHistoryReady] = useState(!nativeRuntime);
   const [historyRevision, setHistoryRevision] = useState(0);
+  const [failedEntry, setFailedEntry] = useState<AiChatEntry>();
   const [toolSettings, setToolSettings] = useState(defaultAiTools);
   const [useWeb, setUseWeb] = useState(false);
   const [useFiles, setUseFiles] = useState(false);
@@ -40,6 +42,8 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   const [historyErrors, setHistoryErrors] = useState<Record<string, string>>({});
   const historyError = historyErrors[current.id] ?? historyErrors.load ?? "";
   const [configured, setConfigured] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const captureLock = useRef(false);
   const [checking, setChecking] = useState(false);
   const requests = useRef(new Map<string, ConversationRequest>());
   const [, refreshRequests] = useState(0);
@@ -72,7 +76,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   const composing = useRef(false);
   const { provider, model, messages, draft } = current;
   const providerName = aiProviders[provider].name;
-  const readyToSend = historyReady && nativeRuntime && configured && Boolean(model) && !checking && !switching && !deleteTarget;
+  const readyToSend = historyReady && nativeRuntime && configured && Boolean(model) && !checking && !capturing && !switching && !deleteTarget;
   const hasSavedSession = sessions.some((session) => session.id === current.id);
   const history = useMemo(() => {
     const query = filter.trim().toLocaleLowerCase();
@@ -98,7 +102,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   }
   async function persist(session: ChatSession): Promise<boolean> {
     if (!loaded.current || !nativeRuntime || deleting.current.has(session.id)) return true;
-    if (!session.messages.length && !session.draft && !sessionsRef.current.some((entry) => entry.id === session.id)) return true;
+    if (!session.messages.length && !session.draft && !session.draftImage && !sessionsRef.current.some((entry) => entry.id === session.id)) return true;
     const snapshot = JSON.stringify(session);
     if (savedVersions.current.get(session.id) === snapshot) return true;
     const version = (versions.current.get(session.id) ?? 0) + 1;
@@ -175,11 +179,21 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
       .finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
   }, [visible, nativeRuntime, provider, configRevision, historyReady]);
+  async function acceptEntry(entry: AiChatEntry) {
+    if (mutation.current) { setFailedEntry(entry); return; }
+    mutation.current = true; setSwitching(true);
+    try {
+      const ok = await persist(currentRef.current);
+      if (!alive.current) return;
+      if (ok) { replaceCurrent({ ...newChatSession(selection, entry.text), draftImage: entry.image }); setFailedEntry(undefined); }
+      else setFailedEntry(entry);
+    } finally { mutation.current = false; if (alive.current) setSwitching(false); }
+  }
   useEffect(() => {
     if (!visible || !historyReady || !entryDraft || lastEntry.current === entryDraft.id) return;
     lastEntry.current = entryDraft.id;
-    if (entryDraft.text.trim()) {
-      void persist(currentRef.current).then((ok) => { if (ok && alive.current) replaceCurrent(newChatSession(selection, entryDraft.text)); });
+    if (entryDraft.text.trim() || entryDraft.image) {
+      void acceptEntry(entryDraft);
     }
   }, [visible, historyReady, entryDraft, selection]);
   useEffect(() => {
@@ -188,7 +202,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     const timer = window.setTimeout(() => { void persist(session); }, 450);
     return () => window.clearTimeout(timer);
   }, [current, historyReady, busy]);
-  useEffect(() => { if (visible && historyReady && !busy && !checking && !deleteTarget) composer.current?.focus(); }, [visible, historyReady, busy, checking, current.id, deleteTarget]);
+  useEffect(() => { if (visible && historyReady && !busy && !checking && !capturing && !deleteTarget) composer.current?.focus(); }, [visible, historyReady, busy, checking, capturing, current.id, deleteTarget]);
   useEffect(() => { if (deleteTarget) cancelDeleteButton.current?.focus(); }, [deleteTarget, switching]);
   useLayoutEffect(() => {
     const input = composer.current;
@@ -207,7 +221,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
   }
   async function switchSession(session?: ChatSession) {
-    if (mutation.current || deleteTarget || rename!==null || !historyReady || session?.id === currentRef.current.id) return;
+    if (captureLock.current || mutation.current || deleteTarget || rename!==null || !historyReady || session?.id === currentRef.current.id) return;
     mutation.current = true; setSwitching(true);
     try {
       if (await persist(currentRef.current)) {
@@ -221,6 +235,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     if (!visible || closing) return;
     const onKey = (event: KeyboardEvent) => {
       if (isCompositionKey(event) || composing.current || event.defaultPrevented) return;
+      if (captureLock.current) return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (event.repeat) return;
@@ -258,7 +273,8 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     }
     const session = { ...source, title: ![t("새 대화"), t("New conversation")].includes(source.title) ? source.title : source.draft.trim().replace(/\s+/g, " ").slice(0, 70), updatedAt: Date.now() };
     const question = session.draft.trim();
-    const turns: ChatMessage[] = [...session.messages, { role: "user", content: question }];
+    const turns: ChatMessage[] = [...session.messages, { role: "user", content: question, ...(session.draftImage ? {image: session.draftImage} : {}) }];
+    if (turns.filter(turn => turn.image).length > 4) { setError(t("A conversation can contain up to four screen captures. Start a new conversation.")); return; }
     if (turns.length > 40 || new TextEncoder().encode(question).length > 32_000 || turns.reduce((size, message) => size + new TextEncoder().encode(message.content).length, 0) > 128_000) {
       setError(t("대화가 너무 깁니다. 새 대화를 시작하거나 내용을 줄여 주세요.")); return;
     }
@@ -274,12 +290,12 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
       onEvent.onmessage = event => {
         if (ownsRequest() && !requests.current.get(session.id)?.cancelled && typeof event.text === "string") patchRequest(session.id, { streamed: event.text });
       };
-      const content = await invoke<string>("ai_chat", { onEvent, requestId: id, provider: session.provider, model: session.model, messages: turns, useWeb, useFiles });
+      const content = await invoke<string>("ai_chat", { onEvent, requestId: id, provider: session.provider, model: session.model, messages: turns, useWeb: session.provider !== "compatible" && useWeb, useFiles });
       if (!ownsRequest()) return;
       if (requests.current.get(session.id)?.cancelled) {
         patchRequest(session.id, { error: t("요청을 중지했습니다. 제공업체에서 이미 처리한 사용량은 청구될 수 있습니다.") }); return;
       }
-      const completed: ChatSession = { ...session, draft: "", messages: [...turns, { role: "assistant", content, modelName: session.modelName || session.model }], updatedAt: Date.now() };
+      const completed: ChatSession = { ...session, draft: "", draftImage: undefined, messages: [...turns, { role: "assistant", content, modelName: session.modelName || session.model }], updatedAt: Date.now() };
       remember(completed);
       if (currentRef.current.id === session.id) replaceCurrent(completed);
       patchRequest(session.id, { streamed: "", question: "", pending: "" });
@@ -288,7 +304,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     finally { if (ownsRequest()) patchRequest(session.id, { id: null, pending: "" }); }
   }
   async function changeConversationModel(next: AiSelection) {
-    if (isRunning() || mutation.current || deleteTarget) return;
+    if (captureLock.current || isRunning() || mutation.current || deleteTarget) return;
     mutation.current = true; setSwitching(true);
     const session = { ...currentRef.current, ...next, messages: currentRef.current.messages.map(message => message.role === "assistant" && !message.modelName ? {...message, modelName: currentRef.current.modelName || currentRef.current.model} : message), updatedAt: Date.now() };
     try {
@@ -299,7 +315,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     } finally {mutation.current = false; setSwitching(false);}
   }
   function confirmRemoval(session: ChatSession) {
-    if (isRunning(session.id) || mutation.current) return;
+    if (captureLock.current || isRunning(session.id) || mutation.current) return;
     setDeleteError(""); setDeleteTarget(session);
   }
   async function removeSession() {
@@ -344,6 +360,17 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     if (nativeRuntime) void invoke("open_web_url", { url }).catch(() => setError(t("링크를 열지 못했습니다.")));
     else window.open(url, "_blank", "noopener,noreferrer");
   }
+  async function captureRegion() {
+    if (!nativeRuntime || captureLock.current || isRunning() || mutation.current) return;
+    const session = currentRef.current;
+    if (session.messages.filter(message => message.image).length >= 4) { setError(t("A conversation can contain up to four screen captures. Start a new conversation.")); return; }
+    captureLock.current = true; setCapturing(true); setError("");
+    try {
+      const image = await invoke<ChatImage | null>("ai_capture_region");
+      if (image && alive.current && currentRef.current.id === session.id) replaceCurrent({ ...currentRef.current, draftImage: image, updatedAt: Date.now() });
+    } catch (error) { if (alive.current) setError(aiErrorText(error)); }
+    finally { captureLock.current = false; if (alive.current) { setCapturing(false); composer.current?.focus(); } }
+  }
   if (!visible) return null;
   async function toggleFiles() {
     if (busy || filesLock.current || !nativeRuntime) return;
@@ -359,9 +386,9 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     } catch (e) { setError(aiErrorText(e)); }
     finally { filesLock.current = false; setFilesBusy(false); }
   }
-  const displayMessages: ChatMessage[] = pending || streamed ? [...messages, {role:"user",content:pending||streamQuestion}, ...(streamed?[{role:"assistant" as const,content:streamed,modelName:current.modelName}]:[])] : messages;
+  const displayMessages: ChatMessage[] = pending || streamed ? [...messages, {role:"user",content:pending||streamQuestion,image:current.draftImage}, ...(streamed?[{role:"assistant" as const,content:streamed,modelName:current.modelName}]:[])] : messages;
   const conversation = <>
-      <header className="ai-header"><div data-tauri-drag-region><strong>{!hasSavedSession&&!messages.length&&!draft?t("New conversation"):current.title}</strong><span className="ai-model-label">{current.modelName || model || t("모델을 선택하세요")} · {providerName}</span></div><button className="ai-icon-button" aria-label={t("대화 이름 변경")} title={t("이름 변경")} disabled={busy||switching} onClick={()=>setRename(current.title)}><Pencil size={14}/></button><button className="ai-icon-button" aria-label={current.pinned?t("대화 고정 해제"):t("대화 고정")} title={current.pinned?t("고정 해제"):t("고정")} aria-pressed={!!current.pinned} disabled={busy||switching} onClick={()=>void changeMetadata({pinned:!current.pinned})}><Pin size={14}/></button><button className="ai-icon-button" aria-label={t("대화 내보내기")} title={t("Markdown 내보내기")} disabled={busy} onClick={()=>{if(nativeRuntime)void invoke<boolean>("ai_export_session",{session:currentRef.current,locale:currentLocale()}).then(saved=>{if(saved)setNotice(t("대화를 내보냈습니다."));}).catch(error=>setNotice(aiErrorText(error)));else downloadChat(currentRef.current);}}><Download size={14}/></button><button className="ai-icon-button" aria-label={t("현재 대화 삭제")} title={busy ? t("Stop this reply before deleting the conversation.") : t("대화 삭제")} onClick={() => confirmRemoval(currentRef.current)} disabled={busy || switching || (!hasSavedSession && !draft && !messages.length)}><Trash2 size={15} /></button></header>
+      <header className="ai-header"><div data-tauri-drag-region><strong>{!hasSavedSession&&!messages.length&&!draft?t("New conversation"):current.title}</strong><span className="ai-model-label">{current.modelName || model || t("모델을 선택하세요")} · {providerName}</span></div><button className="ai-icon-button" aria-label={t("대화 이름 변경")} title={t("이름 변경")} disabled={busy||switching} onClick={()=>setRename(current.title)}><Pencil size={14}/></button><button className="ai-icon-button" aria-label={current.pinned?t("대화 고정 해제"):t("대화 고정")} title={current.pinned?t("고정 해제"):t("고정")} aria-pressed={!!current.pinned} disabled={busy||switching} onClick={()=>void changeMetadata({pinned:!current.pinned})}><Pin size={14}/></button><button className="ai-icon-button" aria-label={t("대화 내보내기")} title={t("Markdown 내보내기")} disabled={busy} onClick={()=>{if(nativeRuntime)void invoke<boolean>("ai_export_session",{session:currentRef.current,locale:currentLocale()}).then(saved=>{if(saved)setNotice(t("대화를 내보냈습니다."));}).catch(error=>setNotice(aiErrorText(error)));else downloadChat(currentRef.current);}}><Download size={14}/></button><button className="ai-icon-button" aria-label={t("현재 대화 삭제")} title={busy ? t("Stop this reply before deleting the conversation.") : t("대화 삭제")} onClick={() => confirmRemoval(currentRef.current)} disabled={busy || switching || (!hasSavedSession && !draft && !current.draftImage && !messages.length)}><Trash2 size={15} /></button></header>
       {rename!==null&&<form className="ai-rename" onSubmit={event=>{event.preventDefault();if(rename.trim())void changeMetadata({title:rename.trim()});}}><input aria-label={t("대화 이름")} autoFocus value={rename} maxLength={70} disabled={switching} onChange={e=>setRename(e.target.value)}/><button disabled={switching||!rename.trim()}>{t("저장")}</button><button type="button" disabled={switching} onClick={()=>setRename(null)}>{t("취소")}</button></form>}
       <div className="ai-messages" ref={(element) => { if (currentRef.current.id === current.id) scroll.current = element; }} onScroll={(event) => {
         if (currentRef.current.id !== current.id) return;
@@ -374,6 +401,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
           {!nativeRuntime && <p className="ai-preview-note">{t("브라우저 미리보기입니다. AI 연결은 macOS 앱에서 사용할 수 있습니다.")}</p>}
         </div> : displayMessages.map((message, index) => <motion.article className={`ai-message ${message.role}`} key={`${index}-${message.role}`} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}>
           <div className="ai-message-label"><strong>{message.role === "user" ? t("나") : message.modelName || current.modelName || model}</strong><button className="ai-icon-button" aria-label={message.role === "user" ? t("질문 복사") : t("답변 복사")} onClick={() => { void navigator.clipboard.writeText(message.content).then(() => setNotice(t("복사했습니다."))).catch(() => setNotice(t("복사하지 못했습니다."))); }}><Copy size={13} /></button>{index<messages.length&&<button className="ai-icon-button" disabled={busy||switching} aria-label={message.role==="user"?t("질문 수정"):t("답변 다시 생성")} title={message.role==="user"?t("질문을 수정해 새 대화로 이어가기"):t("원본을 유지하고 다시 생성")} onClick={()=>void forkMessage(message.role==="user"?index:index-1,message.role==="assistant")}>{message.role==="user"?<Pencil size={13}/>:<RotateCcw size={13}/>}</button>}</div>
+          {message.image && <img className="ai-capture-preview" src={message.image.dataUrl} alt={t("Screen capture")} />}
           <div className={`ai-message-content${message.role === "assistant" ? " ai-markdown" : ""}`}>{message.role === "user" ? message.content : <Markdown remarkPlugins={[remarkGfm]} skipHtml components={{ pre: ({children})=><div className="ai-code-block"><button type="button" aria-label={t("코드 복사")} onClick={event=>{const code=event.currentTarget.parentElement?.querySelector("code")?.textContent??"";void navigator.clipboard.writeText(code).then(()=>setNotice(t("코드를 복사했습니다."))).catch(()=>setNotice(t("복사하지 못했습니다.")));}}><Copy size={13}/></button><pre>{children}</pre></div>, img: ({ alt }) => <span>{alt ? t("[이미지: {0}]", {"0": alt}) : t("[이미지]")}</span>, a: ({ href, children }) => <a href={href} onClick={(event) => { event.preventDefault(); if (href) openLink(href); }}>{children}</a> }}>{message.content}</Markdown>}</div>
         </motion.article>)}
         {streamed&&!busy&&<p className="ai-partial-note">{t("중단된 답변 · 아래 질문을 다시 보내 이어갈 수 있습니다.")}</p>}
@@ -381,14 +409,16 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
       </div>
       {awayFromBottom && <button className="ai-jump-latest" aria-label={t("최신 메시지로 이동")} onClick={scrollToLatest}><ArrowDown size={14} /> {t("최신 메시지")}</button>}
       {error && <div className="ai-request-error ai-feedback-enter" role="alert"><p>{error.split("\n")[0]}</p>{error.includes("\n") && <details><summary>{t("오류 정보")}</summary><pre>{error.split("\n").slice(1).join("\n")}</pre></details>}<div><button onClick={() => void send()} disabled={busy || !draft.trim() || !readyToSend}>{t("다시 보내기")}</button><button onClick={onOpenSettings} disabled={busy}>{t("모델·연결 설정")}</button></div></div>}
+      {failedEntry && <div className="ai-notice" role="status">{t("Your new draft is waiting until the current conversation can be saved.")} <button disabled={switching} onClick={() => void acceptEntry(failedEntry)}>{t("Open new draft")}</button></div>}
       {historyError && <div className="ai-notice ai-error" role="alert">{t(historyError)} <button onClick={() => { if (historyReady) void persist(currentRef.current); else setHistoryRevision((value) => value + 1); }}>{t("기록 저장·조회 다시 시도")}</button></div>}
       {messages.length > 0 && !configured && !checking && <div className="ai-session-model-note">{t("계속 대화하려면 이 제공업체의 API 키를 연결하세요.")}<button onClick={onOpenSettings}>{t("AI 설정 열기")}</button></div>}
-      {(useWeb || useFiles) && <div className="ai-context-hint">{useWeb && <span><Globe size={12}/> {t("웹 검색")}{provider === "openai" ? "· OpenAI" : "· Perplexity Sonar"}</span>}{useFiles && <span><FolderOpen size={12}/> {toolSettings.folders.length===1?t("1 permitted folder · Read content is sent to AI"):t("{0} permitted folders · Read content is sent to AI",{0:toolSettings.folders.length})}</span>}</div>}
+      {((provider !== "compatible" && useWeb) || useFiles) && <div className="ai-context-hint">{provider !== "compatible" && useWeb && <span><Globe size={12}/> {t("웹 검색")}{provider === "openai" ? "· OpenAI" : "· Perplexity Sonar"}</span>}{useFiles && <span><FolderOpen size={12}/> {toolSettings.folders.length===1?t("1 permitted folder · Read content is sent to AI"):t("{0} permitted folders · Read content is sent to AI",{0:toolSettings.folders.length})}</span>}</div>}
       <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
-        <textarea ref={(element) => { if (currentRef.current.id === current.id) composer.current = element; }} aria-label={t("AI 메시지")} placeholder={t("질문을 입력하세요…")} value={busy ? "" : draft} disabled={busy || !historyReady || switching} maxLength={32000} rows={2}
+        {current.draftImage && !busy && <div className="ai-capture-attachment"><img className="ai-capture-preview" src={current.draftImage.dataUrl} alt={t("Attached screen capture")} /><div><span>{t("Screen capture")}</span><small>{t("Sent with your question · Choose a model that supports images")}</small></div><button type="button" className="ai-icon-button" aria-label={t("Remove screen capture")} disabled={capturing || switching} onClick={() => replaceCurrent({...currentRef.current, draftImage: undefined, updatedAt: Date.now()})}><X size={14}/></button></div>}
+        <textarea ref={(element) => { if (currentRef.current.id === current.id) composer.current = element; }} aria-label={t("AI 메시지")} placeholder={t("질문을 입력하세요…")} value={busy ? "" : draft} disabled={busy || capturing || !historyReady || switching} maxLength={32000} rows={2}
           onChange={(event) => updateDraft(event.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
           onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && !isCompositionKey(event.nativeEvent) && !composing.current) { event.preventDefault(); if (!event.repeat) void send(); } }} />
-        <div className="ai-composer-bottom"><div className="ai-composer-controls"><AiModelPicker selection={current} disabled={busy || !historyReady} nativeRuntime={nativeRuntime} onSelect={changeConversationModel} onSettings={onOpenSettings}/><button type="button" className="ai-tool-chip" aria-label={t("이 질문에 웹 검색 사용")} aria-pressed={useWeb} disabled={busy || !toolSettings.webSearch} title={toolSettings.webSearch ? t("필요할 때 웹 검색 · 추가 요금") : t("AI 설정에서 웹 검색을 허용하세요")} onClick={()=>setUseWeb(v=>!v)}><Globe size={14}/><span>{t("웹")}</span></button><button type="button" className="ai-tool-chip" aria-label={t("이 질문에 로컬 파일 사용")} aria-pressed={useFiles} disabled={busy || filesBusy || !nativeRuntime} title={toolSettings.localFiles ? t("허용 폴더의 텍스트를 AI에 전달") : t("AI가 읽을 폴더 선택")} onClick={()=>void toggleFiles()}><FolderOpen size={14}/><span>{t("파일")}</span></button><button type="button" className="ai-icon-button" aria-label={t("AI 도구 설정")} onClick={onOpenSettings} disabled={busy}><SlidersHorizontal size={14}/></button></div>{busy ? <button type="button" className="ai-send" aria-label={t("응답 중지")} onClick={() => void cancelRequest(current.id)} disabled={!pending || activeRequest.cancelled}><Square size={13} /><span>{t("중지")}</span></button> : <button className="ai-send" type="submit" disabled={!draft.trim() || !readyToSend || filesBusy || activeCount >= MAX_CONCURRENT_REQUESTS} title={activeCount >= MAX_CONCURRENT_REQUESTS ? t("Up to three conversations can reply at once. Wait for a reply or stop one.") : undefined} aria-label={t("메시지 전송")}><span>{t("보내기")}</span><ArrowUp size={16} /></button>}</div>
+        <div className="ai-composer-bottom"><div className="ai-composer-controls"><button type="button" className="ai-icon-button" aria-label={t("Capture screen region")} title={t("Capture screen region")} disabled={!nativeRuntime || busy || capturing || switching || !historyReady} onClick={() => void captureRegion()}><Scan size={16}/></button><AiModelPicker selection={current} disabled={busy || !historyReady} nativeRuntime={nativeRuntime} onSelect={changeConversationModel} onSettings={onOpenSettings}/><button type="button" className="ai-tool-chip" aria-label={t("이 질문에 웹 검색 사용")} aria-pressed={provider !== "compatible" && useWeb} disabled={busy || provider === "compatible" || !toolSettings.webSearch} title={provider === "compatible" ? t("Web search is not available for custom API servers.") : toolSettings.webSearch ? t("필요할 때 웹 검색 · 추가 요금") : t("AI 설정에서 웹 검색을 허용하세요")} onClick={()=>setUseWeb(v=>!v)}><Globe size={14}/><span>{t("웹")}</span></button><button type="button" className="ai-tool-chip" aria-label={t("이 질문에 로컬 파일 사용")} aria-pressed={useFiles} disabled={busy || filesBusy || !nativeRuntime} title={toolSettings.localFiles ? t("허용 폴더의 텍스트를 AI에 전달") : t("AI가 읽을 폴더 선택")} onClick={()=>void toggleFiles()}><FolderOpen size={14}/><span>{t("파일")}</span></button><button type="button" className="ai-icon-button" aria-label={t("AI 도구 설정")} onClick={onOpenSettings} disabled={busy}><SlidersHorizontal size={14}/></button></div>{busy ? <button type="button" className="ai-send" aria-label={t("응답 중지")} onClick={() => void cancelRequest(current.id)} disabled={!pending || activeRequest.cancelled}><Square size={13} /><span>{t("중지")}</span></button> : <button className="ai-send" type="submit" disabled={!draft.trim() || !readyToSend || filesBusy || activeCount >= MAX_CONCURRENT_REQUESTS} title={activeCount >= MAX_CONCURRENT_REQUESTS ? t("Up to three conversations can reply at once. Wait for a reply or stop one.") : undefined} aria-label={t("메시지 전송")}><span>{t("보내기")}</span><ArrowUp size={16} /></button>}</div>
       </form>
       {notice && <div className="ai-notice" role="status">{t(notice)}</div>}
 

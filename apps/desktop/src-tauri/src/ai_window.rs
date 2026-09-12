@@ -162,13 +162,17 @@ fn apply(window: &tauri::WebviewWindow, frame: Frame) -> Result<(), String> {
         return Err("채팅 창을 찾지 못했습니다.".into());
     }
     let native = unsafe { &*pointer.cast::<NSWindow>() };
-    native.setFrame_display(
-        NSRect::new(
-            NSPoint::new(frame.x, frame.y),
-            NSSize::new(frame.width, frame.height),
-        ),
-        true,
-    );
+    super::window_glass::without_implicit_animations(|| {
+        native.setFrame_display(
+            NSRect::new(
+                NSPoint::new(frame.x, frame.y),
+                NSSize::new(frame.width, frame.height),
+            ),
+            false,
+        );
+        super::window_glass::refresh_before_display(native);
+        native.displayIfNeeded();
+    });
     Ok(())
 }
 #[cfg(not(target_os = "macos"))]
