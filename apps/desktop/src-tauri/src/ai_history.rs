@@ -28,6 +28,8 @@ pub struct Session {
     model_name: Option<String>,
     title: String,
     messages: Vec<Turn>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    compaction: Option<crate::ai_context::Compaction>,
     draft: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     draft_image: Option<crate::ai_capture::ChatImage>,
@@ -51,7 +53,6 @@ fn validate(session: &Session) -> Result<(), String> {
             .as_ref()
             .is_some_and(|name| name.len() > 720)
         || session.draft.len() > 128_000
-        || session.messages.len() > 40
         || session.messages.len() % 2 != 0
         || session.messages.iter().enumerate().any(|(i, m)| {
             m.model_name.as_ref().is_some_and(|name| name.len() > 720)
@@ -64,13 +65,14 @@ fn validate(session: &Session) -> Result<(), String> {
             .iter()
             .map(|m| m.content.len())
             .sum::<usize>()
-            > 2_097_152
+            > crate::ai_context::MAX_ARCHIVE_BYTES
     {
         return Err("대화 기록이 너무 크거나 올바르지 않습니다.".into());
     }
+    if let Some(compaction) = &session.compaction { compaction.validate(session.messages.len())?; }
     let images: Vec<_> = session.messages.iter().filter_map(|message| message.image.as_ref()).chain(session.draft_image.as_ref()).collect();
-    if images.len() > crate::ai_capture::MAX_SESSION_IMAGES || session.messages.iter().any(|message| message.role != "user" && message.image.is_some()) {
-        return Err("대화마다 화면 캡처를 최대 4개까지 사용할 수 있습니다.".into());
+    if session.messages.iter().any(|message| message.role != "user" && message.image.is_some()) {
+        return Err("Conversation images must belong to user messages.".into());
     }
     for image in images { crate::ai_capture::validate_image(image)?; }
     Ok(())
@@ -134,7 +136,7 @@ pub fn ai_load_history(
         .map_err(|_| "대화 기록을 읽지 못했습니다.")?;
     rows.map(|row| {
         let text = row.map_err(|_| "대화 기록을 읽지 못했습니다.")?;
-        if text.len() > 9_000_000 {
+        if text.len() > crate::ai_context::MAX_ARCHIVE_BYTES {
             return Err("대화 기록이 너무 큽니다.".into());
         }
         let session =
@@ -250,6 +252,25 @@ pub async fn ai_export_session(session: Session, locale: Option<String>) -> Resu
 mod tests {
     use super::*;
     #[test]
+    fn persists_long_original_history_with_a_separate_summary_and_validates_boundaries() {
+        let messages: Vec<_> = (0..120).map(|i| serde_json::json!({"role": if i % 2 == 0 {"user"} else {"assistant"}, "content": format!("Original message {i}")})).collect();
+        let mut value = serde_json::json!({"id":"12345678-1234-1234-1234-123456789012","provider":"openai","model":"fixture","title":"Long conversation","messages":messages,"draft":"Continue","updatedAt":0,"compaction":{"summary":"Important decisions","through":100}});
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE conversations (id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, content TEXT NOT NULL);").unwrap();
+        save(&db, serde_json::from_value(value.clone()).unwrap()).unwrap();
+        let stored: String = db.query_row("SELECT content FROM conversations", [], |r| r.get(0)).unwrap();
+        let loaded: Session = serde_json::from_str(&stored).unwrap();
+        assert_eq!(loaded.messages.len(), 120);
+        assert_eq!(loaded.messages[0].content, "Original message 0");
+        assert_eq!(loaded.compaction.unwrap().through, 100);
+        for through in [1, 121, 122] {
+            value["compaction"]["through"] = serde_json::json!(through);
+            assert!(save(&db, serde_json::from_value(value.clone()).unwrap()).is_err());
+        }
+        let preserved: String = db.query_row("SELECT content FROM conversations", [], |r| r.get(0)).unwrap();
+        assert_eq!(stored, preserved);
+    }
+    #[test]
     fn preserves_capture_drafts_turns_and_old_text_sessions() {
         let mut value = serde_json::json!({"id":"12345678-1234-1234-1234-123456789012","provider":"compatible","model":"vision","title":"Capture","messages":[],"draft":"","updatedAt":0});
         let legacy: Session = serde_json::from_value(value.clone()).unwrap();
@@ -282,6 +303,7 @@ mod tests {
             draft: "Retry me".into(),
             draft_image: None,
             messages: vec![],
+            compaction: None,
             updated_at: 0,
             pinned: false,
         };

@@ -61,6 +61,7 @@ beforeEach(() => {
       case "library_search_files": return {items:[],total:0,limited:false};
       case "library_load": return { entries: [], roots: [], favorites: [] };
       case "ai_load_history": return [];
+      case "ai_prepare_context": return { messages: [], compaction: null };
       case "ai_save_session": return (args as {session: unknown}).session;
       case "search_clipboard_history": return [{ id: 1, text: "A copied fixture", capturedAt: 1 }];
       case "get_clipboard_history_entry_text": return "A copied fixture";

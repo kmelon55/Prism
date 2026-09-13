@@ -9,13 +9,13 @@ import { AiModelPicker } from "./AiModelPicker";
 import { defaultAiTools, getAiTools, setAiTools } from "./providers/aiTools";
 import remarkGfm from "remark-gfm";
 import { aiErrorText, aiProviders, loadAiSelection, readAiSelection, notifyAiSettingsChanged, watchAiSettings, type AiSelection } from "./providers/ai";
-import { downloadChat, forkChatSession, sortChatSessions, deleteChatSession, loadChatHistory, newChatSession, saveChatSession, type ChatImage, type ChatMessage, type ChatSession } from "./providers/aiHistory";
+import { downloadChat, forkChatSession, sortChatSessions, deleteChatSession, loadChatHistory, newChatSession, saveChatSession, type ChatImage, type ChatMessage, type ChatSession, type PreparedChatContext } from "./providers/aiHistory";
 import { queueHistoryOperation } from "./ai/historyQueue";
 import { isCompositionKey } from "./interaction/usePaletteKeyboard";
 
 export interface AiChatEntry { id: number; text: string; image?: ChatImage }
 const MAX_CONCURRENT_REQUESTS = 3;
-interface ConversationRequest { id: string | null; pending: string; streamed: string; question: string; error: string; cancelled?: boolean }
+interface ConversationRequest { id: string | null; pending: string; streamed: string; question: string; error: string; cancelled?: boolean; compacting?: boolean }
 const idleRequest: ConversationRequest = { id: null, pending: "", streamed: "", question: "", error: "", cancelled: false };
 
 const presets = [
@@ -59,6 +59,8 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   const [deleteTarget, setDeleteTarget] = useState<ChatSession | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [awayFromBottom, setAwayFromBottom] = useState(false);
+  const [visibleMessageCount, setVisibleMessageCount] = useState(60);
+  const olderScroll = useRef<{ top: number; height: number } | null>(null);
   const [configRevision, setConfigRevision] = useState(0);
   const currentRef = useRef(current);
   const sessionsRef = useRef(sessions);
@@ -211,8 +213,14 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     input.style.height = `${Math.min(180, Math.max(44, input.scrollHeight))}px`;
   }, [draft, busy, current.id, visible]);
   useEffect(() => {
-    followMessages.current = true; setAwayFromBottom(false);
+    followMessages.current = true; setAwayFromBottom(false); setVisibleMessageCount(60); olderScroll.current = null;
   }, [current.id, visible]);
+  useLayoutEffect(() => {
+    if (olderScroll.current && scroll.current) {
+      scroll.current.scrollTop = olderScroll.current.top + scroll.current.scrollHeight - olderScroll.current.height;
+      olderScroll.current = null;
+    }
+  }, [visibleMessageCount]);
   useEffect(() => {
     if (followMessages.current) scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: "auto" });
   }, [messages, pending, streamed, visible, current.id]);
@@ -271,13 +279,9 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     if ([...requests.current.values()].filter(request => request.id).length >= MAX_CONCURRENT_REQUESTS) {
       setError(t("Up to three conversations can reply at once. Wait for a reply or stop one.")); return;
     }
-    const session = { ...source, title: ![t("새 대화"), t("New conversation")].includes(source.title) ? source.title : source.draft.trim().replace(/\s+/g, " ").slice(0, 70), updatedAt: Date.now() };
+    let session = { ...source, title: ![t("새 대화"), t("New conversation")].includes(source.title) ? source.title : source.draft.trim().replace(/\s+/g, " ").slice(0, 70), updatedAt: Date.now() };
     const question = session.draft.trim();
     const turns: ChatMessage[] = [...session.messages, { role: "user", content: question, ...(session.draftImage ? {image: session.draftImage} : {}) }];
-    if (turns.filter(turn => turn.image).length > 4) { setError(t("A conversation can contain up to four screen captures. Start a new conversation.")); return; }
-    if (turns.length > 40 || new TextEncoder().encode(question).length > 32_000 || turns.reduce((size, message) => size + new TextEncoder().encode(message.content).length, 0) > 128_000) {
-      setError(t("대화가 너무 깁니다. 새 대화를 시작하거나 내용을 줄여 주세요.")); return;
-    }
     const id = crypto.randomUUID();
     const ownsRequest = () => alive.current && !deleting.current.has(session.id) && requests.current.get(session.id)?.id === id;
     patchRequest(session.id, { ...idleRequest, id, question });
@@ -286,11 +290,28 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
       // Save the unanswered question before inference. Switching never changes this request's owner.
       if (!await persist(session) || !ownsRequest()) return;
       patchRequest(session.id, { pending: question });
+      const onProgress = new Channel<null>();
+      onProgress.onmessage = () => {
+        if (ownsRequest() && !requests.current.get(session.id)?.cancelled) patchRequest(session.id, { compacting: true });
+      };
+      const prepared = await invoke<PreparedChatContext>("ai_prepare_context", {
+        requestId: id, provider: session.provider, model: session.model,
+        messages: turns, compaction: session.compaction ?? null, onProgress,
+      });
+      if (!ownsRequest() || requests.current.get(session.id)?.cancelled) return;
+      if (JSON.stringify(prepared.compaction ?? null) !== JSON.stringify(session.compaction ?? null)) {
+        session = { ...session, compaction: prepared.compaction ?? undefined };
+        if (currentRef.current.id === session.id) replaceCurrent(session);
+        // Commit the summary checkpoint before sending the answer request. Never replace the archive.
+        if (!await persist(session)) return;
+      }
+      if (!ownsRequest() || requests.current.get(session.id)?.cancelled) return;
+      patchRequest(session.id, { compacting: false });
       const onEvent = new Channel<{ text: string }>();
       onEvent.onmessage = event => {
         if (ownsRequest() && !requests.current.get(session.id)?.cancelled && typeof event.text === "string") patchRequest(session.id, { streamed: event.text });
       };
-      const content = await invoke<string>("ai_chat", { onEvent, requestId: id, provider: session.provider, model: session.model, messages: turns, useWeb: session.provider !== "compatible" && useWeb, useFiles });
+      const content = await invoke<string>("ai_chat", { onEvent, requestId: id, provider: session.provider, model: session.model, messages: prepared.messages, useWeb: session.provider !== "compatible" && useWeb, useFiles });
       if (!ownsRequest()) return;
       if (requests.current.get(session.id)?.cancelled) {
         patchRequest(session.id, { error: t("요청을 중지했습니다. 제공업체에서 이미 처리한 사용량은 청구될 수 있습니다.") }); return;
@@ -301,7 +322,12 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
       patchRequest(session.id, { streamed: "", question: "", pending: "" });
       await persist(completed);
     } catch (error) { if (ownsRequest()) patchRequest(session.id, { error: aiErrorText(error) }); }
-    finally { if (ownsRequest()) patchRequest(session.id, { id: null, pending: "" }); }
+    finally {
+      if (ownsRequest()) patchRequest(session.id, {
+        id: null, pending: "", compacting: false,
+        ...(requests.current.get(session.id)?.cancelled ? { error: t("요청을 중지했습니다. 제공업체에서 이미 처리한 사용량은 청구될 수 있습니다.") } : {}),
+      });
+    }
   }
   async function changeConversationModel(next: AiSelection) {
     if (captureLock.current || isRunning() || mutation.current || deleteTarget) return;
@@ -363,7 +389,6 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
   async function captureRegion() {
     if (!nativeRuntime || captureLock.current || isRunning() || mutation.current) return;
     const session = currentRef.current;
-    if (session.messages.filter(message => message.image).length >= 4) { setError(t("A conversation can contain up to four screen captures. Start a new conversation.")); return; }
     captureLock.current = true; setCapturing(true); setError("");
     try {
       const image = await invoke<ChatImage | null>("ai_capture_region");
@@ -387,6 +412,7 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
     finally { filesLock.current = false; setFilesBusy(false); }
   }
   const displayMessages: ChatMessage[] = pending || streamed ? [...messages, {role:"user",content:pending||streamQuestion,image:current.draftImage}, ...(streamed?[{role:"assistant" as const,content:streamed,modelName:current.modelName}]:[])] : messages;
+  const messageOffset = Math.max(0, displayMessages.length - visibleMessageCount);
   const conversation = <>
       <header className="ai-header"><div data-tauri-drag-region><strong>{!hasSavedSession&&!messages.length&&!draft?t("New conversation"):current.title}</strong><span className="ai-model-label">{current.modelName || model || t("모델을 선택하세요")} · {providerName}</span></div><button className="ai-icon-button" aria-label={t("대화 이름 변경")} title={t("이름 변경")} disabled={busy||switching} onClick={()=>setRename(current.title)}><Pencil size={14}/></button><button className="ai-icon-button" aria-label={current.pinned?t("대화 고정 해제"):t("대화 고정")} title={current.pinned?t("고정 해제"):t("고정")} aria-pressed={!!current.pinned} disabled={busy||switching} onClick={()=>void changeMetadata({pinned:!current.pinned})}><Pin size={14}/></button><button className="ai-icon-button" aria-label={t("대화 내보내기")} title={t("Markdown 내보내기")} disabled={busy} onClick={()=>{if(nativeRuntime)void invoke<boolean>("ai_export_session",{session:currentRef.current,locale:currentLocale()}).then(saved=>{if(saved)setNotice(t("대화를 내보냈습니다."));}).catch(error=>setNotice(aiErrorText(error)));else downloadChat(currentRef.current);}}><Download size={14}/></button><button className="ai-icon-button" aria-label={t("현재 대화 삭제")} title={busy ? t("Stop this reply before deleting the conversation.") : t("대화 삭제")} onClick={() => confirmRemoval(currentRef.current)} disabled={busy || switching || (!hasSavedSession && !draft && !current.draftImage && !messages.length)}><Trash2 size={15} /></button></header>
       {rename!==null&&<form className="ai-rename" onSubmit={event=>{event.preventDefault();if(rename.trim())void changeMetadata({title:rename.trim()});}}><input aria-label={t("대화 이름")} autoFocus value={rename} maxLength={70} disabled={switching} onChange={e=>setRename(e.target.value)}/><button disabled={switching||!rename.trim()}>{t("저장")}</button><button type="button" disabled={switching} onClick={()=>setRename(null)}>{t("취소")}</button></form>}
@@ -396,16 +422,20 @@ export function AiChat({ visible, nativeRuntime, entryDraft, closing = false, re
         const away = element.scrollHeight - element.scrollTop - element.clientHeight > 80;
         followMessages.current = !away; setAwayFromBottom(away);
       }} role="log" aria-label={t("대화")} aria-live="polite">
+        {messageOffset > 0 && <button type="button" className="ai-load-earlier" onClick={() => {
+          if (scroll.current) olderScroll.current = { top: scroll.current.scrollTop, height: scroll.current.scrollHeight };
+          followMessages.current = false; setVisibleMessageCount(count => count + 60);
+        }}>{t("Show earlier messages")}</button>}
         {displayMessages.length === 0 ? <div className="ai-welcome"><div className="ai-welcome-mark"><Sparkles size={26} /></div><h2>{t("무엇을 함께 해볼까요?")}</h2><p>{readyToSend ? t("질문하거나 텍스트를 붙여넣어 보세요.") : checking ? t("저장된 AI 연결을 확인하고 있습니다…") : t("API 키와 모델을 연결하면 바로 대화할 수 있습니다.")}</p>
           {readyToSend ? <div className="ai-presets">{presets.map((preset) => <button key={preset.label} onClick={() => { updateDraft(preset.prompt); composer.current?.focus(); }}>{preset.label}</button>)}</div> : <button className="ai-connect-button" onClick={onOpenSettings}>{t("AI 설정 열기")}</button>}
           {!nativeRuntime && <p className="ai-preview-note">{t("브라우저 미리보기입니다. AI 연결은 macOS 앱에서 사용할 수 있습니다.")}</p>}
-        </div> : displayMessages.map((message, index) => <motion.article className={`ai-message ${message.role}`} key={`${index}-${message.role}`} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}>
+        </div> : displayMessages.slice(messageOffset).map((message, visibleIndex) => { const index = visibleIndex + messageOffset; return <motion.article className={`ai-message ${message.role}`} key={`${index}-${message.role}`} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}>
           <div className="ai-message-label"><strong>{message.role === "user" ? t("나") : message.modelName || current.modelName || model}</strong><button className="ai-icon-button" aria-label={message.role === "user" ? t("질문 복사") : t("답변 복사")} onClick={() => { void navigator.clipboard.writeText(message.content).then(() => setNotice(t("복사했습니다."))).catch(() => setNotice(t("복사하지 못했습니다."))); }}><Copy size={13} /></button>{index<messages.length&&<button className="ai-icon-button" disabled={busy||switching} aria-label={message.role==="user"?t("질문 수정"):t("답변 다시 생성")} title={message.role==="user"?t("질문을 수정해 새 대화로 이어가기"):t("원본을 유지하고 다시 생성")} onClick={()=>void forkMessage(message.role==="user"?index:index-1,message.role==="assistant")}>{message.role==="user"?<Pencil size={13}/>:<RotateCcw size={13}/>}</button>}</div>
           {message.image && <img className="ai-capture-preview" src={message.image.dataUrl} alt={t("Screen capture")} />}
           <div className={`ai-message-content${message.role === "assistant" ? " ai-markdown" : ""}`}>{message.role === "user" ? message.content : <Markdown remarkPlugins={[remarkGfm]} skipHtml components={{ pre: ({children})=><div className="ai-code-block"><button type="button" aria-label={t("코드 복사")} onClick={event=>{const code=event.currentTarget.parentElement?.querySelector("code")?.textContent??"";void navigator.clipboard.writeText(code).then(()=>setNotice(t("코드를 복사했습니다."))).catch(()=>setNotice(t("복사하지 못했습니다.")));}}><Copy size={13}/></button><pre>{children}</pre></div>, img: ({ alt }) => <span>{alt ? t("[이미지: {0}]", {"0": alt}) : t("[이미지]")}</span>, a: ({ href, children }) => <a href={href} onClick={(event) => { event.preventDefault(); if (href) openLink(href); }}>{children}</a> }}>{message.content}</Markdown>}</div>
-        </motion.article>)}
+        </motion.article>; })}
         {streamed&&!busy&&<p className="ai-partial-note">{t("중단된 답변 · 아래 질문을 다시 보내 이어갈 수 있습니다.")}</p>}
-        {busy && !streamed && <p className="ai-thinking" role="status"><span />{pending ? useWeb || useFiles ? t("필요한 자료를 확인하고 답변을 작성하고 있습니다…") : t("답변을 작성하고 있습니다…") : t("질문을 저장하고 있습니다…")}</p>}
+        {busy && !streamed && <p className="ai-thinking" role="status"><span />{activeRequest.compacting ? t("Summarizing earlier conversation…") : pending ? useWeb || useFiles ? t("필요한 자료를 확인하고 답변을 작성하고 있습니다…") : t("답변을 작성하고 있습니다…") : t("질문을 저장하고 있습니다…")}</p>}
       </div>
       {awayFromBottom && <button className="ai-jump-latest" aria-label={t("최신 메시지로 이동")} onClick={scrollToLatest}><ArrowDown size={14} /> {t("최신 메시지")}</button>}
       {error && <div className="ai-request-error ai-feedback-enter" role="alert"><p>{error.split("\n")[0]}</p>{error.includes("\n") && <details><summary>{t("오류 정보")}</summary><pre>{error.split("\n").slice(1).join("\n")}</pre></details>}<div><button onClick={() => void send()} disabled={busy || !draft.trim() || !readyToSend}>{t("다시 보내기")}</button><button onClick={onOpenSettings} disabled={busy}>{t("모델·연결 설정")}</button></div></div>}

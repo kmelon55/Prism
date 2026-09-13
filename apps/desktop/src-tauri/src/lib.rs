@@ -7,6 +7,7 @@ mod ai;
 mod ai_compatible;
 mod ai_capture;
 mod ai_history;
+mod ai_context;
 mod ai_usage;
 mod ai_key_session;
 #[cfg(target_os = "macos")]
@@ -665,6 +666,7 @@ pub fn run() {
             ai::ai_save_key,
             ai::ai_delete_key,
             ai::ai_chat,
+            ai::ai_prepare_context,
             ai_capture::ai_capture_region,
             ai_tools::ai_get_tools,
             ai_tools::ai_set_tools,

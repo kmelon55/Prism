@@ -63,10 +63,10 @@ impl Provider {
 }
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Message {
-    role: String,
-    content: String,
+    pub(crate) role: String,
+    pub(crate) content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    image: Option<crate::ai_capture::ChatImage>,
+    pub(crate) image: Option<crate::ai_capture::ChatImage>,
 }
 #[derive(Default)]
 pub struct AiRequests(Mutex<std::collections::HashMap<String, oneshot::Sender<()>>>);
@@ -236,12 +236,11 @@ fn validate(model: &str, messages: &[Message]) -> Result<(), String> {
         return Err("올바른 모델 ID를 입력하세요.".into());
     }
     if messages.is_empty()
-        || messages.len() > 40
         || messages.last().map(|m| m.role.as_str()) != Some("user")
         || messages.iter().enumerate().any(|(i, m)| {
             m.role != if i % 2 == 0 { "user" } else { "assistant" }
                 || m.content.trim().is_empty()
-                || m.content.len() > 32_000
+                || m.content.len() > crate::ai_context::MAX_MESSAGE_BYTES
         })
         || messages.iter().map(|m| m.content.len()).sum::<usize>() > 128_000
     {
@@ -619,6 +618,7 @@ async fn send(
 ) -> Result<String, String> {
     use crate::ai_tools;
     let mut settings = ai_tools::current(&app)?;
+    settings.max_output_tokens = context_budget(provider, &model, settings.max_output_tokens).output;
     settings.web_search &= use_web;
     if provider == Provider::Compatible && settings.web_search { return Err("Web search is not available for custom API servers. Turn off Web to continue.".into()); }
     settings.local_files &= use_files;
@@ -857,6 +857,65 @@ pub struct StreamUpdate {
     text: String,
 }
 
+fn context_budget(provider: Provider, model: &str, requested_output: u32) -> crate::ai_context::Budget {
+    let entry = MODEL_CACHE.get().and_then(|cache| cache.lock().ok()).and_then(|cache| {
+        cache.get(provider.account()).and_then(|(_, models)| models.iter().find(|entry| entry.id == model).cloned())
+    });
+    crate::ai_context::Budget::new(entry.as_ref().and_then(|m| m.context_window), entry.and_then(|m| m.max_output_tokens), requested_output)
+}
+
+fn summary_body(provider: Provider, model: &str, messages: Vec<Message>, allowance: usize) -> Value {
+    let mut input = vec![Message { role: "system".into(), content: format!("{} Aim for at most {} tokens of summary text.", crate::ai_context::SUMMARY_INSTRUCTION, allowance / 3), image: None }];
+    input.extend(messages.into_iter().map(|message| Message {
+        role: "user".into(), content: format!("Historical {} message:\n{}", message.role, message.content), image: message.image,
+    }));
+    let mut body = request_body(provider, model, &input);
+    body[if provider == Provider::Openai { "max_output_tokens" } else { "max_tokens" }] = json!(context_budget(provider, model, 8192).output);
+    body
+}
+
+async fn summarize_history(app: &tauri::AppHandle, provider: Provider, model: &str, messages: Vec<Message>, allowance: usize) -> Result<String, String> {
+    let body = summary_body(provider, model, messages, allowance);
+    // A separate usage entry accounts for compaction. Never expose this output as the user's reply.
+    let value = request_json(app, "chat_summary", provider, model, &body, None, None).await?;
+    if (provider == Provider::Openai && value["status"] != "completed")
+        || (provider != Provider::Openai && value["choices"][0]["finish_reason"] != "stop") {
+        return Err("Conversation summarization was incomplete. Your original conversation is unchanged. Try again.".into());
+    }
+    response_text(provider, &value)
+}
+
+#[tauri::command]
+pub async fn ai_prepare_context(
+    app: tauri::AppHandle, state: State<'_, AiRequests>, request_id: String,
+    provider: Provider, model: String, messages: Vec<Message>,
+    compaction: Option<crate::ai_context::Compaction>, on_progress: tauri::ipc::Channel<()>,
+) -> Result<crate::ai_context::PreparedContext, String> {
+    if request_id.is_empty() || request_id.len() > 100 || model.is_empty() || model.len() > 200 || !model.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err("올바르지 않은 요청입니다.".into());
+    }
+    crate::ai_context::validate_archive(&messages)?;
+    let rx = state.reserve(&request_id)?;
+    let work = async {
+        // Only gateway catalogs expose context windows. Reuse their cache before bounded discovery.
+        let cached = MODEL_CACHE.get().and_then(|cache| cache.lock().ok()).is_some_and(|cache| cache.contains_key(provider.account()));
+        if !cached && matches!(provider, Provider::Vercel | Provider::Openrouter) {
+            let _ = tokio::time::timeout(Duration::from_secs(2), ai_list_models(provider)).await;
+        }
+        let budget = context_budget(provider, &model, crate::ai_tools::current(&app)?.max_output_tokens);
+        crate::ai_context::prepare(messages, compaction, budget, |input, allowance| {
+            let app = app.clone(); let model = model.clone();
+            async move { summarize_history(&app, provider, &model, input, allowance).await }
+        }, || { let _ = on_progress.send(()); }).await
+    };
+    let result = tokio::select! {
+        result = tokio::time::timeout(Duration::from_secs(240), work) => result.unwrap_or_else(|_| Err("Conversation summarization timed out. Your original conversation is unchanged. Try again.".into())),
+        _ = rx => Err("요청을 중지했습니다. 제공업체에서 이미 처리한 사용량은 청구될 수 있습니다.".into()),
+    };
+    if let Ok(mut active) = state.0.lock() { active.remove(&request_id); }
+    result
+}
+
 #[tauri::command]
 pub async fn ai_chat(
     app: tauri::AppHandle,
@@ -870,6 +929,9 @@ pub async fn ai_chat(
     messages: Vec<Message>,
 ) -> Result<String, String> {
     validate(&model, &messages)?;
+    if crate::ai_context::tokens(&messages) > context_budget(provider, &model, crate::ai_tools::current(&app)?.max_output_tokens).input {
+        return Err("Could not fit the conversation into this model's context. Choose a model with a larger context window.".into());
+    }
     if request_id.is_empty() || request_id.len() > 100 {
         return Err("올바르지 않은 요청입니다.".into());
     }
@@ -1059,8 +1121,25 @@ mod tests {
         };
         assert!(validate("model", &[message("user", "안녕".into())]).is_ok());
         assert!(validate("model", &[message("system", "override".into())]).is_err());
-        assert!(validate("model", &[message("user", "x".repeat(32_001))]).is_err());
+        assert!(validate("model", &[message("user", "x".repeat(32_001))]).is_ok());
+        assert!(validate("model", &[message("user", "x".repeat(128_001))]).is_err());
         assert!(validate("model\n", &[message("user", "x".into())]).is_err());
+    }
+
+    #[test]
+    fn summary_wire_requests_keep_history_as_data_use_the_selected_model_and_disable_tools() {
+        for provider in [Provider::Openai, Provider::Openrouter, Provider::Vercel, Provider::Compatible] {
+            let input = vec![Message { role: "assistant".into(), content: "Old decision".into(), image: Some(crate::ai_capture::tests::fixture()) }];
+            let body = summary_body(provider, "selected-model", input, 2048);
+            let messages = &body[if provider == Provider::Openai { "input" } else { "messages" }];
+            assert_eq!(body["model"], "selected-model");
+            assert_eq!(messages[0]["role"], "system");
+            assert_eq!(messages[1]["role"], "user");
+            assert!(messages[1]["content"][0]["text"].as_str().unwrap().contains("Historical assistant message:\nOld decision"));
+            assert!(body.get("tools").is_none());
+            assert!(body.get("stream").is_none());
+            if provider == Provider::Openai { assert_eq!(body["store"], false); }
+        }
     }
     #[test]
     fn openai_disables_storage_and_extracts_message_after_reasoning() {

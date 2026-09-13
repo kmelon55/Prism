@@ -3,10 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AiSelection } from "./ai";
 export interface ChatImage { dataUrl: string }
 export interface ChatMessage { role: "user" | "assistant"; content: string; modelName?: string | null; image?: ChatImage }
+export interface ChatCompaction { summary: string; through: number }
+export interface PreparedChatContext { messages: ChatMessage[]; compaction: ChatCompaction | null }
 export interface ChatSession extends AiSelection {
   id: string;
   title: string;
   messages: ChatMessage[];
+  compaction?: ChatCompaction;
   draft: string;
   draftImage?: ChatImage;
   updatedAt: number;
@@ -22,7 +25,7 @@ export function sortChatSessions(sessions: ChatSession[]): ChatSession[] {
 }
 export function forkChatSession(session:ChatSession,userIndex:number):ChatSession {
   if(userIndex<0||session.messages[userIndex]?.role!=="user")throw new Error(t("Choose a user message to edit."));
-  return {...session,id:crypto.randomUUID(),title:`${session.title.slice(0,58)} · ${t("Rewrite")}`,pinned:false,messages:session.messages.slice(0,userIndex),draft:session.messages[userIndex].content,draftImage:session.messages[userIndex].image,updatedAt:Date.now()};
+  return {...session,id:crypto.randomUUID(),title:`${session.title.slice(0,58)} · ${t("Rewrite")}`,pinned:false,messages:session.messages.slice(0,userIndex),compaction:session.compaction && session.compaction.through <= userIndex ? session.compaction : undefined,draft:session.messages[userIndex].content,draftImage:session.messages[userIndex].image,updatedAt:Date.now()};
 }
 export function chatMarkdown(session:ChatSession):string {
   return `# ${session.title.replace(/[\r\n]+/g," ")}\n\n`+session.messages.map(message=>`## ${message.role==="user"?t("나"):message.modelName||session.modelName||session.model}\n\n${message.image ? `![Screen capture](${message.image.dataUrl})\n\n` : ""}${message.content}\n`).join("\n")+(session.draftImage?`\n![Draft screen capture](${session.draftImage.dataUrl})\n`:"")+(session.draft?`\n## ${t("Draft")}\n\n${session.draft}\n`:"");

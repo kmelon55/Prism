@@ -2,7 +2,7 @@ import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveAiSelection } from "./providers/ai";
-import type { ChatImage, ChatSession } from "./providers/aiHistory";
+import { chatMarkdown, forkChatSession, type ChatImage, type ChatSession } from "./providers/aiHistory";
 import { AiChat } from "./AiChat";
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke, Channel: class { onmessage?: (event: {text:string})=>void } }));
@@ -17,6 +17,7 @@ const base = async (command: string, args: any = {}) => {
   if (command === "ai_save_session") { history.set(args.session.id, structuredClone(args.session)); return args.session; }
   if (command === "ai_delete_session") { history.delete(args.sessionId); return; }
   if (command === "ai_key_status") return true;
+  if (command === "ai_prepare_context") return { messages: args.messages, compaction: args.compaction };
   if (command === "ai_chat") return "테스트 답변";
 };
 beforeEach(() => {
@@ -546,4 +547,111 @@ it("keeps a captured entry available when saving the previous conversation fails
   expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).not.toBeNull();
   expect([...history.values()].some(session=>session.draft === "previous draft")).toBe(true);
   expect(chatCalls()).toHaveLength(0);
+});
+
+function seedLongConversation() {
+  const session: ChatSession = {
+    id: crypto.randomUUID(), provider: "openai", model: "fixture-model", title: "Long conversation",
+    draft: "Continue with our decisions", updatedAt: Date.now(),
+    messages: Array.from({ length: 80 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: `Original message ${i + 1}` })),
+  };
+  history.set(session.id, session); return session;
+}
+
+it("checkpoints compaction before inference, preserves the archive, and reuses it after remount and model change", async () => {
+  const original = seedLongConversation();
+  const summary = { through: 70, summary: "Preserved decisions and constraints." };
+  native.invoke.mockImplementation(async (command: string, args: any) => {
+    if (command === "ai_prepare_context") return { compaction: summary, messages: [{ role: "user", content: "Summary plus recent context" }] };
+    if (command === "ai_list_models") return [{ id: "next", name: "Next model" }];
+    if (command === "ai_chat" && chatCalls().length === 1) {
+      expect(history.get(original.id)?.compaction).toEqual(summary);
+      expect(history.get(original.id)?.messages).toEqual(original.messages);
+    }
+    return base(command, args);
+  });
+  await mount();
+  expect(container.querySelectorAll("article")).toHaveLength(60);
+  await click("이전 메시지 보기"); expect(container.querySelectorAll("article")).toHaveLength(80);
+  await click("메시지 전송");
+  expect(chatCalls()[0][1].messages).toEqual([{ role: "user", content: "Summary plus recent context" }]);
+  expect(history.get(original.id)?.messages).toHaveLength(82);
+  expect(chatMarkdown(history.get(original.id)!)).toContain("Original message 1");
+  expect(chatMarkdown(history.get(original.id)!)).toContain("Original message 80");
+  await act(async () => root.unmount()); root = createRoot(container); await mount();
+  await click("대화 모델 변경"); await click("Next model 사용");
+  await type(composer(), "Still continue"); await click("메시지 전송");
+  const prepare = native.invoke.mock.calls.filter(([command]) => command === "ai_prepare_context").at(-1)![1];
+  expect(prepare).toMatchObject({ model: "next", compaction: summary });
+  expect(prepare.messages).toHaveLength(83);
+  expect(history.get(original.id)?.messages).toHaveLength(84);
+});
+
+it("keeps original text and the unanswered draft when summarization fails and retries explicitly", async () => {
+  const original = seedLongConversation(); let fail = true;
+  native.invoke.mockImplementation(async (command: string, args: any) => {
+    if (command === "ai_prepare_context" && fail) { args.onProgress.onmessage(null); throw "Summary provider failed"; }
+    return base(command, args);
+  });
+  await mount(); await click("메시지 전송");
+  expect(chatCalls()).toHaveLength(0);
+  expect(history.get(original.id)?.messages).toEqual(original.messages);
+  expect(history.get(original.id)?.draft).toBe(original.draft);
+  expect(composer().value).toBe(original.draft);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Summary provider failed");
+  fail = false; await click("다시 보내기"); expect(chatCalls()).toHaveLength(1);
+});
+
+it("does not send the answer until a failed summary checkpoint can be saved", async () => {
+  const original = seedLongConversation(); const summary = { through: 70, summary: "Decisions" }; let fail = true;
+  native.invoke.mockImplementation(async (command: string, args: any) => {
+    if (command === "ai_prepare_context") return { compaction: summary, messages: args.messages.slice(70) };
+    if (command === "ai_save_session" && args.session.compaction && fail) throw "Summary disk failure";
+    return base(command, args);
+  });
+  await mount(); await click("메시지 전송"); expect(chatCalls()).toHaveLength(0);
+  expect(history.get(original.id)?.compaction).toBeUndefined();
+  expect(history.get(original.id)?.messages).toHaveLength(80);
+  fail = false; await click("기록 저장·조회 다시 시도");
+  expect(history.get(original.id)?.compaction).toEqual(summary);
+  await click("메시지 전송"); expect(chatCalls()).toHaveLength(1);
+});
+
+it("keeps compaction progress with its conversation and cancels before any answer request", async () => {
+  const original = seedLongConversation(); let finish: (value: any) => void = () => {};
+  native.invoke.mockImplementation((command: string, args: any) => {
+    if (command === "ai_prepare_context") {
+      args.onProgress.onmessage(null);
+      return new Promise(resolve => { finish = resolve; });
+    }
+    return base(command, args);
+  });
+  await mount(); await click("메시지 전송");
+  expect(container.textContent).toContain("이전 대화를 정리하고 있습니다");
+  await click("새 대화"); await type(composer(), "Other draft");
+  expect(container.textContent).not.toContain("이전 대화를 정리하고 있습니다");
+  await chooseConversation("Long conversation"); await click("응답 중지");
+  expect(native.invoke).toHaveBeenCalledWith("ai_cancel", { requestId: native.invoke.mock.calls.find(([c]) => c === "ai_prepare_context")![1].requestId });
+  await act(async () => finish({ compaction: { through: 70, summary: "Late summary" }, messages: [] }));
+  expect(chatCalls()).toHaveLength(0); expect(history.get(original.id)?.compaction).toBeUndefined();
+  expect(composer().value).toBe(original.draft);
+  expect(container.textContent).toContain("요청을 중지했습니다");
+});
+
+it("does not start inference when canceled during the summary checkpoint save", async () => {
+  seedLongConversation(); let finish: () => void = () => {};
+  native.invoke.mockImplementation((command: string, args: any) => {
+    if (command === "ai_prepare_context") return Promise.resolve({ compaction: { through: 70, summary: "Checkpoint" }, messages: args.messages.slice(70) });
+    if (command === "ai_save_session" && args.session.compaction) return new Promise<void>(resolve => { finish = () => { void base(command, args); resolve(); }; });
+    return base(command, args);
+  });
+  await mount(); await click("메시지 전송"); await click("응답 중지");
+  await act(async () => finish()); expect(chatCalls()).toHaveLength(0);
+});
+
+it("invalidates summaries that contain the future when forking an earlier question", () => {
+  const original = { ...seedLongConversation(), compaction: { through: 70, summary: "Later decisions" } };
+  expect(forkChatSession(original, 10).compaction).toBeUndefined();
+  expect(forkChatSession(original, 70).compaction).toEqual(original.compaction);
+  expect(forkChatSession(original, 72).messages).toHaveLength(72);
 });

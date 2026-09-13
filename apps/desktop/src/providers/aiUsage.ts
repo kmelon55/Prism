@@ -17,7 +17,7 @@ export function loadUsage() {
   return invoke<UsageSummary>("ai_usage_summary", { since: new Date(now.getFullYear(), now.getMonth(), 1).getTime() });
 }
 export function featureName(feature: string) {
-  return t(({ transcription: "Transcription", cleanup: "Refine speech", prompt: "Structure prompt", chat: "AI Chat" } as Record<string, string>)[feature] ?? feature);
+  return t(({ transcription: "Transcription", cleanup: "Refine speech", prompt: "Structure prompt", chat: "AI Chat", chat_summary: "Conversation summary" } as Record<string, string>)[feature] ?? feature);
 }
 export function usageProviderName(provider: string) {
   return ({vercel:"Vercel AI Gateway",openai:"OpenAI",openrouter:"OpenRouter",groq:"Groq",xai:"xAI",local:t("Local"),custom:t("Custom")} as Record<string,string>)[provider] ?? provider;

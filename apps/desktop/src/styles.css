@@ -2427,6 +2427,7 @@ kbd {
 .ai-conversation .ai-composer { margin-bottom: 20px; }
 .ai-composer-controls { flex: 1; flex-wrap: wrap; }
 .ai-composer-model { max-width: 100%; }
+.ai-load-earlier { align-self: center; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
 .ai-chat .ai-model-trigger { max-width: min(245px, 100%); }
 .ai-conversation > .ai-request-error, .ai-conversation > .ai-notice, .ai-conversation > .ai-context-hint, .ai-conversation > .ai-session-model-note { flex-shrink: 0; }
 .ai-chat .ai-jump-latest { align-self: center; display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin: -4px 0 10px; padding: 6px 11px; border: 1px solid var(--line-strong); border-radius: 20px; background: var(--shell); font: inherit; font-size: 11px; cursor: pointer; }

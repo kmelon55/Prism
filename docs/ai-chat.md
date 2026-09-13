@@ -101,6 +101,53 @@ and saves an unanswered question before sending, so a failed request remains an 
 Completed turns are saved together. Storage failures remain visible and prevent an unsaved question
 from being sent; retrying storage or sending is always explicit.
 
+## Long conversations
+
+The original transcript and the provider input are separate. There is no 40-message archive or
+request limit. Original messages, screenshots, drafts, and exports remain intact; the existing
+100-conversation / 32 MiB storage quota still applies. The view initially renders the latest 60
+messages, with **Show earlier messages** to expand the original transcript.
+
+Before each answer, native `ai_prepare_context` builds a bounded input. It reuses model-catalog
+context/output limits when available; missing context metadata uses a conservative 32,768-token
+fallback. Token counts are estimates (with extra allowance for multibyte text and screenshots),
+not provider tokenizer measurements. After reserving output and tool space, the input budget uses
+70% of the remaining window, capped at 24,000 estimated tokens to bound recurring cost.
+
+When the active context exceeds that budget or four active screenshots, earlier messages are
+summarized in bounded chunks by the **currently selected provider and model**, without web/file
+tools. The summary preserves goals, constraints, corrections, decisions, exact identifiers and
+numbers, unresolved questions, and relevant image observations. Up to six recent complete pairs
+remain verbatim when they fit half the input budget. Oversized old messages are split at UTF-8
+boundaries without dropping text. A single oversized new question requires shortening it or
+selecting a model with a larger context window.
+
+A separate `{ summary, through }` checkpoint records which original messages were summarized.
+It is persisted before answer inference and reused after restart. Model changes recalculate the
+budget and can recompress a checkpoint. Forking before the checkpoint invalidates it, preventing
+later decisions from leaking into an earlier branch. This is per-conversation context, not memory
+shared across conversations.
+
+For each follow-up, local lexical search can add up to three bounded exact excerpts from the
+summarized archive, including Korean substring matches. Retrieval is scoped to the current
+conversation, does not call an embedding service, and does not guarantee a semantic match or
+re-send an archived screenshot. Summary and retrieved text are labeled as historical data at
+user-message priority. The most recent screenshot remains available to the model.
+
+The composer displays **Summarizing earlier conversation…** during compaction. Stop, switching,
+unmounting, and background requests use the same request ownership rules as answer streaming.
+Empty, overlong, incomplete, failed, or canceled summaries never replace the archive. Failed
+checkpoint persistence prevents answer inference; the original question remains retryable.
+Summary calls are recorded separately as **Conversation summary** in usage. There is no silent
+provider fallback or automatic paid retry. A summary can lose detail; original history and local
+retrieval remain available to recover it.
+
+Regression coverage includes repeated compaction over 120 exchanges, multibyte chunk preservation,
+old-text retrieval, screenshot compaction, smaller-model checkpoints, original-history persistence,
+restart/model changes, fork boundaries, cancellation, and failed summary saves. These are native
+unit and mocked-IPC interaction checks; live provider summarization quality and installed macOS
+interaction require separate verification.
+
 ## Authority and data flow
 
 - Keys are saved per provider using macOS Keychain APIs. The renderer supplies a key only for
@@ -110,12 +157,14 @@ from being sent; retrying storage or sending is always explicit.
   Only non-secret provider/model/name preferences enter localStorage and the native settings file.
 - The native request uses provider-specific fixed HTTPS endpoints, disables redirects, and reads the selected key
   in Rust. No arbitrary endpoint, clipboard capture, or selected-text capture. Tools are explicitly scoped below.
-- OpenAI uses Responses with `store: false`; OpenRouter and Vercel AI Gateway use Chat Completions. The complete
-  current conversation is sent to the selected provider on each explicit send. Provider retention
+- OpenAI uses Responses with `store: false`; OpenRouter and Vercel AI Gateway use Chat Completions. The prepared
+  context (summary, relevant archived excerpts, and recent messages) is sent on each explicit send. Provider retention
   and billing policies still apply. Saving a key is not a credential verification request.
-- One native request runs at a time. Requests have a 10-second connection timeout and 120-second
-  HTTP timeout and a four-minute total turn deadline, with a 1 MiB response bound. Inputs are limited to 40 messages, 32,000 UTF-8 bytes
-  per message, and 128,000 bytes total; output/ reasoning is configurable at 4,096, 16,384 (default), or 32,768 tokens.
+- Up to three conversations can run requests at once. Requests have a 10-second connection timeout and 120-second
+  HTTP timeout and a four-minute total turn deadline, with a 1 MiB response bound. The active input
+  is prepared separately from the archive and bounded by an estimated token budget and a 128,000-byte
+  text ceiling. Output/reasoning is configurable at 4,096, 16,384 (default), or 32,768 tokens,
+  capped by the model catalog and half of its context window to leave input space.
   Cached public catalog metadata caps output to the advertised model maximum when available.
   Catalog metadata also rejects known non-tool models before an inference request with tools enabled.
 - Stop cancels the local HTTP future. A provider may charge for work already performed.
@@ -129,7 +178,7 @@ from being sent; retrying storage or sending is always explicit.
 ## Current limits and verification
 
 Browser preview shows setup but disables credential saving and requests. Secure credential storage
-is currently macOS-only. There is no image/PDF input,
+is currently macOS-only. Screen captures are supported; PDF input is not,
 or direct Anthropic/Gemini integration in this slice. Model access depends on the selected connection and account.
 
 Frontend interaction tests mock native IPC and cover separate-window navigation, model search and
@@ -273,7 +322,7 @@ question draft is durable until completion. Reopening does not restore an interr
 Question editing and regeneration fork the conversation at the selected user turn, preserving the
 original and later messages there. Edit opens an unsent draft. Regenerate explicitly sends that draft
 in the new conversation. The source and fork must be persisted before switching or invoking a model.
-Concurrent conversation requests remain unsupported.
+Up to three conversations can reply concurrently, including context preparation.
 
 The header can rename, pin and export a conversation. Pinning sorts before recency and therefore
 changes numbered sidebar navigation order. Rename/pin acknowledge only after native persistence;
