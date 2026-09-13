@@ -151,6 +151,40 @@ it("keeps the previous model and displays a failed model-save in the picker",asy
   expect(container.querySelector('[aria-label="대화 모델 선택"]')?.textContent).toContain("저장 실패");
   expect(container.querySelector('[aria-label="대화 모델 변경"]')?.textContent).toContain("fixture-model");
 });
+it("keeps provider clicks available when the WebView blurs the search without a focus target", async () => {
+  native.invoke.mockImplementation(async (command: string, args: any) => command === "ai_list_models"
+    ? [{ id: `${args.provider}/next`, name: `${args.provider} model` }] : base(command, args));
+  await mount(); await click("대화 모델 변경");
+  const search = container.querySelector<HTMLInputElement>('[aria-label="대화 모델 검색"]')!;
+  const provider = button("Vercel");
+  await act(async () => {
+    provider.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    search.blur();
+  });
+  expect(provider.isConnected).toBe(true);
+  await act(async () => provider.click());
+  expect(provider.getAttribute("aria-pressed")).toBe("true");
+  await click("vercel model 사용");
+  expect([...history.values()][0]).toMatchObject({ provider: "vercel", model: "vercel/next" });
+  expect(close).not.toHaveBeenCalled();
+});
+it("keeps Tab navigation inside the model picker and places it before screen capture", async () => {
+  native.invoke.mockImplementation(async (command: string, args: any) => command === "ai_list_models" ? [] : base(command, args));
+  await mount();
+  expect(container.querySelector(".ai-composer-controls")?.firstElementChild?.contains(button("대화 모델 변경"))).toBe(true);
+  await click("대화 모델 변경");
+  const dialog = container.querySelector('[aria-label="대화 모델 선택"]')!;
+  const controls = [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)")];
+  await act(async () => controls.at(-1)!.focus());
+  await act(async () => controls.at(-1)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })));
+  expect(document.activeElement).toBe(controls[0]);
+  await act(async () => controls[0].dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })));
+  expect(document.activeElement).toBe(controls.at(-1));
+  expect(dialog.isConnected).toBe(true);
+  expect(close).not.toHaveBeenCalled();
+  await act(async () => composer().dispatchEvent(new Event("pointerdown", { bubbles: true })));
+  expect(container.querySelector('[aria-label="대화 모델 선택"]')).toBeNull();
+});
 it("requires explicit per-question tool activation and closes model picker on Escape only",async()=>{
   native.invoke.mockImplementation(async(command:string,args:any)=>command==="ai_get_tools"?{webSearch:true,localFiles:true,maxOutputTokens:16384,folders:[{id:"fixture",path:"/fixture"}]}:command==="ai_list_models"?[]:base(command,args));
   await mount();await click("대화 모델 변경");

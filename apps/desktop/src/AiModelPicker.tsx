@@ -1,5 +1,5 @@
 import { t, useLocale } from "./i18n";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown, Search, Sparkles, RefreshCw } from "lucide-react";
 import { aiErrorText, aiProviders, formatAiPrice, listAiModels, type AiSelection, type AiProvider, type AiModel } from "./providers/ai";
 export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, onSettings, purpose = "chat" }: { selection: AiSelection; disabled: boolean; nativeRuntime: boolean; onSelect(value: AiSelection): Promise<void>; onSettings(): void; purpose?: "chat" | "dictation" }) {
@@ -34,7 +34,38 @@ export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, on
     if(saving)return;setSaving(true);setError("");
     try{await onSelect({provider,model:model.id,modelName:model.name});setOpen(false);trigger.current?.focus();}catch(e){setError(aiErrorText(e));}finally{setSaving(false);}
   }
-  return <div className="ai-composer-model" ref={host} onKeyDown={e=>{if(open && ["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();const rows=[...host.current!.querySelectorAll<HTMLButtonElement>(".ai-picker-results > button:not(:disabled)")];const i=rows.indexOf(document.activeElement as HTMLButtonElement);rows[(i+(e.key==="ArrowDown"?1:-1)+rows.length)%rows.length]?.focus();}if(open && e.key==="Enter" && e.target===search.current){e.preventDefault();if(filtered[0])void select(filtered[0]);}if(open&&e.key==="Escape"){e.preventDefault();e.stopPropagation();setOpen(false);trigger.current?.focus();}}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOpen(false);}}>
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!open || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+    if (event.key === "Tab") {
+      event.preventDefault();
+      event.stopPropagation();
+      const controls = [...host.current!.querySelectorAll<HTMLElement>(".ai-model-popover button:not(:disabled), .ai-model-popover input:not(:disabled)")];
+      const index = controls.indexOf(document.activeElement as HTMLElement);
+      const next = index < 0 ? (event.shiftKey ? controls.length - 1 : 0)
+        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      controls[next]?.focus();
+    } else if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      const rows = [...host.current!.querySelectorAll<HTMLButtonElement>(".ai-picker-results > button:not(:disabled)")];
+      const index = rows.indexOf(document.activeElement as HTMLButtonElement);
+      const next = index < 0 ? (event.key === "ArrowDown" ? 0 : rows.length - 1)
+        : (index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
+      rows[next]?.focus();
+    } else if (event.key === "Enter" && event.target === search.current) {
+      event.preventDefault();
+      if (filtered[0]) void select(filtered[0]);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      trigger.current?.focus();
+    }
+  }
+  return <div className="ai-composer-model" ref={host} onKeyDown={handleKeyDown} onBlur={event => {
+    // WebKit can blur the search with no relatedTarget when clicking a button.
+    // Outside pointerdown already dismisses the picker; keep inside clicks alive.
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
+  }}>
     <button ref={trigger} type="button" className="ai-model-trigger" aria-label={t(purpose === "dictation" ? "Change text processing model" : "대화 모델 변경")} aria-haspopup="dialog" aria-expanded={open} disabled={disabled || saving} onClick={()=>{setProvider(selection.provider);setQuery("");setLimit(35);setOpen(v=>!v);}}><Sparkles size={13}/><span>{selection.modelName||selection.model||t("모델 선택")}</span><ChevronDown size={13}/></button>
     {open&&<div className="ai-model-popover ai-feedback-enter" role="dialog" aria-label={t(purpose === "dictation" ? "Text processing model" : "대화 모델 선택")}>
       <div className="ai-picker-heading"><strong>{t(purpose === "dictation" ? "Text processing model" : "이 대화의 모델")}</strong><button type="button" aria-label={t("대화 모델 새로고침")} disabled={loading||saving} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={13} className={loading?"ai-spinning":""}/></button></div>
