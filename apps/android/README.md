@@ -69,6 +69,11 @@ device testing. App search correctness is separate from real Samsung/Gboard Kore
 Desktop/Android connectivity, clipboard/file transfer, notification forwarding, hosted sync, and
 continuous discovery are deferred. Future protocol types must be independent of React and Tauri IPC.
 
+Current priority is launcher quality: fast home return and app launch, Korean input/search, favorites,
+alphabet gestures, widget reliability, and measured physical-device idle battery use. The deferred
+[on-demand connectivity concept](connectivity-plan.md) records manual commands, clipboard/file transfer,
+conditional Mac wake, and widget/Quick Settings entry points; it is not an implementation milestone yet.
+
 ## Verification
 
 ```sh
