@@ -61,6 +61,21 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         precondition(catalog.translate(deniedKeyError, english: false).contains("키체인 접근이 거부"))
         precondition(catalog.translate("Could not read the saved key (macOS error -36).", english: false) == "저장된 키를 읽지 못했습니다(macOS 오류 -36).")
         precondition(catalog.translate("fixture-provider-detail", english: true) == "fixture-provider-detail")
+        // A dismissed microphone error must not reappear when another window syncs its locale.
+        let toastController = DictationController(recorder: FakeRecorder(), presentsOverlay: false, toastDuration: 0.02)
+        toastController.fail("microphone denied fixture")
+        precondition(toastController.overlayVisible)
+        try await Task.sleep(for: .milliseconds(60))
+        precondition(!toastController.overlayVisible)
+        toastController.setUILanguage("ko")
+        precondition(!toastController.overlayVisible && toastController.phase == "error")
+        // An older toast must never dismiss a newer recording session.
+        toastController.fail("another fixture")
+        toastController.toggle(fallbackPID: 0)
+        try await Task.sleep(for: .milliseconds(60))
+        precondition(toastController.overlayVisible && toastController.phase == "preparing")
+        toastController.cancel()
+        precondition(!toastController.overlayVisible)
         let languageController = DictationController(recorder: FakeRecorder(), presentsOverlay: false)
         languageController.messages = catalog
         languageController.setUILanguage("en")

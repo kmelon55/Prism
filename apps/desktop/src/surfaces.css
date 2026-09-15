@@ -363,3 +363,6 @@ button:disabled { cursor: default; }
 @media (prefers-contrast: more) {
   .prism-shell::after { display: none; }
 }
+
+.clipboard-type-filter > label { display: flex; align-items: center; gap: 10px; }
+.clipboard-capture-status { margin-left: auto; font-size: 11px; color: var(--text-muted); }

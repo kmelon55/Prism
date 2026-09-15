@@ -245,10 +245,50 @@ pub struct ClipboardHistorySettings {
     capacity: usize,
     persistence_error: Option<String>,
     capture_notice: Option<String>,
+    #[serde(flatten)]
+    preferences: ClipboardPreferences,
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ClipboardPrimaryAction { #[default] Paste, Copy }
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcludedApplication { id: String, name: String }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ClipboardPreferences {
+    primary_action: ClipboardPrimaryAction,
+    paused_until_ms: u64,
+    excluded_applications: Vec<ExcludedApplication>,
+}
+impl ClipboardPreferences {
+    fn capturing(&self, at: u64) -> bool { self.paused_until_ms <= at }
+    fn excludes(&self, source: Option<&str>) -> bool {
+        !self.excluded_applications.is_empty() && source.is_none_or(|id| self.excluded_applications.iter().any(|app| app.id == id))
+    }
+}
+#[derive(Default)]
+struct CaptureCursor { generation: Option<u64>, revision: Option<String> }
+impl CaptureCursor {
+    fn previous(&self, generation: u64) -> Option<&str> {
+        (self.generation == Some(generation)).then(|| self.revision.as_deref()).flatten()
+    }
+    fn observe(&mut self, generation: u64, revision: String) -> bool {
+        let changed = self.generation == Some(generation) && self.revision.as_ref() != Some(&revision);
+        self.generation = Some(generation); self.revision = Some(revision);
+        changed
+    }
+    fn pause(&mut self) { self.generation = None; self.revision = None; }
+}
+
+static SEARCH_PERMIT: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 
 #[derive(Default)]
 struct HistoryStore {
+    preferences: ClipboardPreferences,
     connection: Option<Connection>,
     enabled: bool,
     retention_days: u32,
@@ -348,6 +388,14 @@ impl HistoryStore {
         if actual_max_pages > max_pages {
             return Err(UNAVAILABLE.into());
         }
+        connection.execute_batch("CREATE TABLE IF NOT EXISTS clipboard_preferences (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS clipboard_entries_display ON clipboard_entries(pinned DESC,captured_at_ms DESC,id DESC);
+            CREATE INDEX IF NOT EXISTS clipboard_entries_kind_display ON clipboard_entries(kind,pinned DESC,captured_at_ms DESC,id DESC);")
+            .map_err(|_| UNAVAILABLE)?;
+        let preferences = connection.query_row("SELECT value FROM clipboard_preferences WHERE id=1", [], |r| r.get::<_, String>(0))
+            .optional().map_err(|_| UNAVAILABLE)?
+            .map(|value| serde_json::from_str::<ClipboardPreferences>(&value).map_err(|_| UNAVAILABLE))
+            .transpose()?.unwrap_or_default();
         let (enabled, retention_days) = connection
             .query_row(
                 "SELECT enabled,retention_days FROM clipboard_settings WHERE id=1",
@@ -357,6 +405,7 @@ impl HistoryStore {
             .map_err(|_| UNAVAILABLE.to_string())?;
         let mut store = Self {
             connection: Some(connection),
+            preferences,
             enabled,
             retention_days,
             ..Self::default()
@@ -398,7 +447,9 @@ impl HistoryStore {
                 self.persistence_error = None;
                 Ok(value)
             }
-            Err(_) => {
+            Err(error) => {
+                #[cfg(test)] eprintln!("fixture transaction error: {error:?}");
+                #[cfg(not(test))] let _ = error;
                 self.persistence_error = Some(STORAGE_ERROR.to_string());
                 Err(STORAGE_ERROR.to_string())
             }
@@ -428,7 +479,7 @@ impl HistoryStore {
     }
 
     fn record_payload(&mut self, payload: ClipboardPayload, at: u64) -> Result<(), String> {
-        if !self.enabled {
+        if !self.enabled || !self.preferences.capturing(at) {
             return Ok(());
         }
         let (kind, text, bytes, mime_type, width, height, file_count) = payload.stored()?;
@@ -481,14 +532,16 @@ impl HistoryStore {
         if !self.enabled {
             return Err("Clipboard history is disabled.".into());
         }
-        self.prune(at)?;
-        let mut statement = self.db()?.prepare(&format!("SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE (?1 IS NULL OR kind=?1) ORDER BY pinned DESC,captured_at_ms DESC,id DESC")).map_err(|_| STORAGE_ERROR.to_string())?;
+        // Read-only search: expiry is filtered immediately; the monitor performs physical cleanup.
+        let cutoff = at.saturating_sub(u64::from(self.retention_days) * DAY_MS);
+        let kind_clause = if kind.is_some() { "AND kind=?2" } else { "AND ?2 IS NULL" };
+        let mut statement = self.db()?.prepare(&format!("SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE (pinned=1 OR captured_at_ms>=?1) {kind_clause} ORDER BY pinned DESC,captured_at_ms DESC,id DESC")).map_err(|_| STORAGE_ERROR.to_string())?;
         let limit = limit.min(HISTORY_CAPACITY);
         if limit == 0 {
             return Ok(Vec::new());
         }
         let entries = statement
-            .query_map([kind.map(ClipboardKind::as_str)], entry_from_row)
+            .query_map(params![cutoff, kind.map(ClipboardKind::as_str)], entry_from_row)
             .map_err(|_| STORAGE_ERROR.to_string())?;
         let needle = query.trim().to_lowercase();
         let mut matches = Vec::with_capacity(limit);
@@ -552,6 +605,19 @@ impl HistoryStore {
             }
             ClipboardKind::Text => unreachable!(),
         }
+    }
+
+    fn update_preferences(&mut self, update: impl FnOnce(&mut ClipboardPreferences)) -> Result<(), String> {
+        let mut next = self.preferences.clone();
+        update(&mut next);
+        let value = serde_json::to_string(&next).map_err(|_| STORAGE_ERROR)?;
+        self.transaction(|tx| tx.execute("INSERT INTO clipboard_preferences(id,value) VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET value=excluded.value", [value]))?;
+        let privacy_changed = self.preferences.paused_until_ms != next.paused_until_ms || self.preferences.excluded_applications != next.excluded_applications;
+        self.preferences = next;
+        // Return-action edits must not interrupt capture. Privacy edits establish a fresh baseline.
+        if privacy_changed { self.generation = self.generation.wrapping_add(1); }
+        self.capture_notice = None;
+        Ok(())
     }
 
     fn set_enabled(&mut self, enabled: bool) -> Result<bool, String> {
@@ -646,6 +712,7 @@ impl HistoryStore {
         });
         ClipboardHistorySettings {
             enabled: self.enabled,
+            preferences: self.preferences.clone(),
             retention_days: if self.retention_days == 0 {
                 30
             } else {
@@ -672,7 +739,9 @@ impl ClipboardHistory {
     /// Keep the existing opt-in, filtering, retention and storage limits.
     pub(crate) fn record_dictation(&self, text: &str) {
         if !should_capture(text) { return; }
+        let source = foreground_application_id();
         if let Ok(mut store) = self.store.lock() {
+            if store.preferences.excludes(source.as_deref()) { return; }
             if let Err(error) = store.record_payload(ClipboardPayload::Text(text.to_owned()), now_ms()) {
                 store.capture_notice = Some(error);
             }
@@ -700,28 +769,21 @@ impl ClipboardHistory {
         Ok(())
     }
     fn monitor_loop(self) {
-        let mut last_observed = None;
-        let mut last_generation = None;
+        let mut cursor = CaptureCursor::default();
         let mut ticks = 0;
         loop {
             let active = self
                 .store
                 .lock()
                 .ok()
-                .and_then(|store| store.enabled.then_some(store.generation));
-            if let Some(generation) = active {
-                let observed = read_capture_candidate(if last_generation == Some(generation) {
-                    last_observed.as_deref()
-                } else {
-                    None
-                });
+                .and_then(|store| (store.enabled && store.preferences.capturing(now_ms())).then(|| (store.generation, store.preferences.clone())));
+            if let Some((generation, preferences)) = active {
+                let observed = read_capture_candidate(cursor.previous(generation), &preferences);
                 if let Some((revision, candidate)) = observed {
-                    // Baseline on opt-in/clear/delete. Never recapture the clipboard that was just removed.
-                    if last_generation == Some(generation)
-                        && last_observed.as_ref() != Some(&revision)
-                    {
+                    // Privacy changes and resumes baseline without retaining intervening content.
+                    if cursor.observe(generation, revision) {
                         if let Ok(mut store) = self.store.lock() {
-                            if store.enabled && store.generation == generation {
+                            if store.enabled && store.preferences.capturing(now_ms()) && store.generation == generation {
                                 match candidate {
                                     Ok(Some(payload)) => {
                                         if let Err(error) = store.record_payload(payload, now_ms())
@@ -735,8 +797,6 @@ impl ClipboardHistory {
                             }
                         }
                     }
-                    last_observed = Some(revision);
-                    last_generation = Some(generation);
                 }
                 ticks += 1;
                 if ticks >= 90 {
@@ -748,8 +808,7 @@ impl ClipboardHistory {
                     ticks = 0;
                 }
             } else {
-                last_observed = None;
-                last_generation = None;
+                cursor.pause();
             }
             thread::sleep(POLL_INTERVAL);
         }
@@ -796,10 +855,19 @@ impl ClipboardHistory {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn foreground_application_id() -> Option<String> {
+    objc2::rc::autoreleasepool(|_| objc2_app_kit::NSWorkspace::sharedWorkspace().frontmostApplication()
+        .and_then(|app| app.bundleIdentifier()).map(|id| id.to_string()))
+}
+#[cfg(not(target_os = "macos"))]
+fn foreground_application_id() -> Option<String> { None }
+
 // Read board AND every item privacy marker before any data, then reject torn reads.
 #[cfg(target_os = "macos")]
 fn read_capture_candidate(
     previous: Option<&str>,
+    preferences: &ClipboardPreferences,
 ) -> Option<(String, Result<Option<ClipboardPayload>, String>)> {
     use objc2::rc::autoreleasepool;
     use objc2_app_kit::NSPasteboard;
@@ -808,6 +876,8 @@ fn read_capture_candidate(
         let board = NSPasteboard::generalPasteboard();
         let revision = board.changeCount();
         let revision_text = revision.to_string();
+        let source = foreground_application_id();
+        if preferences.excludes(source.as_deref()) { return Some((revision_text, Ok(None))); }
         // Baseline without materializing content; unchanged images are never re-read every poll.
         if previous.is_none() || previous == Some(revision_text.as_str()) {
             return Some((revision_text, Ok(None)));
@@ -898,6 +968,7 @@ fn read_capture_candidate(
             }
             Err("This clipboard format is unsupported. Copy PNG, JPEG, WebP, plain text, or local files.".into())
         })();
+        if source != foreground_application_id() { return Some((revision_text, Ok(None))); }
         (revision == board.changeCount()).then_some((revision_text, candidate))
     })
 }
@@ -970,7 +1041,7 @@ fn image_payload(bytes: Vec<u8>, mime_type: &str) -> Result<ClipboardPayload, St
 #[path = "clipboard_portable.rs"]
 mod portable;
 #[cfg(not(target_os = "macos"))]
-fn read_capture_candidate(previous: Option<&str>) -> Option<(String, Result<Option<ClipboardPayload>, String>)> {
+fn read_capture_candidate(previous: Option<&str>, _preferences: &ClipboardPreferences) -> Option<(String, Result<Option<ClipboardPayload>, String>)> {
     portable::capture(previous)
 }
 #[cfg(not(target_os = "macos"))]
@@ -1102,6 +1173,48 @@ pub fn get_clipboard_history_settings(
         .settings())
 }
 #[tauri::command]
+pub fn set_clipboard_primary_action(history: State<'_, ClipboardHistory>, action: ClipboardPrimaryAction) -> Result<ClipboardHistorySettings, String> {
+    let mut store = history.store.lock().map_err(|_| UNAVAILABLE)?;
+    store.update_preferences(|p| p.primary_action = action)?;
+    Ok(store.settings())
+}
+#[tauri::command]
+pub fn set_clipboard_capture_pause(history: State<'_, ClipboardHistory>, minutes: u32) -> Result<ClipboardHistorySettings, String> {
+    if ![0, 5, 15, 60].contains(&minutes) { return Err("Choose a supported pause duration.".into()); }
+    let mut store = history.store.lock().map_err(|_| UNAVAILABLE)?;
+    store.update_preferences(|p| p.paused_until_ms = if minutes == 0 { 0 } else { now_ms() + u64::from(minutes)*60_000 })?;
+    Ok(store.settings())
+}
+#[tauri::command]
+pub async fn add_clipboard_excluded_application(history: State<'_, ClipboardHistory>, path: String) -> Result<ClipboardHistorySettings, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let history = history.inner().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let path = crate::app_catalog::validated_target(&path)?;
+            if path.extension().is_none_or(|ext| ext != "app") { return Err("Choose a macOS application.".into()); }
+            let id = objc2::rc::autoreleasepool(|_| {
+                objc2_foundation::NSBundle::bundleWithPath(&objc2_foundation::NSString::from_str(&path.to_string_lossy()))
+                    .and_then(|bundle| bundle.bundleIdentifier()).map(|id| id.to_string())
+            }).ok_or("The application identifier is unavailable.")?;
+            let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let mut store = history.store.lock().map_err(|_| UNAVAILABLE)?;
+            if store.preferences.excluded_applications.len() >= 128 { return Err("Up to 128 applications can be excluded.".into()); }
+            store.update_preferences(|p| { if !p.excluded_applications.iter().any(|a| a.id == id) { p.excluded_applications.push(ExcludedApplication { id, name }); } })?;
+            Ok(store.settings())
+        }).await.map_err(|_| "Could not add the application.".to_string())?
+    }
+    #[cfg(not(target_os = "macos"))]
+    { let _ = (history, path); Err("Application exclusions are available on macOS.".into()) }
+}
+#[tauri::command]
+pub fn remove_clipboard_excluded_application(history: State<'_, ClipboardHistory>, id: String) -> Result<ClipboardHistorySettings, String> {
+    let mut store = history.store.lock().map_err(|_| UNAVAILABLE)?;
+    store.update_preferences(|p| p.excluded_applications.retain(|a| a.id != id))?;
+    Ok(store.settings())
+}
+
+#[tauri::command]
 pub fn set_clipboard_history_retention(
     history: State<'_, ClipboardHistory>,
     retention_days: u32,
@@ -1130,23 +1243,19 @@ pub fn get_clipboard_history_entry_text(
     history.text_for_id(id)
 }
 #[tauri::command]
-pub fn search_clipboard_history(
-    history: State<'_, ClipboardHistory>,
-    query: String,
-    limit: usize,
-    kind: Option<ClipboardKind>,
+pub async fn search_clipboard_history(
+    history: State<'_, ClipboardHistory>, query: String, limit: usize, kind: Option<ClipboardKind>,
 ) -> Result<Vec<ClipboardHistorySearchResult>, String> {
-    Ok(history
-        .store
-        .lock()
-        .map_err(|_| UNAVAILABLE.to_string())?
-        .search_kind(&query, limit, now_ms(), kind)?
-        .into_iter()
-        .map(|mut entry| {
-            entry.text = display_preview(&entry.text);
-            entry
-        })
-        .collect())
+    if query.len() > 4096 { return Err("Clipboard search is too long.".into()); }
+    let permit = SEARCH_PERMIT.try_acquire().map_err(|_| "Clipboard search is busy. Try again.")?;
+    let history = history.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        Ok(history.store.lock().map_err(|_| UNAVAILABLE.to_string())?
+            .search_kind(&query, limit, now_ms(), kind)?.into_iter().map(|mut entry| {
+                entry.text = display_preview(&entry.text); entry
+            }).collect())
+    }).await.map_err(|_| "Clipboard search was interrupted.".to_string())?
 }
 /// Selected-entry only: never ship original image payloads to a search list.
 #[tauri::command]
@@ -1367,6 +1476,90 @@ mod tests {
             HistoryStore::from_connection(Connection::open_in_memory().unwrap()).unwrap();
         store.set_enabled(true).unwrap();
         store
+    }
+    #[test]
+    fn capture_cursor_never_backfills_pause_or_privacy_changes() {
+        let mut cursor = CaptureCursor::default();
+        assert!(!cursor.observe(0, "before-opt-in".into()));
+        assert!(cursor.observe(0, "new-copy".into()));
+        assert!(!cursor.observe(0, "new-copy".into()));
+        cursor.pause();
+        assert_eq!(cursor.previous(0), None);
+        assert!(!cursor.observe(0, "copied-while-paused".into()));
+        assert!(cursor.observe(0, "copied-after-resume".into()));
+        assert_eq!(cursor.previous(1), None);
+        assert!(!cursor.observe(1, "copied-before-exclusion-change".into()));
+        assert!(cursor.observe(1, "next-copy".into()));
+    }
+    #[test]
+    fn preferences_survive_restart_without_deleting_pins_and_pause_blocks_capture() {
+        let db = TestDatabase::new();
+        let until = now_ms() + 900_000;
+        {
+            let mut history = HistoryStore::open(db.0.clone()).unwrap();
+            history.set_enabled(true).unwrap();
+            history.record("keep me".into(), now_ms()).unwrap();
+            let id = history.search("", 1, now_ms()).unwrap()[0].id;
+            history.set_pinned(id, true).unwrap();
+            history.update_preferences(|p| {
+                p.primary_action = ClipboardPrimaryAction::Copy;
+                p.paused_until_ms = until;
+                p.excluded_applications.push(ExcludedApplication {id:"org.fixture.private".into(),name:"Fixture".into()});
+            }).unwrap();
+            history.record("paused copy".into(), now_ms()).unwrap();
+            assert_eq!(history.search("", 10, now_ms()).unwrap().len(), 1);
+        }
+        let mut history = HistoryStore::open(db.0.clone()).unwrap();
+        assert_eq!(history.preferences.primary_action, ClipboardPrimaryAction::Copy);
+        assert_eq!(history.preferences.paused_until_ms, until);
+        assert!(history.search("keep me", 1, now_ms()).unwrap()[0].pinned);
+        assert!(history.preferences.excludes(Some("org.fixture.private")));
+        assert!(history.preferences.excludes(None));
+        assert!(!history.preferences.excludes(Some("org.fixture.allowed")));
+        history.record("after expiration".into(), until + 1).unwrap();
+        assert_eq!(history.search("", 10, until+1).unwrap().len(), 2);
+        history.update_preferences(|p| p.excluded_applications.clear()).unwrap();
+        assert!(!history.preferences.excludes(None));
+    }
+    #[test]
+    fn search_is_read_only_and_filters_expired_entries_without_losing_pins_or_unicode() {
+        let mut history = store();
+        history.record("한글 MixedCase fragment".into(), now_ms()).unwrap();
+        let id = history.search("", 1, now_ms()).unwrap()[0].id;
+        history.set_pinned(id, true).unwrap();
+        history.record("temporary".into(), now_ms()).unwrap();
+        let changes: u64 = history.db().unwrap().query_row("SELECT total_changes()", [], |r| r.get(0)).unwrap();
+        let later = now_ms() + 91 * DAY_MS;
+        assert_eq!(history.search("mixedCASE", 20, later).unwrap().len(), 1);
+        assert_eq!(history.search("한글", 20, later).unwrap()[0].id, id);
+        assert!(history.search("temporary", 20, later).unwrap().is_empty());
+        assert_eq!(history.db().unwrap().query_row("SELECT total_changes()", [], |r| r.get::<_, u64>(0)).unwrap(), changes);
+        assert_eq!(history.db().unwrap().query_row("SELECT COUNT(*) FROM clipboard_entries", [], |r| r.get::<_,u64>(0)).unwrap(), 2);
+    }
+    #[test]
+    #[ignore = "Synthetic debug-build timing; run explicitly, never an installed-app performance gate"]
+    fn synthetic_clipboard_search_timing() {
+        let mut history = store();
+        let at = now_ms();
+        // Insert fixture rows in one transaction; no system clipboard or user database.
+        history.transaction(|tx| {
+            for i in 0..1000 {
+                let text = format!("fixture-{i} 한글 MixedCase {}", "x".repeat(1024));
+                tx.execute("INSERT INTO clipboard_entries(text,captured_at_ms,byte_size) VALUES(?1,?2,?3)",params![text,at,text.len()])?;
+            }
+            Ok(())
+        }).unwrap();
+        for query in ["", "MixedCase", "한글", "not-present"] {
+            let mut timings = Vec::new();
+            for i in 0..105 {
+                let start = std::time::Instant::now();
+                let result = history.search(query, 40, at).unwrap();
+                std::hint::black_box(result);
+                if i >= 5 { timings.push(start.elapsed().as_secs_f64()*1000.0); }
+            }
+            timings.sort_by(f64::total_cmp);
+            println!("clipboard fixture=1000x1KiB query={query:?} n=100 p50_ms={:.3} p95_ms={:.3} max_ms={:.3}",timings[49],timings[94],timings[99]);
+        }
     }
     struct TestDatabase(PathBuf);
     impl TestDatabase {

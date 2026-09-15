@@ -22,6 +22,7 @@ mod application_index;
 mod application_watcher;
 mod arithmetic;
 mod clipboard_history;
+mod clipboard_presentation;
 mod currency;
 mod library;
 mod permissions;
@@ -77,6 +78,11 @@ async fn paste_plain_text(app: AppHandle, text: String) -> Result<(), String> {
 }
 
 fn show_palette(app: &AppHandle) {
+    clipboard_presentation::cancel(app);
+    show_palette_impl(app, true);
+}
+
+fn show_palette_impl(app: &AppHandle, capture_target: bool) {
     if ai_capture::is_capturing() { return; }
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -84,7 +90,7 @@ fn show_palette(app: &AppHandle) {
     if !window_presentation::request_show(&window) {
         return;
     }
-    window_management::remember_frontmost_app(app);
+    if capture_target { window_management::remember_frontmost_app(app); }
     // Chat keeps its existing frame across hide/show, including during a resize transition.
     if !app
         .state::<ai_window::AiWorkspace>()
@@ -202,6 +208,7 @@ fn palette_position_appkit(
 
 #[cfg(desktop)]
 fn toggle_palette(app: &AppHandle) {
+    clipboard_presentation::cancel(app);
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -236,6 +243,12 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
         let _ = dictation::dictation_toggle(app.clone());
         return;
     }
+    let presentation_id = if command_id == "clipboard:open-history" {
+        if !app.get_webview_window("main").is_some_and(|window| window.is_focused().unwrap_or(false)) {
+            window_management::remember_frontmost_app(app);
+        }
+        Some(clipboard_presentation::begin(app))
+    } else { None };
     let background = !command_hotkey_needs_palette(command_id);
     if background {
         // Capture the external target without showing or focusing Prism. When the
@@ -246,7 +259,7 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
         {
             window_management::remember_frontmost_app(app);
         }
-    } else {
+    } else if presentation_id.is_none() {
         show_palette(app);
     }
     let _ = app.emit(
@@ -254,6 +267,7 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
         CommandHotkeyPayload {
             command_id: command_id.to_string(),
             background,
+            presentation_id,
         },
     );
 }
@@ -263,6 +277,7 @@ fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
 struct CommandHotkeyPayload {
     command_id: String,
     background: bool,
+    presentation_id: Option<u64>,
 }
 
 #[tauri::command]
@@ -471,6 +486,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::Updates::default())
         .manage(window_presentation::WindowPresentation::default())
+        .manage(clipboard_presentation::ClipboardPresentation::default())
         .manage(app_icon::ApplicationIconCache::default())
         .manage(currency::CurrencyRates::default())
         .manage(library::Library::default())
@@ -690,8 +706,14 @@ pub fn run() {
             reveal_application,
             set_window_blur,
             get_glass_lighting,
+            clipboard_presentation::pending_clipboard_presentation,
+            clipboard_presentation::complete_clipboard_presentation,
             clipboard_history::get_clipboard_history_settings,
             clipboard_history::set_clipboard_history_retention,
+            clipboard_history::set_clipboard_primary_action,
+            clipboard_history::set_clipboard_capture_pause,
+            clipboard_history::add_clipboard_excluded_application,
+            clipboard_history::remove_clipboard_excluded_application,
             clipboard_history::set_clipboard_history_entry_pinned,
             clipboard_history::get_clipboard_history_entry_text,
             clipboard_history::get_clipboard_history_entry_preview,

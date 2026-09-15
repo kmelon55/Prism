@@ -352,6 +352,7 @@ interface NativeCommandShortcut extends Omit<CommandShortcut, "accelerator"> {
 }
 
 export interface CommandHotkeyPayload {
+  presentationId?: number | null;
   commandId: string;
   background?: boolean;
 }
@@ -528,7 +529,7 @@ export function onPreferencesChanged(callback: (preferences: unknown) => void): 
   return listen<unknown>("prism:preferences-changed", (event) => callback(event.payload));
 }
 
-export function clipboardHistoryItems(entries: ClipboardHistoryEntry[]): CommandItem[] {
+export function clipboardHistoryItems(entries: ClipboardHistoryEntry[], primaryAction: "paste" | "copy" = "paste"): CommandItem[] {
   return entries.map((entry): CommandItem => ({
     id: `clipboard:entry:${entry.id}`,
     providerId: "native-clipboard-history",
@@ -541,8 +542,13 @@ export function clipboardHistoryItems(entries: ClipboardHistoryEntry[]): Command
     accent: "violet",
     data: { historyId: entry.id, previewText: entry.content, capturedAt: entry.capturedAt, pinned: entry.pinned ?? false, clipboardKind: entry.kind ?? "text", mimeType: entry.mimeType ?? "", available: entry.available ?? (entry.kind === "files" ? null : true), byteSize: entry.byteSize ?? 0, fileCount: entry.fileCount ?? 0, width: entry.width ?? 0, height: entry.height ?? 0 },
     actions: [
-      { id: "copy-clipboard-history-entry", title: t("Copy to Clipboard"), shortcut: ["↵"], style: "accent" },
-      { id: "paste-clipboard-history-entry", title: t("붙여넣기"), shortcut: ["⌘", "Enter"] },
+      ...(primaryAction === "paste" ? [
+        { id: "paste-clipboard-history-entry", title: t("Paste to previous app"), shortcut: ["↵"], style: "accent" as const },
+        { id: "copy-clipboard-history-entry", title: t("Copy to Clipboard"), shortcut: ["⌘", "Enter"] },
+      ] : [
+        { id: "copy-clipboard-history-entry", title: t("Copy to Clipboard"), shortcut: ["↵"], style: "accent" as const },
+        { id: "paste-clipboard-history-entry", title: t("Paste to previous app"), shortcut: ["⌘", "Enter"] },
+      ]),
       { id: "pin-clipboard-history-entry", title: t(entry.pinned ? "Unpin entry" : "Pin entry") },
       ...(!entry.kind || entry.kind === "text" ? [{ id: "save-clipboard-as-snippet", title: t("Save as Snippet") }] : []),
       { id: "delete-clipboard-history-entry", title: t("기록에서 삭제"), style: "danger" },

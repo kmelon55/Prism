@@ -1,6 +1,6 @@
 [package]
 name = "prism-desktop"
-version = "0.1.11"
+version = "0.1.12"
 description = "Prism desktop command palette"
 authors = ["Prism contributors"]
 edition = "2021"
@@ -57,5 +57,5 @@ core-foundation-sys = "0.8"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tiff"] }
 objc2 = { version = "0.6", features = ["exception"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "libc", "objc2-quartz-core", "objc2-core-graphics", "NSBitmapImageRep", "NSColor", "NSEvent", "NSGlassEffectView", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSRunningApplication", "NSScreen", "NSUserInterfaceItemIdentification", "NSView", "NSVisualEffectView", "NSWindow", "NSWorkspace"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSObject", "NSString", "NSValue", "NSKeyValueCoding"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSBundle", "NSData", "NSDictionary", "NSObject", "NSString", "NSValue", "NSKeyValueCoding"] }
 objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "objc2-core-graphics", "objc2-core-foundation", "CALayer", "CATransaction"] }

@@ -14,7 +14,8 @@ export function useAiSurface(preferReducedMotion: boolean) {
   useEffect(() => {
     if (reducedMotion) { clear(); setOpen(target.current); setPhase(target.current ? "open" : "closed"); }
   }, [reducedMotion]);
-  const change = useCallback((next: boolean) => {
+  const change = useCallback((next: boolean, immediate = false) => {
+    if (immediate) { target.current = next; clear(); setOpen(next); setPhase(next ? "open" : "closed"); return; }
     if (target.current === next) return;
     target.current = next; clear();
     if (reducedMotion) { setOpen(next); setPhase(next ? "open" : "closed"); return; }

@@ -66,7 +66,7 @@ final class DictationController: ObservableObject {
         preferredUILanguage = locale
         language.english = locale == "en"
         message = messages.translate(message, english: language.english)
-        if phase != "idle" { show() }
+        if overlayVisible { show() }
         emit()
     }
     var callback: DictationCallback?
@@ -84,6 +84,8 @@ final class DictationController: ObservableObject {
     }
     private let recorder: any DictationRecording
     private let presentsOverlay: Bool
+    private(set) var overlayVisible = false
+    private let toastDuration: Double
     private let deliver: (String, Bool, Bool, TextInsertionTarget?, Bool) async -> TextDeliveryResult
     private var target: TextInsertionTarget?
     private var transcriptionAudio: URL?
@@ -103,9 +105,10 @@ final class DictationController: ObservableObject {
     private var receipt = UsageReceipt()
 
 
-    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?, Bool) async -> TextDeliveryResult = { text, paste, enter, target, saveHistory in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target, copyText: { TextInjector.copy($0, saveToHistory: saveHistory) }) }) {
+    init(recorder suppliedRecorder: (any DictationRecording)? = nil, presentsOverlay: Bool = true, toastDuration: Double = 3, recovery: DictationRecoveryStore? = nil, deliver: @escaping (String, Bool, Bool, TextInsertionTarget?, Bool) async -> TextDeliveryResult = { text, paste, enter, target, saveHistory in await TextInjector.deliver(text, paste: paste, pressEnterAfterPaste: enter, target: target, copyText: { TextInjector.copy($0, saveToHistory: saveHistory) }) }) {
         let recorder = suppliedRecorder ?? AudioRecorder()
         self.recorder = recorder; self.presentsOverlay = presentsOverlay; self.deliver = deliver
+        self.toastDuration = toastDuration
         self.recovery = recovery
         if let saved = recovery?.latest() { lastTranscript = saved.result; originalTranscript = saved.original }
         recorder.onLevel = { [weak self] level in self?.amplitude = level }
@@ -271,7 +274,7 @@ final class DictationController: ObservableObject {
                 if saveHistory { sendInternal(["action":"save-history", "transcript":text]) }
                 // Dismiss before publishing inserting: the live overlay would otherwise
                 // switch from transcription status to its default waveform during delivery.
-                if presentsOverlay { overlay.hide() }
+                hideOverlay()
                 phase = "inserting"; emit()
                 let result = await deliver(text, shouldPaste, pressEnter, target, saveHistory)
                 try Task.checkCancellation()
@@ -279,12 +282,12 @@ final class DictationController: ObservableObject {
                 timer?.cancel(); configuration = nil; target = nil; removeCancel()
                 if result.enteredInTargetApp || result == .pasteSent || (!shouldPaste && result == .copied) {
                     phase = "idle"; message = ""
-                    if presentsOverlay { overlay.hide() }
+                    hideOverlay()
                     emit()
                 } else {
                     phase = "error"
                     message = result.fallbackMessage(language)
-                    show(); emit(); dismissLater(after: 3, session: session)
+                    show(); emit(); dismissLater(after: toastDuration, session: session)
                 }
             } catch {
                 guard !Task.isCancelled, generation == session else { return }
@@ -303,7 +306,7 @@ final class DictationController: ObservableObject {
         processingContinuation?.resume(returning: ProcessingResult(error: "cancelled")); processingContinuation = nil; timer?.cancel(); timer = nil
         if let audio = recorder.stop() { try? FileManager.default.removeItem(at: audio) }
         if let transcriptionAudio { try? FileManager.default.removeItem(at: transcriptionAudio) }; transcriptionAudio = nil
-        configuration = nil; target = nil; removeCancel(); overlayPreviewPhase = nil; if presentsOverlay { overlay.hide() }
+        configuration = nil; target = nil; removeCancel(); overlayPreviewPhase = nil; hideOverlay()
     }
     func fail(_ text: String) {
         // Microphone interruption and duration limits must preserve the stopped audio.
@@ -317,13 +320,13 @@ final class DictationController: ObservableObject {
                 recoveryWarning = language.text("녹음 원본 위치: ", "Recording location: ") + audio.path
             }
         }
-        clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: 3, session: generation)
+        clear(); phase = "error"; message = messages.translate(text, english: language.english); show(); emit(); dismissLater(after: toastDuration, session: generation)
     }
     private func dismissLater(after seconds: Double, session: UInt64) {
         timer = Task {
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled, generation == session else { return }
-            if presentsOverlay { overlay.hide() }
+            hideOverlay()
         }
     }
     func preview(_ json: String? = nil) {
@@ -397,10 +400,15 @@ final class DictationController: ObservableObject {
         if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }; localMonitor = nil
     }
+    private func hideOverlay() {
+        overlayVisible = false
+        if presentsOverlay { overlay.hide() }
+    }
     private func show() {
-        guard presentsOverlay else { return }
         // Language updates can request a refresh while asynchronous delivery is pending.
         guard phase != "inserting" else { return }
+        overlayVisible = true
+        guard presentsOverlay else { return }
         if message.isEmpty { overlay.show() } else { overlay.showToast(message) }
     }
 }

@@ -437,7 +437,7 @@ export function SettingsView(props: SettingsViewProps) {
               onClick={() => onCommandHotkeyRemove(command.id)}
             ><X size={13} /></button>
           ) : null}
-          {(!promptOnly || !enabled) && <button
+          {activeSection !== "clipboard" && (!promptOnly || !enabled) && <button
             className={`switch ${enabled ? "active" : ""}`}
             role="switch"
             aria-label={`${enabled ? t("Disable") : t("Enable")} ${t(command.title)}`}
@@ -445,6 +445,7 @@ export function SettingsView(props: SettingsViewProps) {
             disabled={!command.management.canDisable}
             onClick={() => onToggleCommand(command.id)}
           ><span /></button>}
+          {activeSection === "clipboard" && !enabled && <button onClick={() => onToggleCommand(command.id)}>{t("Enable command")}</button>}
         </div>
       </div>
     );
@@ -785,8 +786,13 @@ export function SettingsView(props: SettingsViewProps) {
             </>
           ) : null}
 
-          {activeSection === "clipboard" ? (
-            clipboardDetails ?? <>
+          {activeSection === "clipboard" ? (<>
+            <div className="settings-group" role="group" aria-label={t("Clipboard shortcut")}>
+              <h3 className="settings-group-title">{t("Clipboard shortcut")}</h3>
+              {prismCommandDefinitions.filter(command => command.id === prismCommandIds.clipboardHistory).map(renderCommandRow)}
+              {commandHotkeyError ? <div className="preference-alert" role="alert">{commandHotkeyError}</div> : null}
+            </div>
+            {clipboardDetails ?? <>
               <div className="settings-group" role="group" aria-label={t("History")}>
                 <h3 className="settings-group-title">{t("History")}</h3>
                 <div className="settings-row"><div className="preference-copy"><strong>{t("Clipboard history")}</strong><span>{t("Store copied text locally so it can appear in Prism.")}</span></div><button className={`switch ${clipboardEnabled ? "active" : ""}`} role="switch" aria-label={t("Enable clipboard history")} aria-checked={clipboardEnabled} disabled={!nativeRuntime || clipboardBusy} onClick={onClipboardToggle}><span /></button></div>
@@ -794,8 +800,8 @@ export function SettingsView(props: SettingsViewProps) {
               </div>
               <div className="settings-callout"><Clipboard size={17} /><div><strong>{t("Private by default")}</strong><span>{t("History is opt-in, local-only, and never needs a network connection.")}</span></div></div>
               {clipboardError ? <div className="preference-alert" role="alert"><TriangleAlert size={15} /><span>{t(clipboardError)}</span></div> : null}
-            </>
-          ) : null}
+            </>}
+          </>) : null}
 
           {activeSection === "shortcut" ? (
             <>

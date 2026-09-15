@@ -12,9 +12,13 @@ export interface ClipboardPreviewMetadata {
   fileCount?: number;
   available?: boolean | null;
 }
+export type ClipboardPrimaryAction = "paste" | "copy";
 export type ClipboardRetentionDays = 1 | 7 | 30 | 90;
 export interface ClipboardSettingsState {
   enabled: boolean;
+  primaryAction?: ClipboardPrimaryAction;
+  pausedUntilMs?: number;
+  excludedApplications?: Array<{ id: string; name: string }>;
   retentionDays: ClipboardRetentionDays;
   entryCount: number;
   pinnedCount: number;

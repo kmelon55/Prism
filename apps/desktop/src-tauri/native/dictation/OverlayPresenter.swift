@@ -103,6 +103,8 @@ final class OverlayPresenter {
 
     func hide() {
         panel.orderOut(nil)
+        // Release TimelineViews while hidden; orderOut alone retains their update loops.
+        hosting.rootView = AnyView(EmptyView())
     }
 
     private func configureSurface(contentSize: NSSize) {

@@ -25,6 +25,7 @@ let container: HTMLDivElement;
 beforeAll(async () => {
   Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
   App = (await import("./App")).App;
+  await import("./settings/SettingsView");
   await import("./emoji/EmojiPicker");
   await (await import("./emoji/catalog")).loadEmojiCatalog();
 });
@@ -45,6 +46,9 @@ beforeEach(() => {
       };
       case "set_global_shortcut": return { accelerator: (args as { accelerator: string }).accelerator, defaultAccelerator: "shift+control+Space", isDefault: false, registered: true, issue: null };
       case "get_accessibility_permission_status": return { supported: true, granted: false, canRequest: true, message: "Permission required" };
+      case "pending_clipboard_presentation": return null;
+      case "complete_clipboard_presentation": return true;
+      case "paste_clipboard_history_entry": return undefined;
       case "get_clipboard_history_enabled": return true;
       case "get_clipboard_history_settings": return {enabled:true,retentionDays:30,entryCount:1,pinnedCount:0,capacity:1000,persistenceError:null};
       case "prepare_window_appearance":
@@ -426,10 +430,11 @@ describe("mounted palette keyboard flows with mocked native IPC", () => {
     expect(container.querySelector('[aria-label="Favorites"]')).not.toBeNull();
   });
 
-  it("copies without dismissing, then deletes only the chosen clipboard entry", async () => {
+  it("uses the configured copy Return action without dismissing, then deletes only the chosen entry", async () => {
     const original = native.invoke.getMockImplementation()!;
     let entries = [{id: 1, text: "A copied fixture", capturedAt: 1}, {id: 2, text: "Second fixture", capturedAt: 2}];
     native.invoke.mockImplementation(async (command, args) => {
+      if (command === "get_clipboard_history_settings") return {enabled:true,retentionDays:30,entryCount:2,pinnedCount:0,capacity:1000,persistenceError:null,primaryAction:"copy"};
       if (command === "search_clipboard_history") return entries;
       if (command === "get_clipboard_history_entry_text") return entries.find(entry => entry.id === args.id)?.text;
       if (command === "copy_clipboard_history_entry") return;
@@ -1409,7 +1414,7 @@ it("selects clipboard rows without copying and shows complete multiline text in 
   expect(container.querySelector(".clipboard-preview-content")?.textContent).toBe(fullText);
   expect(native.invoke.mock.calls.some(([name]) => name === "copy_clipboard_history_entry")).toBe(false);
   await key("Enter");
-  expect(native.invoke).toHaveBeenCalledWith("copy_clipboard_history_entry", { id: 2 });
+  expect(native.invoke).toHaveBeenCalledWith("paste_clipboard_history_entry", { id: 2 });
 });
 
 it("opens captured regions from the command hotkey without sending and leaves search intact on cancel", async () => {
@@ -1423,4 +1428,62 @@ it("opens captured regions from the command hotkey without sending and leaves se
   await trigger();
   expect(container.querySelector('.ai-chat img')?.getAttribute("src")).toBe(capture.dataUrl);
   expect(native.invoke.mock.calls.some(([command])=>command === "ai_chat")).toBe(false);
+});
+
+
+it("prepares clipboard content before revealing a direct hotkey and drops obsolete presentation requests", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  const shown: number[] = [];
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "complete_clipboard_presentation") {
+      expect(input().getAttribute("aria-label")).toBe("Search clipboard history");
+      expect(container.querySelector(".clipboard-workspace")).not.toBeNull();
+      shown.push(args.requestId); return true;
+    }
+    return original(command, args);
+  });
+  await mount(); native.invoke.mockClear();
+  await act(async () => {
+    native.listeners.get("prism:command-hotkey")!({payload:{commandId:"clipboard:open-history",presentationId:1}});
+    native.listeners.get("prism:command-hotkey")!({payload:{commandId:"clipboard:open-history",presentationId:2}});
+  });
+  expect(shown).toEqual([]);
+  await settle();
+  expect(shown).toEqual([2]);
+  expect(native.invoke).not.toHaveBeenCalledWith("reveal_palette");
+  await key("Enter");
+  expect(native.invoke).toHaveBeenCalledWith("paste_clipboard_history_entry", {id:1});
+});
+
+it("waits for the saved Return preference before allowing a clipboard action", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let loaded!: (settings: unknown) => void;
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "get_clipboard_history_settings") return new Promise(resolve => { loaded = resolve; });
+    if (command === "copy_clipboard_history_entry") return;
+    return original(command, args);
+  });
+  await mount(); await type("clipboard"); await key("Enter"); await key("Enter");
+  expect(native.invoke).not.toHaveBeenCalledWith("paste_clipboard_history_entry", expect.anything());
+  expect(native.invoke).not.toHaveBeenCalledWith("search_clipboard_history", expect.anything());
+  await act(async () => loaded({enabled:true,retentionDays:30,entryCount:1,pinnedCount:0,capacity:1000,persistenceError:null,primaryAction:"copy"}));
+  await settle(); await key("Enter");
+  expect(native.invoke).toHaveBeenCalledWith("copy_clipboard_history_entry", {id:1});
+  expect(native.invoke).not.toHaveBeenCalledWith("paste_clipboard_history_entry", expect.anything());
+});
+
+it("coalesces rapid clipboard typing into the latest native query", async () => {
+  await mount(); await type("clipboard"); await key("Enter"); native.invoke.mockClear();
+  await act(async () => {
+    const field = input();
+    for (const value of ["a", "ab", "abc"]) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,value);
+      field.dispatchEvent(new Event("input",{bubbles:true}));
+    }
+  });
+  expect(native.invoke).not.toHaveBeenCalledWith("search_clipboard_history", expect.anything());
+  await settle();
+  const queries = native.invoke.mock.calls.filter(([command]) => command === "search_clipboard_history");
+  expect(queries).toHaveLength(1);
+  expect(queries[0][1]).toMatchObject({query:"abc"});
 });

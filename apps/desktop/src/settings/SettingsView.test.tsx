@@ -130,6 +130,8 @@ describe("Settings discovery", () => {
     expect(navigation()).not.toContain("Scripts");
     await clickSection("Clipboard");
     expect(container.querySelector("[data-clipboard-details]")).not.toBeNull();
+    expect(container.querySelector('[data-command-id="clipboard:open-history"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Global shortcut for Clipboard History"]')).not.toBeNull();
     expect(container.querySelector('[role="group"][aria-label="History"]')).toBeNull();
     await clickSection("General");
     expect(container.querySelector("[data-clipboard-details]")).toBeNull();

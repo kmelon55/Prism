@@ -5,6 +5,8 @@ import { DEFAULT_BACKGROUND_BLUR, normalizeBackgroundBlur } from "./settings/app
 import { PrismMark } from "./PrismMark";
 import { normalizeReflections } from "./settings/reflectionPreferences";
 import { useGlassRefraction } from "./interaction/useGlassRefraction";
+import { createClipboardSearchQueue } from "./clipboard/searchQueue";
+import { afterClipboardRender } from "./clipboard/presentation";
 import { ClipboardSettings } from "./clipboard/ClipboardSettings";
 import { RaycastImport } from "./backup/RaycastImport";
 import { BackupSettings } from "./backup/BackupSettings";
@@ -12,13 +14,14 @@ import { mergeSafePreferences } from "./backup/backup";
 import { loadPreferences, persistPreferences, recoverPreferences, restoreReviewedBackupPreferences } from "./backup/preferencesPersistence";
 import { PreferencesRecovery } from "./backup/PreferencesRecovery";
 import { SnippetExpansionSettings } from "./snippets/SnippetExpansionSettings";
+import { ClipboardCaptureStatus } from "./clipboard/ClipboardCaptureStatus";
 import { ClipboardTypeFilter } from "./clipboard/ClipboardTypeFilter";
 import { ClipboardEntryPreview } from "./clipboard/ClipboardEntryPreview";
-import { getClipboardHistoryEntryText, setClipboardHistoryEntryPinned } from "./providers/clipboard";
+import { getClipboardHistorySettings, type ClipboardSettingsState, getClipboardHistoryEntryText, setClipboardHistoryEntryPinned } from "./providers/clipboard";
 import { ScriptRunPanel } from "./scripts/ScriptRunPanel";
 import { startScriptSession } from "./scripts/runStore";
 import { LibraryRunDialog, needsLibraryRun, type LibraryRunAction } from "./library/LibraryRunDialog";
-import { SettingsView, type SettingsPreferences as Preferences, type ThemePreference } from "./settings/SettingsView";
+import type { SettingsPreferences as Preferences, ThemePreference } from "./settings/SettingsView";
 import { t, useLocale, localizeCommand, bilingual, notifyLanguageChanged, type Language } from "./i18n";
 import { usePaletteUpdate } from "./usePaletteUpdate";
 import { LibraryPanel } from "./LibraryPanel";
@@ -173,6 +176,7 @@ import { runWebAction, webActionIds, webProvider } from "./providers/web";
 import { initialNavigation, navigate } from "./interaction/navigation";
 import { useAiSurface } from "./interaction/useAiSurface";
 import { usePaletteKeyboard } from "./interaction/usePaletteKeyboard";
+const SettingsView = lazy(() => import("./settings/SettingsView").then(module => ({ default: module.SettingsView })));
 const EmojiPicker = lazy(() => import("./emoji/EmojiPicker").then(module => ({ default: module.EmojiPicker })));
 const AiChat = lazy(() => import("./AiChat").then(module => ({ default: module.AiChat })));
 import { InstantAnswer } from "./InstantAnswer";
@@ -678,6 +682,12 @@ export function App() {
   const [shortcutError, setShortcutError] = useState("");
   const [shortcutBusy, setShortcutBusy] = useState(false);
   const [shortcutRecording, setShortcutRecording] = useState(false);
+  const queuedClipboardSearch = useRef(createClipboardSearchQueue(searchClipboardHistory));
+  const [clipboardSettingsError, setClipboardSettingsError] = useState("");
+  const [clipboardSettings, setClipboardSettings] = useState<ClipboardSettingsState>();
+  const [pendingClipboardPresentation, setPendingClipboardPresentation] = useState<number>();
+  const lastClipboardPresentation = useRef(-1);
+  const prepareClipboardRef = useRef<(id: number) => void>(() => undefined);
   const [clipboardEnabled, setClipboardEnabledState] = useState(false);
   const [clipboardType, setClipboardType] = useState<"all" | "text" | "image" | "files">("all");
   const [clipboardBusy, setClipboardBusy] = useState(false);
@@ -819,9 +829,16 @@ export function App() {
     if (!nativeRuntime) return;
     let active = true;
     let stopListening: (() => void) | undefined;
+    let sequence = 0;
+    const refresh = () => { const current = ++sequence; return void getClipboardHistorySettings().then(settings => {
+      if (active && current === sequence && settings) { setClipboardSettingsError(""); setClipboardSettings(settings); setClipboardEnabledState(settings.enabled); }
+    }).catch(error => { if (active && current === sequence) { setClipboardSettings(undefined); setClipboardSettingsError(errorMessage(error, t("Could not read clipboard preferences."))); } }); };
+    refresh();
+    window.addEventListener("focus", refresh);
     void onClipboardHistorySettingChanged((enabled) => {
       if (!active) return;
       setClipboardEnabledState(enabled);
+      refresh();
       setCatalogRevision((revision) => revision + 1);
     }).then((unlisten) => {
       if (active) stopListening = unlisten;
@@ -830,6 +847,7 @@ export function App() {
       console.error("Prism could not listen for clipboard setting changes", error);
     });
     return () => {
+      window.removeEventListener("focus", refresh);
       active = false;
       stopListening?.();
     };
@@ -1112,10 +1130,15 @@ export function App() {
         return () => controller.abort();
       }
       setLoading(true);
-      void searchClipboardHistory(query, query.trim() ? 40 : 24, clipboardType)
+      if (!clipboardSettings) {
+        if (clipboardSettingsError) { setLoading(false); receiveResults([]); setFailures([{providerId:"native-clipboard-history",providerLabel:t("Clipboard History"),message:clipboardSettingsError}]); }
+        return () => controller.abort();
+      }
+      const search = () => void queuedClipboardSearch.current(controller.signal, query, query.trim() ? 40 : 24, clipboardType)
         .then((entries) => {
           if (controller.signal.aborted) return;
-          receiveResults(clipboardHistoryItems(entries).map(localizeCommand));
+          if (!entries) return;
+          receiveResults(clipboardHistoryItems(entries, clipboardSettings?.primaryAction ?? "paste").map(localizeCommand));
           setLoading(false);
         })
         .catch((error) => {
@@ -1124,7 +1147,10 @@ export function App() {
           setFailures([{ providerId: "native-clipboard-history", providerLabel: t("Clipboard History"), message: errorMessage(error, t("Clipboard history is unavailable.")) }]);
           setLoading(false);
         });
-      return () => controller.abort();
+      // Immediate entry; coalesce typing before sending native work that cannot be aborted mid-SQL.
+      const timer = query.trim() ? window.setTimeout(search, 60) : undefined;
+      if (timer === undefined) search();
+      return () => { window.clearTimeout(timer); controller.abort(); };
     }
     const aliases = searchAliases;
     const sources = nativeRuntime ? [...providers, libraryProvider(libraryData, paletteCommandDefinitions.map(item=>({...item,providerId:"prism"}))), fileProvider] : providers;
@@ -1152,7 +1178,7 @@ export function App() {
     return () => {
       controller.abort();
     };
-  }, [locale, updateItem, libraryData, catalogRevision, clipboardEnabled, clipboardType, nativeRuntime, paletteView, searchAliases, preferences.disabledCommandIds, query, searchGeneration, settingsWindow]);
+  }, [locale, updateItem, libraryData, catalogRevision, clipboardSettings, clipboardSettingsError, clipboardEnabled, clipboardType, nativeRuntime, paletteView, searchAliases, preferences.disabledCommandIds, query, searchGeneration, settingsWindow]);
 
   useEffect(() => {
     if (!keyboardNavigation.current) return;
@@ -1755,6 +1781,30 @@ export function App() {
     }
   };
 
+  prepareClipboardRef.current = (id: number) => {
+    if (id <= lastClipboardPresentation.current) return;
+    lastClipboardPresentation.current = id;
+    setCommandEditor(undefined); closeActions(); setPreferencesOpen(false);
+    setAiOpen(false, true); setLibraryOpen(false); setEmojiOpen(false); setScriptView(undefined); setLibraryRun(undefined);
+    setClipboardType("all"); setToast("");
+    navigatePalette({ type: "reset" });
+    navigatePalette({ type: "clipboard", scrollTop: 0 });
+    setPendingClipboardPresentation(id);
+  };
+  useLayoutEffect(() => {
+    if (pendingClipboardPresentation === undefined || paletteView !== "clipboard" || aiOpen || preferencesOpen || libraryOpen || emojiOpen || scriptView || libraryRun) return;
+    const id = pendingClipboardPresentation;
+    let active = true;
+    const cancel = afterClipboardRender(() => {
+      void invoke("set_ai_workspace", {expanded: false, reduceMotion: true})
+        .then(() => active ? invoke<boolean>("complete_clipboard_presentation", {requestId: id}) : false)
+        .then(shown => { if (active && shown) inputRef.current?.focus(); })
+        .catch(error => { setToast(errorMessage(error, t("Could not open clipboard history."))); })
+        .finally(() => setPendingClipboardPresentation(current => current === id ? undefined : current));
+    });
+    return () => { active = false; cancel(); };
+  }, [pendingClipboardPresentation, paletteView, aiOpen, preferencesOpen, libraryOpen, emojiOpen, scriptView, libraryRun]);
+
   executeCommandRef.current = (commandId: string, background = false) => {
     if (preferences.disabledCommandIds.includes(commandId) || hiddenMaintenanceCommandIds.has(commandId)) return;
     if (commandId.startsWith("native:")) {
@@ -1785,11 +1835,18 @@ export function App() {
     if (!nativeRuntime || settingsWindow) return;
     let active = true;
     let stopListening: (() => void) | undefined;
-    void onCommandHotkey(({ commandId, background }) => {
-      if (active) executeCommandRef.current(commandId, background);
+    void onCommandHotkey(({ commandId, background, presentationId }) => {
+      if (!active) return;
+      if (commandId === "clipboard:open-history" && presentationId != null) prepareClipboardRef.current(presentationId);
+      else executeCommandRef.current(commandId, background);
     }).then((unlisten) => {
-      if (active) stopListening = unlisten;
-      else unlisten();
+      if (active) {
+        stopListening = unlisten;
+        // Recover a hotkey received before the initial renderer subscribed.
+        void invoke<number | null>("pending_clipboard_presentation").then(id => {
+          if (active && typeof id === "number") prepareClipboardRef.current(id);
+        }).catch(error => console.error("Could not recover clipboard presentation", error));
+      } else unlisten();
     }).catch((error) => {
       console.error("Prism could not listen for command shortcuts", error);
     });
@@ -1863,7 +1920,7 @@ export function App() {
         onClose={() => setLibraryRun(undefined)} onComplete={(action) => { setLibraryRun(undefined); if (action === "copy") setToast(t("복사했습니다.")); else void dismissPalette(); }} />
       : scriptView ? <ScriptRunPanel script={scriptView} onBack={() => { setScriptView(undefined); requestAnimationFrame(() => inputRef.current?.focus()); }} />
       : libraryOpen ? <LibraryPanel nativeRuntime={nativeRuntime} onClose={closeLibrary} onChange={reloadLibrary} initialEntry={libraryEntry} initialTab={libraryTab} initialQuery={fileEntryQuery} initialIncludeSystem={fileEntrySystem}/> : preferencesOpen ? (
-        <SettingsView
+        <Suspense fallback={<div className="workspace-loading" role="status">{t("Loading…")}</div>}><SettingsView
           CommandGlyph={CommandGlyph}
           preferences={preferences}
           onChange={updatePreferences}
@@ -1886,7 +1943,7 @@ export function App() {
           maintenanceTask={maintenanceTask}
           onRefreshApplications={() => void refreshApplications()}
           onClearIconCache={() => void clearIconCache()}
-          clipboardDetails={<ClipboardSettings onChanged={(state) => { setClipboardEnabledState(state.enabled); setCatalogRevision(value => value + 1); }} />}
+          clipboardDetails={<ClipboardSettings onChanged={(state) => { setClipboardSettings(state); setClipboardEnabledState(state.enabled); setCatalogRevision(value => value + 1); }} />}
           snippetDetails={nativeRuntime ? <SnippetExpansionSettings /> : undefined}
           backupDetails={<>
             <RaycastImport nativeRuntime={nativeRuntime} aliases={{
@@ -1950,7 +2007,7 @@ export function App() {
           scriptRegistryStatus={scriptRegistryStatus}
           scriptRegistryError={t(scriptRegistryError)}
           onScriptRegistryRefresh={() => void refreshScripts()}
-        />
+        /></Suspense>
       ) : aiOpen ? null : (
         <>
           <div className="search-zone">
@@ -1980,7 +2037,7 @@ export function App() {
           </div>
 
           <div className={`workspace${paletteView === "clipboard" ? " clipboard-workspace" : ""}`}>
-            {paletteView === "clipboard" && <ClipboardTypeFilter value={clipboardType} onChange={value => { setClipboardType(value); setCatalogRevision(revision => revision + 1); }} />}
+            {paletteView === "clipboard" && <ClipboardTypeFilter status={<ClipboardCaptureStatus settings={clipboardSettings} />} value={clipboardType} onChange={value => { setClipboardType(value); setCatalogRevision(revision => revision + 1); }} />}
             <section className="results-pane" aria-label={t("Search results")}>
               {(preferencesLoad.status === "malformed" || preferencesLoad.status === "unavailable") && <div className="provider-failure" role="alert"><span>{t("설정을 읽지 못해 임시 기본값을 사용합니다. 백업 및 복원에서 확인하세요.")}</span><button onClick={() => void openPreferences()}>{t("Settings")}</button></div>}
               {failures.map((failure) => <FailureNotice key={failure.providerId} failure={failure} onRetry={() => {
