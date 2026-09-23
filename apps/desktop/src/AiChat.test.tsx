@@ -3,7 +3,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveAiSelection } from "./providers/ai";
 import { chatMarkdown, forkChatSession, type ChatImage, type ChatSession } from "./providers/aiHistory";
+import { prepareImageAttachment } from "./ai/imageAttachment";
 import { AiChat } from "./AiChat";
+vi.mock("./ai/imageAttachment", () => ({ prepareImageAttachment: vi.fn() }));
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke, Channel: class { onmessage?: (event: {text:string})=>void } }));
 let root: Root;
@@ -22,6 +24,7 @@ const base = async (command: string, args: any = {}) => {
 };
 beforeEach(() => {
   Object.defineProperty(navigator,"language",{configurable:true,value:"ko-KR"});
+  vi.mocked(prepareImageAttachment).mockReset();
   localStorage.clear(); close.mockReset(); openSettings.mockReset(); history = new Map();
   localStorage.setItem("prism.ai.selection.v1", JSON.stringify({ provider: "openai", model: "fixture-model" }));
   native.invoke.mockReset().mockImplementation(base);
@@ -186,16 +189,18 @@ it("keeps Tab navigation inside the model picker and places it before screen cap
   await act(async () => composer().dispatchEvent(new Event("pointerdown", { bubbles: true })));
   expect(container.querySelector('[aria-label="대화 모델 선택"]')).toBeNull();
 });
-it("requires explicit per-question tool activation and closes model picker on Escape only",async()=>{
+it("offers automatic web search without a toggle and keeps file access explicit",async()=>{
   native.invoke.mockImplementation(async(command:string,args:any)=>command==="ai_get_tools"?{webSearch:true,localFiles:true,maxOutputTokens:16384,folders:[{id:"fixture",path:"/fixture"}]}:command==="ai_list_models"?[]:base(command,args));
   await mount();await click("대화 모델 변경");
   await act(async()=>container.querySelector('[aria-label="대화 모델 검색"]')!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
   expect(close).not.toHaveBeenCalled();expect(container.querySelector('[aria-label="대화 모델 선택"]')).toBeNull();
   await type(composer(),"plain question");await click("메시지 전송");
-  expect(chatCalls()[0][1]).toMatchObject({useWeb:false,useFiles:false});
-  await click("이 질문에 웹 검색 사용");await click("이 질문에 로컬 파일 사용");
+  expect(chatCalls()[0][1]).toMatchObject({useFiles:false});
+  expect(button("이 질문에 웹 검색 사용")).toBeUndefined();
+  expect(chatCalls()[0][1]).not.toHaveProperty("useWeb");
+  await click("이 질문에 로컬 파일 사용");
   await type(composer(),"look it up");await click("메시지 전송");
-  expect(chatCalls()[1][1]).toMatchObject({useWeb:true,useFiles:true});
+  expect(chatCalls()[1][1]).toMatchObject({useFiles:true});
 });
 
 function seedSessions(count = 4) {
@@ -505,18 +510,18 @@ it("keeps failed background completion saves recoverable in their own conversati
 const captureFixture = {dataUrl:"data:image/jpeg;base64,fixture"};
 it("keeps captures unsent, retains images in followups and restores the image when editing", async () => {
   await mount(true, true, {id: 9, text: "", image: captureFixture});
-  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')?.getAttribute("src")).toBe(captureFixture.dataUrl);
+  expect(container.querySelector('img[alt="첨부한 이미지"]')?.getAttribute("src")).toBe(captureFixture.dataUrl);
   expect(chatCalls()).toHaveLength(0);
   await type(composer(), "이 화면 설명해 줘"); await click("메시지 전송");
   expect(chatCalls()[0][1].messages[0].image).toEqual(captureFixture);
   expect([...history.values()].find(session=>session.messages.length)?.messages[0].image).toEqual(captureFixture);
-  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).toBeNull();
+  expect(container.querySelector('img[alt="첨부한 이미지"]')).toBeNull();
   await type(composer(), "그 숫자는?"); await click("메시지 전송");
   expect(chatCalls()[1][1].messages[0].image).toEqual(captureFixture);
   expect(chatCalls()[1][1].messages[2].image).toBeUndefined();
   await click("질문 수정");
-  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).not.toBeNull();
-  await click("화면 캡처 제거"); expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).toBeNull();
+  expect(container.querySelector('img[alt="첨부한 이미지"]')).not.toBeNull();
+  await click("이미지 제거"); expect(container.querySelector('img[alt="첨부한 이미지"]')).toBeNull();
 });
 it("preserves a capture on failed send and keeps the previous draft on canceled selection", async () => {
   native.invoke.mockImplementation(async(command,args)=> {
@@ -544,7 +549,7 @@ it("keeps a captured entry available when saving the previous conversation fails
   expect(container.textContent).toContain("새 초안을 보관");
   fail = false; await click("새 초안 열기");
   expect(composer().value).toBe("new question");
-  expect(container.querySelector('img[alt="첨부된 화면 캡처"]')).not.toBeNull();
+  expect(container.querySelector('img[alt="첨부한 이미지"]')).not.toBeNull();
   expect([...history.values()].some(session=>session.draft === "previous draft")).toBe(true);
   expect(chatCalls()).toHaveLength(0);
 });
@@ -654,4 +659,74 @@ it("invalidates summaries that contain the future when forking an earlier questi
   expect(forkChatSession(original, 10).compaction).toBeUndefined();
   expect(forkChatSession(original, 70).compaction).toEqual(original.compaction);
   expect(forkChatSession(original, 72).messages).toHaveLength(72);
+});
+
+async function dropFiles(files: File[]) {
+  await act(async () => {
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: { files, types: ["Files"] } });
+    container.querySelector(".ai-chat")!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+}
+it("attaches a dropped image without inference, persists it and sends it with the question", async () => {
+  vi.mocked(prepareImageAttachment).mockResolvedValue(captureFixture);
+  await mount(); await type(composer(), "Keep my question");
+  const file = new File(["image"], "Screenshot.png", {type:"image/png"});
+  await dropFiles([file]);
+  expect(prepareImageAttachment).toHaveBeenCalledWith(file);
+  expect(chatCalls()).toHaveLength(0);
+  expect(composer().value).toBe("Keep my question");
+  expect([...history.values()][0].draftImage).toEqual(captureFixture);
+  await act(async () => root.unmount()); root = createRoot(container); await mount();
+  expect(container.querySelector('img[alt="첨부한 이미지"]')).not.toBeNull();
+  await click("메시지 전송");
+  expect(chatCalls()[0][1].messages[0].image).toEqual(captureFixture);
+});
+it("keeps the existing attachment and draft when a dropped file cannot be read", async () => {
+  await mount(true, true, { id: 90, text: "Existing question", image: captureFixture });
+  vi.mocked(prepareImageAttachment).mockRejectedValue("Could not read this image.");
+  await dropFiles([new File(["broken"], "broken.png", {type:"image/png"})]);
+  expect(container.querySelector('img[alt="첨부한 이미지"]')?.getAttribute("src")).toBe(captureFixture.dataUrl);
+  expect(composer().value).toBe("Existing question");
+  expect(container.textContent).toContain("이미지를 읽지 못했습니다.");
+  expect(chatCalls()).toHaveLength(0);
+});
+it("rejects multiple dropped files without silently discarding any", async () => {
+  await mount();
+  await dropFiles([new File(["a"],"a.png"),new File(["b"],"b.png")]);
+  expect(prepareImageAttachment).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("이미지를 한 번에 하나씩 놓으세요.");
+});
+it("rejects images for a known text-only model and blocks sending an existing image", async () => {
+  native.invoke.mockImplementation(async (command:string,args:any) => command === "ai_list_models"
+    ? [{id:"fixture-model",name:"Text only",supportsImages:false}] : base(command,args));
+  await mount(); await dropFiles([new File(["image"],"shot.png",{type:"image/png"})]);
+  expect(prepareImageAttachment).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("이 모델은 이미지 입력을 지원하지 않습니다.");
+  await mount(true,true,{id:91,text:"Look at this",image:captureFixture});
+  expect(button("메시지 전송").disabled).toBe(true);
+  await click("이미지 제거");
+  expect(button("메시지 전송").disabled).toBe(false);
+});
+it("keeps attachment decoding bound to its conversation and blocks sending until it finishes", async () => {
+  let resolve!: (value:ChatImage)=>void;
+  vi.mocked(prepareImageAttachment).mockImplementation(()=>new Promise(done=>{resolve=done;}));
+  await mount(); await type(composer(),"Wait for image");
+  await dropFiles([new File(["image"],"shot.png",{type:"image/png"})]);
+  expect(button("메시지 전송").disabled).toBe(true);
+  await click("새 대화");
+  await act(async()=>resolve(captureFixture));
+  expect(composer().value).toBe("Wait for image");
+  expect([...history.values()][0].draftImage).toEqual(captureFixture);
+  expect(chatCalls()).toHaveLength(0);
+});
+it("keeps a dropped image editable after a save failure and prevents inference", async()=>{
+  vi.mocked(prepareImageAttachment).mockResolvedValue(captureFixture);
+  native.invoke.mockImplementation(async(command:string,args:any)=>{if(command==="ai_save_session")throw "저장 실패";return base(command,args);});
+  await mount(); await type(composer(),"Keep this"); await dropFiles([new File(["image"],"shot.png",{type:"image/png"})]);
+  await click("메시지 전송");
+  expect(chatCalls()).toHaveLength(0);
+  expect(container.querySelector('img[alt="첨부한 이미지"]')).not.toBeNull();
+  expect(container.textContent).toContain("저장 실패");
 });

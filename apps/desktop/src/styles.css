@@ -2499,3 +2499,5 @@ kbd {
 :root[data-theme="light"] .prism-update-notice { background: #f6f7fa; }
 .prism-update-notice .settings-row { gap: 16px; }
 .prism-update-notice .preference-copy { min-width: 0; }
+
+.ai-image-drop-hint { position: absolute; inset: 8px; z-index: 20; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--shell) 92%, transparent); color: var(--text); font-size: 14px; pointer-events: none; }

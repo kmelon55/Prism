@@ -162,15 +162,14 @@ it("persists tool permissions and only accepts folders returned by the native pi
     return handle(command,args);
   });
   await mount();
-  await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="웹 검색 허용"]')!.click());
-  expect(settings.webSearch).toBe(true);
-  expect(native.invoke).toHaveBeenCalledWith("ai_set_tools",{webSearch:true,localFiles:false,maxOutputTokens:16384});
+  expect(container.querySelector('[aria-label="웹 검색 허용"]')).toBeNull();
+  expect(container.textContent).toContain("자동 웹 검색");
   await click("허용 폴더 추가");
   expect(container.textContent).toContain("/fixture/docs");
   expect(native.invoke).toHaveBeenCalledWith("ai_add_folder",{locale:"ko"});
   await click("/fixture/docs 허용 취소");expect(settings.folders).toHaveLength(0);
   await act(async()=>root.unmount());root=createRoot(container);await mount();
-  expect(container.querySelector<HTMLInputElement>('[aria-label="웹 검색 허용"]')?.checked).toBe(true);
+  expect(container.querySelector('[aria-label="웹 검색 허용"]')).toBeNull();
 });
 
 it("does not unlock the Keychain on mount or focus and loads OpenAI models after explicit approval",async()=>{

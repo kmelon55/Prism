@@ -57,7 +57,7 @@ Reading settings and model discovery do not prompt for Keychain access. **Allow 
 explicit authorization action; inference can also request access when needed. Authorized keys are reused
 in process memory. Neither keys nor server response bodies are included in diagnostic messages.
 
-Custom connections do not use the built-in Perplexity web-search route. The Web control is disabled for
+Custom connections do not use the built-in Perplexity web-search route. Web search is not offered for
 them; permitted local-file tools still use existing capability checks. No model price is inferred from
 nonstandard catalog fields. Reported response usage is retained, and missing cost remains unknown.
 No connection check invokes paid inference or downloads a local model.

@@ -17,6 +17,7 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "title": "Prism",
         "width": 760,
         "height": 500,

@@ -607,20 +607,31 @@ fn add_sources(mut text: String, value: &Value, provider: Provider) -> String {
     }
     text
 }
+// OpenAI's /models catalog omits hosted-tool capabilities. Keep unsupported legacy
+// and fine-tuned models usable without attaching a tool that makes every turn fail.
+// Source: https://developers.openai.com/api/docs/guides/tools-web-search (2026-09-23).
+fn openai_web_search_supported(model: &str) -> bool {
+    if model.starts_with("gpt-4.1-nano") || model.starts_with("o3-mini") { return false; }
+    ["gpt-4.1", "gpt-4o", "gpt-5", "gpt-6", "o3", "o4-mini"].iter().any(|family| {
+        model == *family || model.strip_prefix(family).is_some_and(|suffix| suffix.starts_with('-') || suffix.starts_with('.'))
+    })
+}
 async fn send(
     app: tauri::AppHandle,
     provider: Provider,
     model: String,
     messages: Vec<Message>,
-    use_web: bool,
     use_files: bool,
     updates: Option<tauri::ipc::Channel<StreamUpdate>>,
 ) -> Result<String, String> {
     use crate::ai_tools;
     let mut settings = ai_tools::current(&app)?;
     settings.max_output_tokens = context_budget(provider, &model, settings.max_output_tokens).output;
-    settings.web_search &= use_web;
-    if provider == Provider::Compatible && settings.web_search { return Err("Web search is not available for custom API servers. Turn off Web to continue.".into()); }
+    settings.web_search = match provider {
+        Provider::Compatible => false,
+        Provider::Openai => openai_web_search_supported(&model),
+        _ => true,
+    };
     settings.local_files &= use_files;
     if provider != Provider::Openai && provider != Provider::Compatible {
         let cached = MODEL_CACHE
@@ -645,10 +656,7 @@ async fn send(
             if let Some(limit) = entry.max_output_tokens {
                 settings.max_output_tokens = settings.max_output_tokens.min(limit);
             }
-            if (settings.web_search || settings.local_files) && entry.supports_tools == Some(false)
-            {
-                return Err("이 모델은 도구 호출을 지원하지 않습니다. 웹·파일을 끄거나 도구 지원 모델을 선택하세요.".into());
-            }
+            apply_model_capabilities(&mut settings, entry, &messages)?;
         }
     }
     let custom_target = if provider == Provider::Compatible { Some(crate::ai_compatible::target(&app, "chat/completions", true).await?) } else { None };
@@ -709,7 +717,7 @@ where
     } else {
         "max_tokens"
     }] = json!(settings.max_output_tokens);
-    let definitions = ai_tools::definitions(&settings, provider != Provider::Openai);
+    let definitions = ai_tools::definitions(&settings, matches!(provider, Provider::Vercel | Provider::Openrouter));
     let mut tools = definitions.clone();
     if provider == Provider::Openai {
         tools = tools
@@ -727,6 +735,7 @@ where
     }
     if !tools.is_empty() {
         body["tools"] = json!(tools);
+        body["tool_choice"] = json!("auto");
     }
     let mut tool_count = 0;
     let mut search_count = 0;
@@ -735,13 +744,12 @@ where
     for _ in 0..5 {
         // Re-check persisted permissions before sending any subsequent tool results.
         let latest = current()?;
-        if (settings.web_search && !latest.web_search)
-            || (settings.local_files
+        if settings.local_files
                 && (!latest.local_files
                     || settings
                         .folders
                         .iter()
-                        .any(|f| !latest.folders.iter().any(|g| g.id == f.id))))
+                        .any(|f| !latest.folders.iter().any(|g| g.id == f.id)))
         {
             return Err("도구 접근 설정이 바뀌어 요청을 중지했습니다. 다시 보내세요.".into());
         }
@@ -919,7 +927,6 @@ pub async fn ai_prepare_context(
 #[tauri::command]
 pub async fn ai_chat(
     app: tauri::AppHandle,
-    use_web: Option<bool>,
     use_files: Option<bool>,
     on_event: tauri::ipc::Channel<StreamUpdate>,
     state: State<'_, AiRequests>,
@@ -937,7 +944,7 @@ pub async fn ai_chat(
     }
     let rx = state.reserve(&request_id)?;
     let result = tokio::select! {
-        result = tokio::time::timeout(Duration::from_secs(240), send(app, provider, model, messages, use_web.unwrap_or(false), use_files.unwrap_or(false), Some(on_event))) => result.unwrap_or_else(|_| Err("요청이 4분을 초과했습니다. 질문 범위를 줄이거나 다른 모델을 선택하세요.".into())),
+        result = tokio::time::timeout(Duration::from_secs(240), send(app, provider, model, messages, use_files.unwrap_or(false), Some(on_event))) => result.unwrap_or_else(|_| Err("요청이 4분을 초과했습니다. 질문 범위를 줄이거나 다른 모델을 선택하세요.".into())),
         _ = rx => Err("요청을 중지했습니다. 제공업체에서 이미 처리한 사용량은 청구될 수 있습니다.".into()),
     };
     if let Ok(mut active) = state.0.lock() {
@@ -1173,12 +1180,25 @@ mod tests {
 pub struct AiModel {
     max_output_tokens: Option<u32>,
     supports_tools: Option<bool>,
+    supports_images: Option<bool>,
     id: String,
     name: String,
     context_window: Option<u64>,
     input_price: Option<f64>,
     output_price: Option<f64>,
     pricing_variable: bool,
+}
+fn apply_model_capabilities(settings: &mut crate::ai_tools::ToolSettings, model: &AiModel, messages: &[Message]) -> Result<(), String> {
+    if model.supports_images == Some(false) && messages.iter().any(|message| message.image.is_some()) {
+        return Err("This model does not support images. Choose an image-capable model.".into());
+    }
+    if model.supports_tools == Some(false) {
+        settings.web_search = false;
+        if settings.local_files {
+            return Err("This model does not support tools. Turn off Files or choose a tool-capable model.".into());
+        }
+    }
+    Ok(())
 }
 // Provider catalogs quote USD per token; the UI uses USD per million tokens.
 fn million_token_price(value: &Value) -> Option<f64> {
@@ -1266,6 +1286,11 @@ pub(crate) fn parse_models(provider: Provider, value: &Value) -> Result<Vec<AiMo
             supports_tools: row["supported_parameters"]
                 .as_array()
                 .map(|p| p.iter().any(|v| v == "tools")),
+            supports_images: match provider {
+                Provider::Vercel => row["modalities"]["input"].as_array(),
+                Provider::Openrouter => row["architecture"]["input_modalities"].as_array(),
+                _ => None,
+            }.map(|modes| modes.iter().any(|mode| mode == "image")),
             id: id.to_owned(),
             name,
             context_window: row["context_window"]
@@ -1543,6 +1568,47 @@ mod tool_loop_tests {
             content: "Read my notes and find public documentation".into(),
         }]
     }
+
+    #[test]
+    fn automatic_search_does_not_break_unsupported_openai_models() {
+        for model in ["gpt-4.1", "gpt-4o-mini", "gpt-5.4-mini", "gpt-6-sol", "o3", "o4-mini-2025-04-16"] {
+            assert!(openai_web_search_supported(model), "{model}");
+        }
+        for model in ["gpt-4.1-nano", "gpt-4.1-nano-2025-04-14", "o3-mini", "o1", "gpt-4", "gpt-3.5-turbo", "ft:gpt-4.1:custom", "unknown"] {
+            assert!(!openai_web_search_supported(model), "{model}");
+        }
+    }
+    #[tokio::test]
+    async fn automatic_search_is_offered_but_a_direct_answer_never_calls_search() {
+        for provider in [Provider::Openai, Provider::Openrouter, Provider::Vercel] {
+            let count = AtomicUsize::new(0);
+            let answer = run_turn(provider, "fixture".into(), messages(), ToolSettings::default(),
+                || Ok(ToolSettings::default()), |_, model, body| {
+                    assert_eq!(count.fetch_add(1, Ordering::SeqCst), 0);
+                    assert_eq!(model, "fixture");
+                    assert_eq!(body["tool_choice"], "auto");
+                    let tool = &body["tools"][0];
+                    if provider == Provider::Openai { assert_eq!(tool["type"], "web_search"); }
+                    else { assert_eq!(tool["function"]["name"], "web_search"); }
+                    async move { Ok(if provider == Provider::Openai {
+                        json!({"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Direct answer"}]}]})
+                    } else { json!({"choices":[{"finish_reason":"stop","message":{"content":"Direct answer"}}]}) }) }
+                }).await.unwrap();
+            assert_eq!(answer, "Direct answer");
+            assert_eq!(count.load(Ordering::SeqCst), 1);
+        }
+    }
+    #[test]
+    fn text_only_models_keep_plain_chat_and_reject_images_or_explicit_file_tools() {
+        let rows = parse_models(Provider::Openrouter, &json!({"data":[{"id":"plain", "architecture":{"input_modalities":["text"],"output_modalities":["text"]}, "supported_parameters":[]}]})).unwrap();
+        let mut settings = ToolSettings::default();
+        apply_model_capabilities(&mut settings, &rows[0], &messages()).unwrap();
+        assert!(!settings.web_search);
+        settings.local_files = true;
+        assert!(apply_model_capabilities(&mut settings, &rows[0], &messages()).unwrap_err().contains("does not support tools"));
+        let mut images = messages(); images[0].image = Some(crate::ai_capture::tests::fixture());
+        assert!(apply_model_capabilities(&mut ToolSettings::default(), &rows[0], &images).unwrap_err().contains("does not support images"));
+    }
     #[tokio::test]
     async fn executes_local_and_search_calls_then_returns_grounded_answer() {
         let root = std::env::temp_dir().join(format!("prism-tool-loop-{}", std::process::id()));
@@ -1584,7 +1650,7 @@ mod tool_loop_tests {
     #[tokio::test]
     async fn revoked_permissions_stop_before_another_provider_request() {
         let settings = ToolSettings {
-            web_search: true,
+            local_files: true,
             ..Default::default()
         };
         let answer = run_turn(

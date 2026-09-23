@@ -5,7 +5,7 @@ import { isTauriRuntime } from "./native";
 
 export type AiProvider = "vercel" | "openai" | "openrouter" | "compatible";
 export interface AiSelection { provider: AiProvider; model: string; modelName?: string | null }
-export interface AiModel { supportsTools?: boolean | null; maxOutputTokens?: number | null; id: string; name: string; contextWindow: number | null; inputPrice?: number | null; outputPrice?: number | null; pricingVariable?: boolean }
+export interface AiModel { supportsImages?: boolean | null; supportsTools?: boolean | null; maxOutputTokens?: number | null; id: string; name: string; contextWindow: number | null; inputPrice?: number | null; outputPrice?: number | null; pricingVariable?: boolean }
 export interface AiKeyInfo { configured: boolean; maskedKey: string | null; unlocked?: boolean }
 export const aiProviders: Record<AiProvider, { name: string; description: string; keyUrl?: string }> = {
   compatible: { name: "OpenAI-compatible", get description() { return t("Connect a local model or your own API server"); } },

@@ -34,7 +34,7 @@ Model discovery uses fixed native GET endpoints:
 | OpenAI | `https://api.openai.com/v1/models` | Saved OpenAI key; text-family candidates, excluding known specialized endpoints |
 | OpenRouter | `https://openrouter.ai/api/v1/models` | Public; text input/output, excluding batch variants |
 
-Lists are fetched when opening/changing a connection and on explicit refresh. Search is local.
+Lists are fetched when opening/changing a connection, when checking the active chat model capabilities, and on explicit refresh. Search is local.
 Each list request has a 20-second HTTP timeout and an 8 MiB body limit. Late results from a
 previous connection are ignored. Errors, empty catalogs, no search matches, and saved models
 missing from the current catalog are explicit; failed refresh never replaces the saved selection.
@@ -166,7 +166,8 @@ interaction require separate verification.
   text ceiling. Output/reasoning is configurable at 4,096, 16,384 (default), or 32,768 tokens,
   capped by the model catalog and half of its context window to leave input space.
   Cached public catalog metadata caps output to the advertised model maximum when available.
-  Catalog metadata also rejects known non-tool models before an inference request with tools enabled.
+  Catalog metadata omits automatic web search for known non-tool models; explicitly enabled file
+  tools still require tool support before an inference request.
 - Stop cancels the local HTTP future. A provider may charge for work already performed.
   Failed/canceled requests restore the draft and remove the pending turn so retry remains explicit.
 - HTTP failures are classified from bounded provider metadata into credential, credit, rate-limit,
@@ -178,7 +179,7 @@ interaction require separate verification.
 ## Current limits and verification
 
 Browser preview shows setup but disables credential saving and requests. Secure credential storage
-is currently macOS-only. Screen captures are supported; PDF input is not,
+is currently macOS-only. Screen captures and dropped PNG/JPEG/WebP images are supported; PDF input is not,
 or direct Anthropic/Gemini integration in this slice. Model access depends on the selected connection and account.
 
 Frontend interaction tests mock native IPC and cover separate-window navigation, model search and
@@ -221,12 +222,22 @@ Conversation presence follows [Motion's React lifecycle](https://motion.dev/docs
 
 ## Composer tools and local access
 
-Settings → AI now includes Web search, Local file reading, permitted folders, and the output/reasoning
-budget. Both tool permissions start off. After granting a capability, enable the corresponding Web or
-Files control in the composer for requests that should use it. Tool switches remain visibly enabled
-until switched off; disabling a permission in Settings disables its composer control as well.
-Model selection and the send/stop control replace the persistent saved-status text; storage failures
-remain visible and continue to block sending.
+Web search is a built-in tool on supported OpenAI, OpenRouter and Vercel connections. There is no
+web permission checkbox or per-question Web switch. Each eligible request offers search with
+`tool_choice: auto`; the model can answer directly without running a search. Existing persisted
+`webSearch: false` values are ignored. Known models without tool support still support plain chat;
+search is omitted rather than making every conversation fail. OpenAI catalog responses do not identify
+hosted-tool capabilities, so automatic search uses documented supported families and excludes
+legacy, unknown and fine-tuned models, including GPT-4.1 nano and o3-mini. See the
+[OpenAI web search guide](https://developers.openai.com/api/docs/guides/tools-web-search) and
+[GPT-4.1 nano capabilities](https://developers.openai.com/api/docs/models/gpt-4.1-nano).
+Custom API connections do not include
+web search. Actual searches may incur additional usage charges.
+
+Settings → AI retains Local file reading, permitted folders, and the output/reasoning budget.
+Local file access stays off until explicitly granted. Enable the Files control for turns that may
+read the permitted folders; disabling its permission disables that control. Storage failures remain
+visible and block sending. An unavailable tool never silently changes the selected model.
 
 The native host implements a bounded tool loop: at most five model rounds and six local/custom tool
 calls per question. Vercel and OpenRouter expose a `web_search` function backed by a separate
@@ -349,3 +360,29 @@ Conversation content and user names remain unchanged. The Files composer control
 and opens a folder picker when needed; a successful grant also enables reading. Canceling preserves
 the off state. Settings and the composer receive native permission-change notifications. See
 [language and search](language-and-search.md) for the full behavior and verification boundaries.
+
+## Image drag and drop — 2026-09-23
+
+Drop a PNG, JPEG or WebP file anywhere inside the chat to attach it to the current draft. The original
+question stays intact; a new image replaces the current draft image. One image can be dropped at a
+time, and the existing four-image conversation limit remains. Nothing is sent until the user sends
+a question. The preview can be removed, persists with the draft, and follows the existing conversation
+history, retry, fork and export paths.
+
+The renderer reads only the dropped File, rejects unsupported formats and files over 40 MiB,
+checks decoded dimensions, scales to at most 1600 pixels and encodes a bounded JPEG. Transparent
+images use a white background. Rust independently validates persisted/request images. No new
+arbitrary-path reader or remote-image fetch was added. Tauri's native drop interception is disabled
+for the main window to allow HTML file-drop events; see the
+[Tauri configuration reference](https://v2.tauri.app/reference/config/#windowconfig).
+
+Model catalogs expose known image support. A known text-only model rejects attachment and cannot
+send existing image turns until an image-capable model is selected. Missing modality metadata stays
+unknown; it is not presented as proof that an OpenAI/custom model supports vision.
+
+Verification: 643 frontend/core tests, 262 Rust tests (5 intentionally ignored), TypeScript and web
+build passed. The existing chunk-size warning remains. An isolated Orca browser fixture exercised
+real PNG decoding (2400×900 → 1600×600), draft persistence and an image-bearing send through mocked
+IPC. [Chat screenshot](evidence/chat-input-2026-09-23/sent.png). This does not prove an installed
+macOS Finder/screenshot-thumbnail drop, native window behavior or a paid provider response. The
+installed app and its signing identity were preserved; no application replacement or release occurred.

@@ -19,15 +19,18 @@ pub struct Folder {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ToolSettings {
+    // Search is a built-in capability. Ignore the legacy persisted opt-in flag.
+    #[serde(skip, default = "web_search_enabled")]
     pub web_search: bool,
     pub local_files: bool,
     pub max_output_tokens: u32,
     pub folders: Vec<Folder>,
 }
+fn web_search_enabled() -> bool { true }
 impl Default for ToolSettings {
     fn default() -> Self {
         Self {
-            web_search: false,
+            web_search: true,
             local_files: false,
             max_output_tokens: 16384,
             folders: vec![],
@@ -77,7 +80,6 @@ pub fn ai_get_tools(
 pub fn ai_set_tools(
     app: tauri::AppHandle,
     state: State<'_, AiTools>,
-    web_search: bool,
     local_files: bool,
     max_output_tokens: u32,
 ) -> Result<ToolSettings, String> {
@@ -89,7 +91,6 @@ pub fn ai_set_tools(
         .lock()
         .map_err(|_| "도구 설정을 저장하지 못했습니다.")?;
     let mut value = read(&app)?;
-    value.web_search = web_search;
     value.local_files = local_files;
     value.max_output_tokens = max_output_tokens;
     write(&app, &value)
@@ -394,6 +395,15 @@ fn directory_names(_: fs::File) -> Result<Vec<Value>, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn legacy_web_opt_out_does_not_disable_builtin_search_or_grant_files() {
+        let value: super::ToolSettings = serde_json::from_str(r#"{"webSearch":false,"localFiles":false,"maxOutputTokens":4096,"folders":[]}"#).unwrap();
+        assert!(value.web_search);
+        assert!(!value.local_files);
+        assert_eq!(value.max_output_tokens, 4096);
+        assert!(serde_json::to_value(&value).unwrap().get("webSearch").is_none());
+    }
+
     use super::*;
     #[test]
     fn files_require_a_grant_and_cannot_escape_through_paths_or_links() {
@@ -467,8 +477,9 @@ mod tests {
         fs::remove_dir_all(path).unwrap();
     }
     #[test]
-    fn tools_are_absent_until_enabled_and_files_need_folders() {
-        assert!(definitions(&ToolSettings::default(), true).is_empty());
+    fn search_is_available_by_default_and_files_still_need_folders() {
+        assert_eq!(definitions(&ToolSettings::default(), true).len(), 1);
+        assert!(definitions(&ToolSettings::default(), false).is_empty());
         let mut settings = ToolSettings {
             web_search: true,
             local_files: true,
