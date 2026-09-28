@@ -10,16 +10,50 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 
-/** One home slot. A replacement commits only after binding AND configuration succeed. */
+/** Stack additions commit only after binding AND configuration succeed. */
 class WidgetController(private val activity: ComponentActivity) {
     private val preferences = activity.getSharedPreferences("widgets", Context.MODE_PRIVATE)
     val manager: AppWidgetManager = AppWidgetManager.getInstance(activity)
     val host = AppWidgetHost(activity, 1701)
-    private val mutableId = MutableStateFlow(preferences.getInt("active", AppWidgetManager.INVALID_APPWIDGET_ID))
+    private fun readStack(): WidgetStack = runCatching {
+        if (!preferences.contains("stack")) {
+            val legacy = preferences.getInt("active", AppWidgetManager.INVALID_APPWIDGET_ID)
+            if (legacy == AppWidgetManager.INVALID_APPWIDGET_ID) WidgetStack()
+            else WidgetStack(listOf(WidgetSlot(legacy, preferences.getInt("height", 180))), legacy)
+        } else {
+            val array = JSONArray(preferences.getString("stack", "[]"))
+            val slots = List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                WidgetSlot(item.getInt("id"), item.optInt("height", 180).coerceIn(80, 480))
+            }.filter { it.id != AppWidgetManager.INVALID_APPWIDGET_ID }.distinctBy { it.id }
+            WidgetStack(slots, preferences.getInt("active", -1))
+        }
+    }.getOrDefault(WidgetStack())
+    private val mutableStack = MutableStateFlow(readStack())
+    val stack = mutableStack.asStateFlow()
+    private val mutableId = MutableStateFlow(mutableStack.value.active?.id ?: AppWidgetManager.INVALID_APPWIDGET_ID)
     val activeId = mutableId.asStateFlow()
-    private val mutableHeight = MutableStateFlow(preferences.getInt("height", 180))
+    private val mutableHeight = MutableStateFlow(mutableStack.value.active?.height ?: 180)
     val height = mutableHeight.asStateFlow()
+
+    private fun save(next: WidgetStack, clearPending: Boolean = false) {
+        val json = JSONArray().apply { next.slots.forEach { slot ->
+            put(JSONObject().put("id", slot.id).put("height", slot.height))
+        } }
+        val edit = preferences.edit().putString("stack", json.toString())
+            .putInt("active", next.active?.id ?: AppWidgetManager.INVALID_APPWIDGET_ID)
+            .putInt("height", next.active?.height ?: 180)
+        if (clearPending) edit.remove("pending")
+        edit.apply()
+        mutableStack.value = next
+        mutableId.value = next.active?.id ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        mutableHeight.value = next.active?.height ?: 180
+    }
+    fun select(id: Int) = save(mutableStack.value.select(id))
+    fun step(direction: Int) = save(mutableStack.value.step(direction))
     var onError: () -> Unit = {}
     private var pending: Int
         get() = preferences.getInt("pending", AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -69,26 +103,21 @@ class WidgetController(private val activity: ComponentActivity) {
         if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
         val info = manager.getAppWidgetInfo(id)
         if (info == null) { cancelPending(); onError(); return }
-        val old = mutableId.value
         // Provider dimensions from AppWidgetManager are pixels; persist UI size in dp.
         val heightDp = (info.minHeight / activity.resources.displayMetrics.density).toInt().coerceIn(120, 400)
-        preferences.edit().putInt("active", id).putInt("height", heightDp).remove("pending").apply()
-        mutableId.value = id
-        mutableHeight.value = heightDp
-        if (old != AppWidgetManager.INVALID_APPWIDGET_ID && old != id) host.deleteAppWidgetId(old)
+        save(mutableStack.value.add(WidgetSlot(id, heightDp)), clearPending = true)
     }
 
     fun cancelPending() {
         val id = pending
-        if (id != AppWidgetManager.INVALID_APPWIDGET_ID && id != mutableId.value) host.deleteAppWidgetId(id)
+        if (id != AppWidgetManager.INVALID_APPWIDGET_ID && mutableStack.value.slots.none { it.id == id }) host.deleteAppWidgetId(id)
         preferences.edit().remove("pending").apply()
     }
 
     fun remove() {
         cancelPending()
         val id = mutableId.value
-        preferences.edit().remove("active").apply()
-        mutableId.value = AppWidgetManager.INVALID_APPWIDGET_ID
+        save(mutableStack.value.remove(id))
         if (id != AppWidgetManager.INVALID_APPWIDGET_ID) host.deleteAppWidgetId(id)
     }
 
@@ -97,8 +126,7 @@ class WidgetController(private val activity: ComponentActivity) {
             (it / activity.resources.displayMetrics.density).toInt()
         } ?: 80
         val next = (mutableHeight.value + delta).coerceIn(minHeight.coerceIn(80, 400), 480)
-        preferences.edit().putInt("height", next).apply()
-        mutableHeight.value = next
+        save(mutableStack.value.resize(next))
     }
 
     companion object { const val CONFIGURE_REQUEST = 1702 }
