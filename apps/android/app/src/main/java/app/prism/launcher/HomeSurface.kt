@@ -46,17 +46,17 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
-/** Include the relevant alphabets, even when a letter currently has no installed apps. */
-internal fun alphabetSections(labels: List<String>): List<String> {
-    val present = labels.map(AppSearch::section).toSet()
-    val letters = AppSearch.sectionOrder.filter {
-        when {
-            it == "#" -> "#" in present
-            it.first() in 'A'..'Z' -> present.any { section -> section.first() in 'A'..'Z' }
-            else -> present.any { section -> section.first() in 'ㄱ'..'ㅎ' }
-        }
-    }
-    return listOf("★") + letters
+/** Keep every index slot available; filtering empty groups is opt-in. */
+internal fun alphabetSections(labels: List<String>, showAll: Boolean = true, showKorean: Boolean = true): List<String> {
+    val order = AppIndex.order(showKorean)
+    if (showAll) return listOf("★") + order
+    val present = labels.map { AppIndex.section(it, it, showKorean) }.toSet()
+    return listOf("★") + order.filter { it in present }
+}
+
+internal fun alphabetLabel(section: String, syllables: Boolean): String {
+    val index = "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ".indexOf(section)
+    return if (syllables && index >= 0 && section.length == 1) "가나다라마바사아자차카타파하"[index].toString() else section
 }
 
 @Composable
