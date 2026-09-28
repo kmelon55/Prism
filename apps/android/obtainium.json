@@ -1,0 +1,7 @@
+{
+  "id": "app.prism.launcher",
+  "url": "https://github.com/kmelon55/Prism",
+  "author": "kmelon55",
+  "name": "Prism Android",
+  "additionalSettings": "{\"filterReleaseTitlesByRegEx\":\"^Prism Android \",\"apkFilterRegEx\":\"^Prism-Android-.*\\\\.apk$\",\"verifyLatestTag\":false,\"fallbackToOlderReleases\":true,\"includePrereleases\":false,\"includeZips\":false,\"includeTarballs\":false,\"versionDetection\":true,\"versionExtractionRegEx\":\"\\\\d+\\\\.\\\\d+\\\\.\\\\d+$\",\"matchGroupToUse\":\"$0\"}"
+}

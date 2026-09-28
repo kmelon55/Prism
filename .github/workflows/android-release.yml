@@ -1,0 +1,93 @@
+name: Release Android
+
+on:
+  push:
+    tags: ["android-v[0-9]*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing Android tag, such as android-v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - run: node --test scripts/android-release.test.mjs
+      - name: Validate release version and immutable publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/android-release.mjs validate-publication
+      - name: Restore persistent Android signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          encoded = os.environ.get('ANDROID_KEYSTORE_BASE64', '')
+          if not encoded:
+              raise SystemExit('Missing ANDROID_KEYSTORE_BASE64 repository secret')
+          path = Path(os.environ['RUNNER_TEMP']) / 'prism-release.jks'
+          fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+          with os.fdopen(fd, 'wb') as stream:
+              stream.write(base64.b64decode(encoded, validate=True))
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write(f'ANDROID_KEYSTORE_PATH={path}\n')
+          PY
+      - name: Test, build, and verify signed release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node scripts/android-release.mjs build
+      - name: Publish Android assets without changing the desktop latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node scripts/android-release.mjs version | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).name')
+          output="dist/android/$RELEASE_TAG"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --latest=false \
+              --title "Prism Android $version" --notes-file "$output/release-notes.md"
+          fi
+          gh release edit "$RELEASE_TAG" --title "Prism Android $version" --notes-file "$output/release-notes.md"
+          gh release upload "$RELEASE_TAG" "$output"/*.apk "$output/obtainium.json" \
+            "$output/release.json" "$output/SHA256SUMS.txt" --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest=false
+      - name: Remove runner signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/prism-release.jks"

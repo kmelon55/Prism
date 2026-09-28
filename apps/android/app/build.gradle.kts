@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val releaseVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val signingNames = listOf("ANDROID_KEYSTORE_PATH", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD")
+val signingValues = signingNames.associateWith { System.getenv(it).orEmpty() }
+val hasReleaseSigning = signingValues.values.all { it.isNotBlank() }
+require(signingValues.values.all { it.isBlank() } || hasReleaseSigning) {
+    "Provide all four Android release signing variables, or none for debug builds."
 }
 
 android {
@@ -11,9 +23,23 @@ android {
         applicationId = "app.prism.launcher"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersion.getProperty("versionCode").toInt()
+        versionName = releaseVersion.getProperty("versionName")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        if (hasReleaseSigning) create("release") {
+            storeFile = file(signingValues.getValue("ANDROID_KEYSTORE_PATH"))
+            storePassword = signingValues.getValue("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = signingValues.getValue("ANDROID_KEY_ALIAS")
+            keyPassword = signingValues.getValue("ANDROID_KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
+        }
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -21,6 +47,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+}
+
+// Never silently produce an unsigned release or substitute the debug certificate.
+tasks.configureEach {
+    if (name == "validateSigningRelease" || name == "packageRelease" || name == "packageReleaseBundle") {
+        doFirst { check(hasReleaseSigning) { "Android release signing is required. See apps/android/distribution.md." } }
+    }
 }
 
 dependencies {

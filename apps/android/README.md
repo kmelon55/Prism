@@ -4,6 +4,10 @@ A native, offline Android home launcher built with Kotlin and Jetpack Compose. I
 quiet favorites list, fast Korean-aware app search, an Android widget stack, and optional double-tap
 screen locking. It is independent of the desktop development server and does not use a WebView.
 
+For phone installation and ongoing updates, use the signed APK and Obtainium import link in the
+[Android releases](https://github.com/kmelon55/Prism/releases?q=android-v).
+See [installation and distribution](distribution.md) for setup and the initial debug-to-release transition.
+
 ## Run
 
 Open this directory in Android Studio, or use JDK 17 and an Android SDK with platform 35 and build
