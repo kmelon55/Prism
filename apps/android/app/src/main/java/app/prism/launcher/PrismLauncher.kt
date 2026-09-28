@@ -6,21 +6,27 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.os.Build
 import android.util.LruCache
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -31,44 +37,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
-internal val Ink = Color(0xFF111312)
-internal val Paper = Color(0xFFF1F0EA)
-internal val Muted = Color(0xFFA8ADA8)
-private val Lilac = Color(0xFFD8E0D1)
 internal object AppIcons { val cache = LruCache<String, Bitmap>(100) }
 
 @Composable
@@ -80,17 +71,25 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     var query by rememberSaveable { mutableStateOf("") }
     var searchFocused by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var folderId by rememberSaveable { mutableStateOf<String?>(null) }
+    var editFolderId by rememberSaveable { mutableStateOf<String?>(null) }
+    var folderEditor by rememberSaveable { mutableStateOf(false) }
     var aliasId by rememberSaveable { mutableStateOf<String?>(null) }
     var widgetPicker by rememberSaveable { mutableStateOf(false) }
     var editingHome by rememberSaveable { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     var browseSection by remember { mutableStateOf<String?>(null) }
     var railDragging by remember { mutableStateOf(false) }
-    val railSections = remember(state.apps) { alphabetSections(state.apps.map { it.label }) }
+    var railFromStart by remember { mutableStateOf(false) }
+    var browseAnchor by remember { mutableFloatStateOf(0f) }
+    var browsePosition by remember { mutableFloatStateOf(0f) }
+    val railSections = remember(state.apps, state.showAllIndexLetters, state.showKoreanIndex) {
+        alphabetSections(state.apps.map { if (state.showKoreanIndex) it.label else it.englishLabel }, state.showAllIndexLetters, state.showKoreanIndex)
+    }
 
     fun home() {
         screen = "home"; query = ""; searchFocused = false; browseSection = null
-        selectedId = null; aliasId = null; widgetPicker = false; editingHome = false
+        selectedId = null; folderId = null; folderEditor = false; editFolderId = null; aliasId = null; widgetPicker = false; editingHome = false
         keyboard?.hide()
     }
     // The initial composition should not erase state restored after widget binding/configuration.
@@ -98,61 +97,95 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     LaunchedEffect(homeRequest) {
         if (homeRequest != lastHomeRequest) { home(); lastHomeRequest = homeRequest }
     }
-    BackHandler(screen != "home" || editingHome) { home() }
+    BackHandler(screen != "home" || editingHome) {
+        home()
+    }
     val launch: (LauncherApp) -> Unit = { app ->
         if (model.launch(app)) home() else activity.message(R.string.open_failed)
     }
 
-    MaterialTheme(colorScheme = darkColorScheme(
-        primary = Lilac, onPrimary = Ink, background = Ink, surface = Ink,
-        onSurface = Paper, onBackground = Paper, onSurfaceVariant = Muted,
-        surfaceContainer = Color(0xFF202420), outline = Color(0xFF646C64),
-    )) {
+    PrismTheme(state.prismEffects, state.prismIcons, state.themeAccent, state.wallpaperDim) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, contentColor = Paper) {
-        Box(Modifier.fillMaxSize().background(
-            if (screen == "home") Brush.verticalGradient(listOf(Color(0xD9111312), Color(0xF2111312)))
-            else Brush.verticalGradient(listOf(Ink, Ink)),
-        )) {
-            when (screen) {
+        Box(Modifier.fillMaxSize()) {
+            PrismBackdrop(Modifier.matchParentSize())
+            AnimatedContent(targetState = screen to searchFocused, modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    when {
+                        targetState.first == "home" ->
+                            (slideInVertically(tween(380, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(260))) togetherWith
+                                (slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it / 5 } + fadeOut(tween(160)))
+                        initialState.first == "home" && !railDragging ->
+                            (slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 5 } + fadeIn(tween(220))) togetherWith
+                                (slideOutVertically(tween(280, easing = FastOutSlowInEasing)) { -it / 4 } + fadeOut(tween(160)))
+                        else -> fadeIn(tween(140)) togetherWith fadeOut(tween(100))
+                    }.using(null)
+                }, label = "launcher-navigation") { route ->
+            when (route.first) {
                 "home" -> HomeScreen(
                     state, activity.widgets, editingHome, launch,
                     onSearch = { browseSection = null; searchFocused = true; screen = "apps" },
-                    onAllApps = { browseSection = null; searchFocused = false; screen = "apps" },
+                    onChooseFavorites = { keyboard?.hide(); screen = "favorites" },
                     onSettings = { screen = "settings" },
-                    onSelect = { selectedId = it.id },
+                    onSelect = { keyboard?.hide(); selectedId = it.id },
+                    onFolder = { folderId = it },
+                    onEditFolder = { editFolderId = it; folderEditor = true },
+                    onMoveFolder = model::moveFolder,
                     onMove = model::moveFavorite,
                     onEdit = { editingHome = !editingHome },
                     onLock = activity::lockScreen,
                     defaultHome = defaultHome, onChooseHome = activity::chooseHome,
                 )
-                "apps" -> if (searchFocused) AppsScreen(state, query, { query = it }, true, launch,
-                    onSelect = { selectedId = it.id }, onBack = ::home, onRetry = model::refresh)
-                else AlphabetApps(state, browseSection, launch,
-                    onSelect = { selectedId = it.id }, onBack = ::home,
+                "favorites" -> FavoritesPicker(state, model::toggleFavorite, onDone = ::home)
+                "apps" -> if (route.second) PrismSearchScreen(state, query, { query = it }, launch,
+                    onSelect = { keyboard?.hide(); selectedId = it.id }, onBack = ::home, onRetry = model::refresh,
+                    onCommand = { command ->
+                        keyboard?.hide()
+                        when (command) {
+                            PaletteCommand.Widgets -> widgetPicker = true
+                            PaletteCommand.Settings -> screen = "settings"
+                            PaletteCommand.ChooseFavorites -> screen = "favorites"
+                            PaletteCommand.EditHome -> { home(); editingHome = true }
+                            PaletteCommand.Wallpaper -> activity.chooseWallpaper()
+                            PaletteCommand.AllApps -> { query = ""; browseSection = null; searchFocused = false }
+                        }
+                    })
+                else AlphabetApps(state, browseSection, browseAnchor, browsePosition, railDragging, launch,
+                    onSelect = { keyboard?.hide(); selectedId = it.id },
                     onSearch = { searchFocused = true }, onSettings = { screen = "settings" }, onRetry = model::refresh)
-                "settings" -> SettingsScreen(activity, onBack = ::home, onAddWidget = { widgetPicker = true },
+                "settings" -> SettingsScreen(activity, model, state, onBack = ::home, onAddWidget = { widgetPicker = true },
                     onEditHome = { home(); editingHome = true })
+            }
             }
             // Keep this node mounted across home/browse transitions so a held pointer is never lost.
             if ((screen == "home" || screen == "apps") && !searchFocused && !editingHome) {
-                AlphabetRail(railSections, browseSection, railDragging,
-                    modifier = Modifier.align(Alignment.CenterEnd).safeDrawingPadding(),
-                    onDragging = { railDragging = it },
-                    onSection = { section ->
-                        keyboard?.hide()
-                        if (section == "★") home() else {
-                            browseSection = section; query = ""; searchFocused = false; screen = "apps"
-                        }
-                    })
+                for (fromStart in listOf(false, true)) {
+                    AlphabetRail(railSections, browseSection, railDragging && railFromStart == fromStart,
+                        modifier = Modifier.align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd).safeDrawingPadding(),
+                        fromStart = fromStart, koreanSyllables = state.koreanIndexSyllables,
+                        onDragging = { railDragging = it; if (it) railFromStart = fromStart },
+                        onSection = { section, anchor, position ->
+                            keyboard?.hide()
+                            if (section == "★") home() else {
+                                browseSection = section; browseAnchor = anchor; browsePosition = position
+                                query = ""; searchFocused = false; screen = "apps"
+                            }
+                        })
+                }
             }
         }
         }
 
         val selected = state.apps.find { it.id == selectedId }
         if (selected != null) {
-            ModalBottomSheet(onDismissRequest = { selectedId = null }) {
-                Column(Modifier.padding(horizontal = 24.dp).navigationBarsPadding()) {
+            ModalBottomSheet(onDismissRequest = { selectedId = null },
+                containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp,
+                dragHandle = { PrismSheetHandle() }) {
+                Column(Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * .7f).dp)
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).navigationBarsPadding()) {
                     Text(selected.label, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                    AppShortcuts(selected, model, defaultHome, activity::chooseHome) { shortcut ->
+                        if (model.launchShortcut(shortcut)) home() else activity.message(R.string.open_failed)
+                    }
                     val favorite = selected.id in state.favorites
                     TextButton(onClick = { model.toggleFavorite(selected.id); selectedId = null }) {
                         Icon(if (favorite) Icons.Rounded.StarOutline else Icons.Rounded.Star, null)
@@ -169,6 +202,15 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                 }
             }
         }
+        state.folders.find { it.id == folderId }?.let { folder ->
+            FolderPopup(folder, state, onDismiss = { folderId = null },
+                onEdit = { editFolderId = folder.id; folderId = null; folderEditor = true },
+                onLaunch = launch, onSelect = { folderId = null; selectedId = it.id })
+        }
+        if (folderEditor) FolderEditor(state.folders.find { it.id == editFolderId }, state.apps,
+            onDismiss = { folderEditor = false },
+            onSave = { name, apps -> model.saveFolder(editFolderId, name, apps); folderEditor = false },
+            onDelete = { editFolderId?.let(model::removeFolder); folderEditor = false })
         aliasId?.let { id ->
             var alias by rememberSaveable(id) { mutableStateOf(state.aliases[id] ?: "") }
             AlertDialog(
@@ -193,104 +235,70 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
 
 @Composable
 internal fun AppRow(app: LauncherApp, alias: String?, modifier: Modifier = Modifier, large: Boolean = false,
-    onClick: () -> Unit, onLongClick: () -> Unit) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).combinedClickable(
-        onClick = onClick, onLongClick = onLongClick, onLongClickLabel = stringResource(R.string.app_info),
-    ).padding(horizontal = 8.dp, vertical = if (large) 12.dp else 9.dp), verticalAlignment = Alignment.CenterVertically) {
+    onClick: () -> Unit, onLongClick: () -> Unit, longClickLabel: String? = null) {
+    Row(modifier.fillMaxWidth().swipeRight(onLongClick).clip(RoundedCornerShape(14.dp)).combinedClickable(
+        onClick = onClick, onLongClick = onLongClick, onLongClickLabel = longClickLabel ?: stringResource(R.string.app_actions),
+    ).padding(horizontal = 8.dp, vertical = if (large) 8.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
         AppIcon(app)
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(if (large) 24.dp else 18.dp))
         Column(Modifier.weight(1f)) {
-            Text(app.label, color = Paper, fontSize = if (large) 23.sp else 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(app.label, color = Paper, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!alias.isNullOrBlank()) Text(alias, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 @Composable
-private fun AppIcon(app: LauncherApp) {
+internal fun AppIcon(app: LauncherApp) {
     val context = LocalContext.current
-    val cacheKey = "${app.id}:${app.iconRevision}"
+    val themed = LocalPrismIcons.current
+    val cacheKey = "${app.id}:${app.iconRevision}:$themed"
     val bitmap by produceState<Bitmap?>(AppIcons.cache.get(cacheKey), cacheKey) {
         value = AppIcons.cache.get(cacheKey)
         if (value == null) value = withContext(Dispatchers.IO) {
             runCatching {
-                context.getSystemService(LauncherApps::class.java).getActivityList(app.component.packageName, app.user)
+                val drawable = context.getSystemService(LauncherApps::class.java).getActivityList(app.component.packageName, app.user)
                     .find { it.componentName == app.component }?.getBadgedIcon(context.resources.displayMetrics.densityDpi)
-                    ?.toBitmap(96, 96)?.also { AppIcons.cache.put(cacheKey, it) }
+                val mono = if (themed && Build.VERSION.SDK_INT >= 33) (drawable as? AdaptiveIconDrawable)?.monochrome else null
+                val icon = mono?.mutate()?.apply { setTint(android.graphics.Color.WHITE) } ?: drawable
+                icon?.toBitmap(96, 96)?.also { AppIcons.cache.put(cacheKey, it) }
             }.getOrNull()
         }
     }
-    val rendered = bitmap
-    if (rendered != null) Image(rendered.asImageBitmap(), null, Modifier.size(36.dp))
-    else Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF373143)), contentAlignment = Alignment.Center) {
-        Text(app.label.take(1), color = Lilac, fontSize = 16.sp)
-    }
-}
-
-@Composable
-private fun AppsScreen(state: LauncherState, query: String, onQuery: (String) -> Unit, focus: Boolean,
-    onLaunch: (LauncherApp) -> Unit, onSelect: (LauncherApp) -> Unit, onBack: () -> Unit, onRetry: () -> Unit) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val apps = remember(state.apps, state.aliases, state.recent, query) {
-        if (query.isBlank()) state.apps else state.apps.mapNotNull { app ->
-            AppSearch.score(SearchableApp(app.id, app.label, state.aliases[app.id] ?: ""), query)?.let { app to it }
-        }.sortedWith(compareBy<Pair<LauncherApp, Int>> { it.second }.thenBy {
-            state.recent.indexOf(it.first.id).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE
-        }).map { it.first }
-    }
-    LaunchedEffect(focus) {
-        if (focus) { focusRequester.requestFocus(); keyboard?.show() }
-    }
-    LaunchedEffect(query) { listState.scrollToItem(0) }
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
-            Text(stringResource(R.string.all_apps), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-
-        }
-        OutlinedTextField(
-            value = query, onValueChange = onQuery, singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).focusRequester(focusRequester),
-            placeholder = { Text(stringResource(R.string.search_hint), fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Rounded.Search, stringResource(R.string.search_apps)) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, stringResource(R.string.clear)) } },
-            shape = RoundedCornerShape(20.dp), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) apps.firstOrNull()?.let(onLaunch) }),
-        )
-        if (state.error) Row(Modifier.padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.catalog_error), Modifier.weight(1f), color = Muted)
-            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-        }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (apps.isEmpty() && !state.loading) {
-            Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(if (query.isBlank()) R.string.empty_apps else R.string.empty_search), style = MaterialTheme.typography.titleMedium)
-                if (query.isNotBlank()) Text(stringResource(R.string.empty_search_hint), color = Muted)
-            }
-        }
-        // A separate recent row only in search mode. Keep alphabet positions based on the actual list.
-        if (query.isBlank() && focus && state.recent.isNotEmpty()) {
-            Text(stringResource(R.string.recent_apps), color = Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp))
-            val recent = state.recent.take(3).mapNotNull { id -> state.apps.find { it.id == id } }
-            recent.forEach { app -> AppRow(app, null, Modifier.padding(horizontal = 20.dp), onClick = { onLaunch(app) }, onLongClick = { onSelect(app) }) }
-            HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = Color(0xFF332E40))
-        }
-        Row(Modifier.weight(1f)) {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 4.dp, bottom = 20.dp)) {
-                items(apps, key = LauncherApp::id) { app ->
-                    AppRow(app, state.aliases[app.id], onClick = { onLaunch(app) }, onLongClick = { onSelect(app) })
-                }
-            }
-
-        }
+    val frame = if (themed) Modifier.prismPanel(LocalPrismEffects.current, 14.dp, luminous = false) else Modifier
+    Box(Modifier.size(42.dp).then(frame), contentAlignment = Alignment.Center) {
+        val rendered = bitmap
+        if (rendered != null) Image(rendered.asImageBitmap(), null,
+            Modifier.size(if (themed) 27.dp else 36.dp).clip(RoundedCornerShape(if (themed) 7.dp else 10.dp)),
+            colorFilter = if (themed) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null)
+        else Text(app.label.take(1), color = PrismAccent, fontSize = 16.sp)
     }
 }
 
 @Composable
 internal fun HomeWidget(widgets: WidgetController) {
+    val stack by widgets.stack.collectAsStateWithLifecycle()
+    PrismPanel(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            ActiveHomeWidget(widgets)
+            if (stack.slots.size > 1) WidgetStackControls(widgets)
+        }
+    }
+}
+
+@Composable
+private fun WidgetStackControls(widgets: WidgetController) {
+    val stack by widgets.stack.collectAsStateWithLifecycle()
+    Row(Modifier.fillMaxWidth().swipeHorizontal(onLeft = { widgets.step(1) }, onRight = { widgets.step(-1) }),
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = { widgets.step(-1) }) { Icon(Icons.Rounded.ChevronLeft, stringResource(R.string.previous_widget)) }
+        Text(stringResource(R.string.widget_position, stack.slots.indexOf(stack.active) + 1, stack.slots.size), color = Muted)
+        IconButton(onClick = { widgets.step(1) }) { Icon(Icons.Rounded.ChevronRight, stringResource(R.string.next_widget)) }
+    }
+}
+
+@Composable
+private fun ActiveHomeWidget(widgets: WidgetController) {
     val id by widgets.activeId.collectAsStateWithLifecycle()
     val height by widgets.height.collectAsStateWithLifecycle()
     if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
@@ -300,19 +308,19 @@ internal fun HomeWidget(widgets: WidgetController) {
         return
     }
     key(id) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
             val width = maxWidth.value.toInt()
             AndroidView(
                 factory = { context -> widgets.host.createView(context, id, info) },
                 update = { view -> view.updateAppWidgetSize(null, width, height, width, height) },
-                modifier = Modifier.fillMaxWidth().height(height.dp),
+                modifier = Modifier.fillMaxWidth().testTag("native-home-widget").height(height.dp).clip(RoundedCornerShape(18.dp)),
             )
         }
     }
 }
 
 @Composable
-private fun SettingsScreen(activity: MainActivity, onBack: () -> Unit, onAddWidget: () -> Unit, onEditHome: () -> Unit) {
+private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: LauncherState, onBack: () -> Unit, onAddWidget: () -> Unit, onEditHome: () -> Unit) {
     val isHome by activity.defaultHome.collectAsStateWithLifecycle()
     val widgetId by activity.widgets.activeId.collectAsStateWithLifecycle()
     val lockRequested by activity.lockRequested.collectAsStateWithLifecycle()
@@ -325,14 +333,81 @@ private fun SettingsScreen(activity: MainActivity, onBack: () -> Unit, onAddWidg
             Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge)
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            PrismPanel(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsLabel(R.string.prism_theme, R.string.prism_theme_hint)
+                    Text(stringResource(R.string.theme_accent), color = Muted)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("neutral" to R.string.accent_neutral, "blue" to R.string.accent_blue,
+                            "sage" to R.string.accent_sage, "violet" to R.string.accent_violet).forEach { (value, label) ->
+                            FilterChip(selected = state.themeAccent == value, onClick = { model.setThemeAccent(value) },
+                                modifier = Modifier.testTag("theme-accent-$value"),
+                                leadingIcon = { Box(Modifier.size(12.dp).background(themeAccent(value), androidx.compose.foundation.shape.CircleShape)) },
+                                label = { Text(stringResource(label)) })
+                        }
+                    }
+                    Text(stringResource(R.string.wallpaper_dim), color = Muted)
+                    Slider(value = state.wallpaperDim, onValueChange = model::setWallpaperDim, valueRange = .35f..1f,
+                        modifier = Modifier.testTag("wallpaper-dim").semantics { contentDescription = activity.getString(R.string.wallpaper_dim) })
+                    TextButton(onClick = activity::chooseWallpaper) { Text(stringResource(R.string.choose_wallpaper)) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.show_clock), Modifier.weight(1f))
+                        Switch(state.showClock, model::setShowClock, modifier = Modifier.testTag("show-clock"))
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.prism_effects), Modifier.weight(1f))
+                        Switch(state.prismEffects, model::setPrismEffects,
+                            modifier = Modifier.semantics { contentDescription = activity.getString(R.string.prism_effects) })
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.prism_icons), Modifier.weight(1f))
+                        Switch(state.prismIcons, model::setPrismIcons,
+                            modifier = Modifier.semantics { contentDescription = activity.getString(R.string.prism_icons) })
+                    }
+                }
+            }
             SettingsLabel(R.string.default_launcher, if (isHome) R.string.default_active else R.string.default_launcher_hint)
             FilledTonalButton(onClick = activity::chooseHome) { Text(stringResource(R.string.choose_home)) }
             SettingsDivider()
+            SettingsLabel(R.string.alphabet_settings, R.string.alphabet_settings_hint)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alphabet_show_all), Modifier.weight(1f))
+                Switch(checked = state.showAllIndexLetters, onCheckedChange = model::setShowAllIndexLetters,
+                    modifier = Modifier.semantics { contentDescription = activity.getString(R.string.alphabet_show_all) })
+            }
+            Text(stringResource(R.string.korean_index_grouping), color = Muted, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = state.showKoreanIndex, onClick = { model.setShowKoreanIndex(true) },
+                    label = { Text(stringResource(R.string.korean_index_separate)) })
+                FilterChip(selected = !state.showKoreanIndex, onClick = { model.setShowKoreanIndex(false) },
+                    label = { Text(stringResource(R.string.korean_index_english)) })
+            }
+            if (!state.showKoreanIndex) Text(stringResource(R.string.english_index_hint), color = Muted, style = MaterialTheme.typography.bodySmall)
+            if (state.showKoreanIndex) {
+                Text(stringResource(R.string.korean_index_style), color = Muted, style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = state.koreanIndexSyllables, onClick = { model.setKoreanIndexSyllables(true) },
+                        label = { Text("가 · 나 · 다") })
+                    FilterChip(selected = !state.koreanIndexSyllables, onClick = { model.setKoreanIndexSyllables(false) },
+                        label = { Text("ㄱ · ㄴ · ㄷ") })
+                }
+            }
+            Text(stringResource(R.string.index_browse_style), color = Muted, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !state.selectedIndexOnly, onClick = { model.setSelectedIndexOnly(false) },
+                    label = { Text(stringResource(R.string.index_browse_all)) })
+                FilterChip(selected = state.selectedIndexOnly, onClick = { model.setSelectedIndexOnly(true) },
+                    label = { Text(stringResource(R.string.index_browse_selected)) })
+            }
+            SettingsDivider()
             SettingsLabel(R.string.widgets, R.string.widget_hint)
             FilledTonalButton(onClick = onAddWidget) {
-                Text(stringResource(if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) R.string.add_widget else R.string.replace_widget))
+                Text(stringResource(R.string.add_widget))
             }
             if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetStackControls(activity.widgets)
+                val label = activity.widgets.manager.getAppWidgetInfo(widgetId)?.loadLabel(activity.packageManager)
+                Text(label ?: stringResource(R.string.widget_missing), color = Muted)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { activity.widgets.resize(-40) }) { Icon(Icons.Rounded.Remove, stringResource(R.string.widget_shorter)) }
                     IconButton(onClick = { activity.widgets.resize(40) }) { Icon(Icons.Rounded.Add, stringResource(R.string.widget_taller)) }
@@ -381,15 +456,16 @@ private fun SettingsLabel(title: Int, description: Int) {
 }
 
 @Composable
-private fun SettingsDivider() { HorizontalDivider(Modifier.padding(vertical = 12.dp), color = Color(0xFF332E40)) }
+private fun SettingsDivider() { PrismRule(Modifier.padding(vertical = 12.dp)) }
 
 @Composable
-private fun WidgetPicker(widgets: WidgetController, onDismiss: () -> Unit, onChoose: (AppWidgetProviderInfo) -> Unit) {
+internal fun WidgetPicker(widgets: WidgetController, onDismiss: () -> Unit, onChoose: (AppWidgetProviderInfo) -> Unit) {
     val context = LocalContext.current
     val providers by produceState<List<Pair<AppWidgetProviderInfo, String>>?>(null) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 widgets.manager.getInstalledProvidersForProfile(android.os.Process.myUserHandle())
+                    .filter { it.widgetCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN != 0 }
                     .sortedBy { it.loadLabel(context.packageManager) }.map { provider ->
                         val appLabel = runCatching {
                             context.packageManager.getApplicationInfo(provider.provider.packageName, 0).loadLabel(context.packageManager).toString()
@@ -400,15 +476,28 @@ private fun WidgetPicker(widgets: WidgetController, onDismiss: () -> Unit, onCho
                 .getOrDefault(emptyList())
         }
     }
+    var query by rememberSaveable { mutableStateOf("") }
+    val matches = providers.orEmpty().filter { (provider, appLabel) ->
+        query.isBlank() || "$appLabel ${provider.loadLabel(context.packageManager)}".contains(query, ignoreCase = true)
+    }
     val pickerHeight = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, dragHandle = { PrismSheetHandle() }) {
         Text(stringResource(R.string.widget_picker), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp))
+        OutlinedTextField(query, { query = it }, singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).testTag("widget-search"),
+            placeholder = { Text(stringResource(R.string.search_widgets)) }, leadingIcon = { Icon(Icons.Rounded.Search, null) })
         if (providers == null) LinearProgressIndicator(Modifier.fillMaxWidth())
         else if (providers!!.isEmpty()) Text(stringResource(R.string.no_widgets), modifier = Modifier.padding(28.dp))
-        LazyColumn(Modifier.fillMaxWidth().height(pickerHeight).navigationBarsPadding(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-            items(providers.orEmpty(), key = { it.first.provider.flattenToString() }) { (provider, appLabel) ->
-                TextButton(onClick = { onChoose(provider) }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
-                    Column(Modifier.fillMaxWidth()) {
+        LazyColumn(Modifier.fillMaxWidth().height(pickerHeight).navigationBarsPadding().testTag("widget-picker"), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+            if (providers != null && providers!!.isNotEmpty() && matches.isEmpty()) item {
+                Text(stringResource(R.string.empty_search), Modifier.padding(16.dp), color = Muted)
+            }
+            items(matches, key = { it.first.provider.flattenToString() }) { (provider, appLabel) ->
+                TextButton(onClick = { onChoose(provider) }, modifier = Modifier.fillMaxWidth()
+                    .testTag("widget-provider-${provider.provider.flattenToString()}"), contentPadding = PaddingValues(16.dp)) {
+                    Column(Modifier.fillMaxWidth().prismPanel(LocalPrismEffects.current, 20.dp, false).padding(16.dp)) {
+                        WidgetPreview(provider)
                         Text(provider.loadLabel(context.packageManager), color = Paper, style = MaterialTheme.typography.titleMedium)
                         Text(appLabel, color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
@@ -416,4 +505,26 @@ private fun WidgetPicker(widgets: WidgetController, onDismiss: () -> Unit, onCho
             }
         }
     }
+}
+
+@Composable
+private fun WidgetPreview(provider: AppWidgetProviderInfo) {
+    val context = LocalContext.current
+    val preview by produceState<Bitmap?>(null, provider.provider) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val drawable = provider.loadPreviewImage(context, context.resources.displayMetrics.densityDpi)
+                    ?: provider.loadIcon(context, context.resources.displayMetrics.densityDpi)
+                drawable?.let {
+                    val width = it.intrinsicWidth.coerceIn(1, 720)
+                    val height = it.intrinsicHeight.coerceIn(1, 480)
+                    it.toBitmap(width, height)
+                }
+            }.getOrNull()
+        }
+    }
+    val bitmap = preview
+    if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxWidth().height(112.dp).padding(bottom = 16.dp),
+        contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+    else Icon(Icons.Rounded.Widgets, null, Modifier.size(48.dp).padding(bottom = 12.dp), tint = Muted)
 }
