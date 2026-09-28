@@ -32,6 +32,9 @@ pub(crate) fn application_roots() -> Vec<PathBuf> {
         // Safari in /Applications can link into the system Cryptex app volume.
         // Resolve this root too so discovery and launch validation agree.
         PathBuf::from("/System/Cryptexes/App/System/Applications"),
+        // Finder lives outside the application directories. Include its bundle
+        // without exposing the background services beside it as launcher apps.
+        PathBuf::from("/System/Library/CoreServices/Finder.app"),
     ];
     if let Some(home) = home_dir() {
         roots.push(home.join("Applications"));
@@ -114,6 +117,15 @@ fn insert_app(apps: &mut BTreeMap<String, NativeApplication>, name: String, path
 
 #[cfg(target_os = "macos")]
 fn scan_root(root: &Path, apps: &mut BTreeMap<String, NativeApplication>) {
+    if root.extension().and_then(|value| value.to_str()) == Some("app") {
+        if root.is_dir() {
+            if let Some(name) = root.file_stem().and_then(|value| value.to_str()) {
+                insert_app(apps, name.to_string(), root.to_path_buf());
+            }
+        }
+        return;
+    }
+
     fn visit(root: &Path, depth: usize, apps: &mut BTreeMap<String, NativeApplication>) {
         if depth > 2 {
             return;
@@ -331,6 +343,28 @@ mod tests {
             validated_target(safari.to_str().unwrap()).unwrap(),
             safari.canonicalize().unwrap()
         );
+    }
+
+    #[test]
+    fn discovers_and_validates_finder_without_exposing_other_core_services() {
+        let finder = Path::new("/System/Library/CoreServices/Finder.app");
+        let applications = discover();
+        let matches: Vec<_> = applications
+            .iter()
+            .filter(|app| app.name == "Finder")
+            .collect();
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(Path::new(&matches[0].path), finder);
+        assert_eq!(matches[0].id, application_id(finder.to_str().unwrap()));
+        assert_eq!(
+            validated_target(&matches[0].path).unwrap(),
+            finder.canonicalize().unwrap()
+        );
+        assert!(!applications
+            .iter()
+            .any(|app| app.path == "/System/Library/CoreServices/Dock.app"));
+        assert!(validated_target("/System/Library/CoreServices/Dock.app").is_err());
     }
 
     #[test]

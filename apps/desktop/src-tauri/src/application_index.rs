@@ -557,4 +557,24 @@ mod tests {
         assert!(index.lookup("Code").is_none());
         assert!(index.lookup("missing").is_none());
     }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn refreshed_and_persisted_catalog_finds_finder_by_name_and_korean_alias() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("applications.sqlite3");
+        let index = ApplicationIndex::open(&database_path).unwrap();
+        index.refresh().unwrap();
+
+        for catalog in [index, ApplicationIndex::open(&database_path).unwrap()] {
+            for query in ["finder", "Finder", "파인더", "ㅍㅇㄷ"] {
+                let results = catalog.search(query, 40);
+                let finder = results.first().expect("Finder search result");
+                assert_eq!(finder.name, "Finder", "{query}");
+                assert_eq!(finder.path, "/System/Library/CoreServices/Finder.app");
+                assert!(catalog.contains(&finder.id, &finder.path));
+                assert!(app_catalog::validated_target(&finder.path).is_ok());
+            }
+        }
+    }
 }
