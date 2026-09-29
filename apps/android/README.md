@@ -28,11 +28,22 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
 
 ## First-version behavior
 
-- Prism appearance uses near-black glass surfaces, restrained white rim reflections, a plain digital
-  clock, and actual battery level. Settings offer four accent colors, wallpaper dimming, and clock visibility. Lighting is static; the clock and battery refresh only while home
-  is visible. Settings can independently disable Prism lighting and the Prism icon theme.
-- The icon theme frames real app icons in beveled monochrome tiles. Android 13+ monochrome assets
-  are used when provided; other icons retain their original artwork with saturation removed.
+- Settings offer independent Flat, Matte, and Liquid Glass surface modes, plus explicit Original icons
+  and Themed icons choices that persist independently of the surface material.
+  Matte uses opaque charcoal surfaces with cached upper-left highlights and lower-right shadows;
+  panels and icon tiles appear raised, while the battery strip is recessed.
+- Liquid Glass requires Android 13+ and uses an AGSL shader to refract actual background pixels
+  through curved edges, with background-derived Fresnel reflections and subtle dispersion.
+  A faint fixed rim defines thickness. Touch and device tilt do not change the material;
+  no sensor listener, camera, or continuous animation loop is used.
+  Android restricts reading the system wallpaper, so glass uses a built-in background or a photo
+  copied into private app storage. The system wallpaper remains unchanged. Glass background dimming
+  is stored separately from the other modes, and older Android versions fall back to Matte.
+- The clock and actual battery level refresh only while home is visible. Settings also offer four
+  accent colors, wallpaper dimming, and clock visibility.
+- The icon theme frames real app symbols in the selected material with restrained accent colors.
+  Android 13+ monochrome assets are preferred, followed by adaptive foregrounds and legacy artwork.
+  Neutral uses stable per-app accents; selecting an accent color applies it to the themed symbols.
   Turning the theme off restores full-color app icons. No external icon-pack support is implied.
 - Home widgets share the Prism frame, while third-party widget contents and gestures remain under
   their provider's control. Search, app/folder sheets, and settings use the same colors and shapes.
@@ -44,23 +55,43 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
 - Edit home includes Create folder. Folders open as pop-ups; long-press a folder to rename it,
   select apps, or delete it after confirmation. Folder membership and order persist on device;
   deleting a folder never removes installed apps or favorites.
-- Choose favorites opens a dedicated selection screen: tapping a row or its star toggles a favorite
-  without launching an app. An Add apps button follows the last favorite; the search palette provides it too.
-  Selections persist immediately and survive activity recreation.
+- Manage favorites combines app selection, removal, and ordering in one screen. Selected apps appear
+  first and have move-up/down controls; tapping a row or star never launches an app. Empty homes show
+  Add apps; home editing and the search palette open the same manager. Home editing is labeled
+  separately for arranging the home and its folders. Selections and order persist immediately.
+- Settings → Side index chooses alphabetical or category browsing in the same edge gesture.
+  Categories replace letters on the rail; there is no separate grid or drawer button. While held,
+  a category's first app starts at 35% of safe content height; releasing restores the complete grouped
+  list at the same position. Both edges support the gesture, and All apps opens this same list.
+  Android-declared categories and conservative local hints supply the grouping; unknown apps remain
+  in Other. Long-press an app and choose Change category to override its group or return to Automatic.
+  Overrides and the browsing mode persist without changing favorites or home folders.
+- Category browsing supports food, maps/transit, travel, shopping, finance, productivity, utilities,
+  browsers, photos, video, music, health, education, reading, news, games, communication, legacy media,
+  and Other. Only populated groups appear. Localized/English app names and conservative package hints
+  refine Android's broad metadata; explicit game declarations remain games. Unrecognized apps fall
+  back to Other, and manual choices always win. The local rules are not exhaustive store metadata.
+  Recently used is a separate, automatically ordered group of up to 12 apps opened from Prism,
+  including app shortcuts. These apps also remain in their normal categories. No usage-access
+  permission, background usage polling, or network lookup is required.
+  Food identity rules include the publisher-listed packages for
+  [Baemin](https://play.google.com/store/apps/details?id=com.sampleapp) and
+  [Coupang Eats](https://play.google.com/store/apps/details?id=com.coupang.mobile.eats).
 - Returning to favorites brings the home surface down from above with a short eased transition.
   The edge rail remains mounted during navigation so a held browsing gesture stays continuous.
   Compose respects the Android animation duration setting; there is no permanent animation loop.
 - Long-press and drag a favorite to reorder it, with a lifted surface and edge auto-scrolling.
   Order persists immediately; accessibility actions also support moving up/down and opening app actions.
 - The home screen uses a plain clock panel, icon-and-label favorites, and a dark wallpaper scrim.
-  There are no permanent search or app-drawer buttons on home. Long-press empty home space to open settings.
+  There are no permanent search or app-drawer buttons on home. Long-press empty home space to enter
+  editing; Done returns to the normal home screen. Settings remain available from the clock or search palette.
 - Touch and hold either edge directly from home, then slide vertically to browse apps
   without opening the keyboard. Every letter keeps its vertical position throughout the gesture. Only horizontal displacement
   forms a broad curve around the finger; distant letters join the inward pull. The selected letter appears
   as a separate, unboxed preview inward from the alphabet. Pulling inward moves the arc away from
   the thumb, and release folds it back while preserving the list position. Haptics fire once per letter.
 - Browsing uses smaller app labels, consistent icon spacing, and no top toolbar. The search control
-  hides during index dragging. The chosen group begins above the thumb so several rows are visible
+  hides during index dragging. In full-list mode, the chosen group begins above the thumb so several rows are visible
   around it. Long-press empty space for settings; Back or the star returns home.
 - The complete `★`, Korean, `A–Z`, and `#` index appears by default, including empty sections.
   Settings → Alphabet index can hide empty letters and switch Korean display between `가 · 나 · 다` and `ㄱ · ㄴ · ㄷ`.
@@ -68,8 +99,10 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
   without an English label remain reachable under `#`. Displayed app names and Korean search stay
   unchanged. All index preferences persist locally.
 - Index browsing can scroll the complete list or show only the selected letter’s apps. The latter
-  keeps unrelated groups out of the list and shows an empty state for letters without apps. The
-  All apps palette command opens the complete catalog.
+  isolates the group only while the rail is held and starts its first app at 35% of safe content
+  height, independent of finger position. Releasing restores neighboring groups while preserving
+  the selected app's position, then permits normal scrolling in either direction. Empty letters show
+  an empty state while held and resolve to the next available group on release.
   In the full-alphabet mode, the list interpolates through gaps between installed groups.
 - Swipe upward from the bottom home area or past the end of the favorites list to open
   the Prism palette. Its top input sits beside the back arrow and searches apps and local commands
@@ -88,8 +121,9 @@ pinned in `gradle/wrapper/gradle-wrapper.properties`. Dependencies are pinned to
   configuration, then adds it to a real Android widget stack, replacing the built-in clock. Existing single
   widgets migrate without rebinding. Binding uses Android consent and provider configuration; a new
   widget joins the stack only after both succeed. Cancellation keeps the entire previous stack.
-  Swipe the control strip below a widget or use its arrows to switch; widget content retains its own
-  touch gestures. Selection and each widget's height survive restarts. Removal asks for confirmation
+  Swipe across widget pages or use the page indicators and arrows to switch. Widget taps and vertical
+  scrolling stay native; the control strip is also swipeable for providers that own horizontal gestures.
+  Selection and each widget's height survive restarts. Removal asks for confirmation
   and deletes only the selected widget; removing the last restores the clock. The host listens only while the activity is started.
 - Optional double-tap locking applies to the clock and empty footer. A disclosure precedes opening
   Accessibility settings; the user must enable the service there. The service requests no window content,
