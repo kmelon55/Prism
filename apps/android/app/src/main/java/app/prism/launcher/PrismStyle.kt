@@ -19,8 +19,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -28,8 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.cos
-import kotlin.math.sin
 
 internal val Ink = Color(0xFF050505)
 internal val Paper = Color(0xFFF2F2F2)
@@ -47,11 +46,16 @@ internal val PrismCyan = Color(0xFF91DFE8)
 internal val PrismEmber = Color(0xFFFF7755)
 internal val LocalPrismEffects = staticCompositionLocalOf { true }
 internal val LocalPrismIcons = staticCompositionLocalOf { true }
+internal val LocalPrismAppearance = staticCompositionLocalOf { PrismAppearance.Matte }
 
 @Composable
-internal fun PrismTheme(effects: Boolean, icons: Boolean, accent: String, wallpaperDim: Float, content: @Composable () -> Unit) {
+internal fun PrismTheme(effects: Boolean, icons: Boolean, accent: String, wallpaperDim: Float,
+    appearance: PrismAppearance = if (effects) PrismAppearance.Matte else PrismAppearance.Flat,
+    glassBackgroundRevision: Long = 0L, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalPrismEffects provides effects, LocalPrismIcons provides icons,
-        LocalPrismAccent provides themeAccent(accent), LocalWallpaperDim provides wallpaperDim) {
+        LocalPrismAccent provides themeAccent(accent), LocalWallpaperDim provides wallpaperDim,
+        LocalPrismAppearance provides appearance) {
+        GlassEnvironment(appearance == PrismAppearance.Liquid && android.os.Build.VERSION.SDK_INT >= 33, glassBackgroundRevision) {
         MaterialTheme(
             colorScheme = darkColorScheme(
                 primary = themeAccent(accent), onPrimary = Ink,
@@ -72,59 +76,123 @@ internal fun PrismTheme(effects: Boolean, icons: Boolean, accent: String, wallpa
                 labelSmall = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp),
             ), content = content,
         )
+        }
     }
 }
 
-/** All illumination is cached static drawing: no animation loop or off-screen blur. */
+/** The glass sampler and visible background use the same center-cropped, app-owned bitmap. */
 @Composable
 internal fun PrismBackdrop(modifier: Modifier = Modifier) {
     val effects = LocalPrismEffects.current
     val dim = LocalWallpaperDim.current
+    val scene = LocalGlassScene.current
+    val paint = remember { android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG) }
     Canvas(modifier.fillMaxSize()) {
+        if (scene != null) drawIntoCanvas {
+            it.nativeCanvas.drawBitmap(scene.bitmap, null, glassBackdropRect(scene.bitmap, size), paint)
+        }
         drawRect(Color.Black.copy(alpha = dim))
-        if (effects) {
+        if (effects && scene == null) {
             drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = .035f), Color.Transparent),
                 Offset(size.width * .12f, 0f), size.width * 1.1f))
         }
     }
 }
 
+/** Matte raised material. Soft opposing shadows are cached geometry, not animated blur. */
+@Composable
 internal fun Modifier.prismPanel(effects: Boolean, radius: Dp = 28.dp, luminous: Boolean = true): Modifier {
+    val scene = LocalGlassScene.current
+    if (effects && LocalPrismAppearance.current == PrismAppearance.Liquid && scene != null && android.os.Build.VERSION.SDK_INT >= 33) {
+        return liquidGlassPanel(scene, radius)
+    }
+    return mattePanel(effects, radius, luminous)
+}
+
+private fun Modifier.mattePanel(effects: Boolean, radius: Dp, luminous: Boolean): Modifier {
     val shape = RoundedCornerShape(radius)
-    return shadow(20.dp, shape, ambientColor = Color(0x66000000), spotColor = Color(0x99000000))
+    if (!effects) return shadow(20.dp, shape, ambientColor = Color(0x66000000), spotColor = Color(0x99000000))
         .clip(shape)
-        .background(Brush.linearGradient(if (effects)
-            listOf(Color(0x382E2E2E), Color(0x68101010), Color(0x38202020))
-            else listOf(Color(0xFF181818), Color(0xFF101010))))
-        .drawWithCache {
-            val rim = Brush.linearGradient(listOf(Color.White.copy(alpha = .28f), Color.White.copy(alpha = .05f),
-                Color.White.copy(alpha = .12f), Color.White.copy(alpha = .16f)))
-            val innerRim = Brush.verticalGradient(listOf(Color.White.copy(alpha = .12f), Color.Transparent, Color.Black.copy(alpha = .28f)))
-            val sheen = Brush.verticalGradient(listOf(Color.White.copy(alpha = .06f), Color.White.copy(alpha = .012f)))
-            val reflection = Path().apply {
-                moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(size.width, size.height * .15f)
-                cubicTo(size.width * .68f, size.height * .11f, size.width * .42f, size.height * .5f, 0f, size.height * .46f)
-                close()
-            }
-            val bloom = Brush.radialGradient(listOf(Color.White.copy(alpha = .025f), Color.Transparent),
-                Offset(size.width * .86f, size.height * .95f), size.width * .7f)
-            onDrawBehind {
-                if (effects) {
-                    drawPath(reflection, sheen)
-                    if (luminous) drawRect(bloom)
-                }
-                val inset = .6.dp.toPx()
-                drawRoundRect(if (effects) rim else Brush.linearGradient(listOf(Color(0xFF383838), Color(0xFF242424))),
-                    topLeft = Offset(inset, inset), size = Size(size.width - inset * 2, size.height - inset * 2),
-                    cornerRadius = CornerRadius(radius.toPx()), style = Stroke(1.dp.toPx()))
-                if (effects) {
-                    val inner = 2.dp.toPx()
-                    drawRoundRect(innerRim, topLeft = Offset(inner, inner),
-                        size = Size((size.width - inner * 2).coerceAtLeast(0f), (size.height - inner * 2).coerceAtLeast(0f)),
-                        cornerRadius = CornerRadius((radius.toPx() - inner).coerceAtLeast(0f)), style = Stroke(.7.dp.toPx()))
-                }
+        .background(Brush.linearGradient(listOf(Color(0xFF181818), Color(0xFF101010))))
+        .border(1.dp, Brush.linearGradient(listOf(Color(0xFF383838), Color(0xFF242424))), shape)
+
+    return drawWithCache {
+        val compact = size.minDimension <= 64.dp.toPx()
+        val corner = radius.toPx().coerceAtMost(size.minDimension / 2f)
+        val softness = (if (compact) 6.dp else 12.dp).toPx()
+        val lift = (if (compact) 3.dp else 5.dp).toPx()
+        val layers = (12 downTo 1).map { step ->
+            val fraction = step / 12f
+            softness * fraction to (1f - fraction) / 12f
+        }
+        onDrawBehind {
+            // Draw outside the clipping boundary: light above/left, deeper shade below/right.
+            layers.forEach { (spread, opacity) ->
+                val shadowSize = Size(size.width + spread * 2f, size.height + spread * 2f)
+                val shadowCorner = CornerRadius(corner + spread)
+                drawRoundRect(Color.Black.copy(alpha = opacity * 1.8f),
+                    topLeft = Offset(lift - spread, lift - spread), size = shadowSize, cornerRadius = shadowCorner)
+                drawRoundRect(Color.White.copy(alpha = opacity * if (luminous) .16f else .12f),
+                    topLeft = Offset(-lift * .6f - spread, -lift * .6f - spread),
+                    size = shadowSize, cornerRadius = shadowCorner)
             }
         }
+    }.clip(shape).drawWithCache {
+        val compact = size.minDimension <= 64.dp.toPx()
+        val corner = radius.toPx().coerceAtMost(size.minDimension / 2f)
+        val body = Brush.linearGradient(
+            0f to Color(if (compact) 0xFF242629 else 0xFF202225),
+            .46f to Color(0xFF191B1E),
+            1f to Color(0xFF121416),
+            start = Offset.Zero, end = Offset(size.width * .8f, size.height),
+        )
+        val crown = Brush.radialGradient(
+            listOf(Color.White.copy(alpha = .025f), Color.Transparent),
+            center = Offset(size.width * .18f, 0f), radius = maxOf(size.maxDimension * .8f, 1f),
+        )
+        val edge = Brush.linearGradient(
+            0f to Color.White.copy(alpha = .09f),
+            .35f to Color.White.copy(alpha = .018f),
+            .65f to Color.Transparent,
+            1f to Color.Black.copy(alpha = .24f),
+            start = Offset.Zero, end = Offset(size.width, size.height),
+        )
+        onDrawBehind {
+            drawRect(body)
+            drawRect(crown)
+            val inset = .5.dp.toPx()
+            drawRoundRect(edge, topLeft = Offset(inset, inset),
+                size = Size((size.width - inset * 2).coerceAtLeast(0f), (size.height - inset * 2).coerceAtLeast(0f)),
+                cornerRadius = CornerRadius((corner - inset).coerceAtLeast(0f)), style = Stroke(1.dp.toPx()))
+        }
+    }
+}
+
+/** A quiet inset for information within a raised panel. */
+@Composable
+internal fun Modifier.prismInset(effects: Boolean, radius: Dp = 18.dp): Modifier {
+    if (!effects) return this
+    if (LocalPrismAppearance.current == PrismAppearance.Liquid) return background(Color.Black.copy(alpha = .13f), RoundedCornerShape(radius))
+    return clip(RoundedCornerShape(radius)).drawWithCache {
+        val corner = radius.toPx().coerceAtMost(size.minDimension / 2f)
+        val body = Brush.linearGradient(listOf(Color(0xFF0D0F11), Color(0xFF17191C)))
+        val edge = Brush.verticalGradient(listOf(Color.Black.copy(alpha = .5f), Color.Transparent, Color.White.copy(alpha = .045f)))
+        val shade = Brush.verticalGradient(listOf(Color.Black.copy(alpha = .25f), Color.Transparent), endY = 8.dp.toPx())
+        onDrawBehind {
+            drawRect(body)
+            drawRect(shade)
+            val inset = .5.dp.toPx()
+            drawRoundRect(edge, topLeft = Offset(inset, inset),
+                size = Size((size.width - inset * 2).coerceAtLeast(0f), (size.height - inset * 2).coerceAtLeast(0f)),
+                cornerRadius = CornerRadius((corner - inset).coerceAtLeast(0f)), style = Stroke(1.dp.toPx()))
+        }
+    }
+}
+
+internal fun prismIconAccent(id: String): Color {
+    val colors = listOf(Color(0xFF61C4EE), Color(0xFFFD796A), Color(0xFFAD96EB),
+        Color(0xFF68CCB0), Color(0xFFE8BC67), Color(0xFFE387B3))
+    return colors[Math.floorMod(id.hashCode(), colors.size)]
 }
 
 @Composable

@@ -41,6 +41,11 @@ data class LauncherState(
     val wallpaperDim: Float = .95f,
     val showClock: Boolean = true,
     val prismEffects: Boolean = true,
+    val prismMaterial: String = "matte",
+    val glassWallpaperDim: Float = .22f,
+    val glassBackgroundRevision: Long = 0L,
+    val glassBackgroundLoading: Boolean = false,
+    val glassBackgroundError: Boolean = false,
     val prismIcons: Boolean = true,
     val loading: Boolean = true,
     val error: Boolean = false,
@@ -60,6 +65,9 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
         wallpaperDim = preferences.getFloat("wallpaperDim", .95f).coerceIn(.35f, 1f),
         showClock = preferences.getBoolean("showClock", true),
         prismEffects = preferences.getBoolean("prismEffects", true),
+        prismMaterial = preferences.getString("prismMaterial", "matte") ?: "matte",
+        glassWallpaperDim = preferences.getFloat("glassWallpaperDim", .22f).coerceIn(0f, .8f),
+        glassBackgroundRevision = preferences.getLong("glassBackgroundRevision", 0L),
         prismIcons = preferences.getBoolean("prismIcons", true),
     ))
     val state = mutableState.asStateFlow()
@@ -255,6 +263,35 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setPrismEffects(enabled: Boolean) {
         preferences.edit().putBoolean("prismEffects", enabled).apply()
         mutableState.value = mutableState.value.copy(prismEffects = enabled)
+    }
+
+    fun setAppearance(appearance: PrismAppearance) {
+        val material = if (appearance == PrismAppearance.Flat) mutableState.value.prismMaterial else appearance.key
+        preferences.edit().putBoolean("prismEffects", appearance != PrismAppearance.Flat)
+            .putString("prismMaterial", material).apply()
+        mutableState.value = mutableState.value.copy(prismEffects = appearance != PrismAppearance.Flat, prismMaterial = material)
+    }
+
+    fun setGlassWallpaperDim(value: Float) {
+        val dim = value.coerceIn(0f, .8f)
+        preferences.edit().putFloat("glassWallpaperDim", dim).apply()
+        mutableState.value = mutableState.value.copy(glassWallpaperDim = dim)
+    }
+
+    fun setGlassBackground(uri: android.net.Uri?) {
+        if (mutableState.value.glassBackgroundLoading) return
+        mutableState.value = mutableState.value.copy(glassBackgroundLoading = true, glassBackgroundError = false)
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { GlassBackgroundStore.replace(getApplication(), uri) }
+            }
+            if (result.isSuccess) {
+                val revision = mutableState.value.glassBackgroundRevision + 1L
+                preferences.edit().putLong("glassBackgroundRevision", revision).apply()
+                mutableState.value = mutableState.value.copy(glassBackgroundRevision = revision)
+            }
+            mutableState.value = mutableState.value.copy(glassBackgroundLoading = false, glassBackgroundError = result.isFailure)
+        }
     }
 
     fun setPrismIcons(enabled: Boolean) {

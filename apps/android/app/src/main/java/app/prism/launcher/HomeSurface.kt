@@ -247,11 +247,13 @@ private fun HomeClock() {
                     color = PrismAccent, fontSize = 11.sp)
             }
             Text(now.format(DateTimeFormatter.ofPattern(pattern)), color = Paper, fontSize = 56.sp,
-                fontWeight = FontWeight.Light, letterSpacing = (-2).sp, modifier = Modifier.testTag("home-clock-time"))
-            PrismRule()
-            if (battery >= 0) Row(verticalAlignment = Alignment.CenterVertically) {
+                fontWeight = if (LocalPrismAppearance.current == PrismAppearance.Matte) FontWeight.SemiBold else FontWeight.Light,
+                letterSpacing = (-2).sp, modifier = Modifier.testTag("home-clock-time"))
+            if (battery >= 0) Row(Modifier.fillMaxWidth().prismInset(LocalPrismEffects.current)
+                .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.BatteryFull, null, Modifier.size(20.dp), tint = Muted)
+                    Icon(Icons.Rounded.BatteryFull, null, Modifier.size(20.dp),
+                        tint = if (LocalPrismEffects.current) PrismCyan else Muted)
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(R.string.battery_level, battery), color = Muted, fontSize = 12.sp)

@@ -105,4 +105,17 @@
     <string name="wallpaper_dim">배경 어둡기</string>
     <string name="show_clock">기본 시계</string>
     <string name="search_widgets">앱 및 위젯 검색</string>
+    <string name="surface_style">표면 스타일</string>
+    <string name="surface_flat">플랫</string>
+    <string name="surface_matte">무광 입체</string>
+    <string name="surface_liquid">리퀴드 글래스</string>
+    <string name="glass_requires_android">리퀴드 글래스는 Android 13 이상에서 사용할 수 있어요.</string>
+    <string name="glass_hint">뒤쪽 배경이 유리 가장자리에서 굴절되어 입체감이 생겨요.</string>
+    <string name="glass_background_hint">굴절에 사용할 전용 배경이에요. 기본 배경을 쓰거나 사진을 골라보세요. 시스템 배경화면은 바뀌지 않아요.</string>
+    <string name="glass_choose_image">글래스 배경 선택</string>
+    <string name="glass_default_image">기본 배경 사용</string>
+    <string name="glass_image_error">이미지를 열지 못했어요. 이전 배경은 그대로 유지돼요.</string>
+    <string name="icon_style">아이콘 스타일</string>
+    <string name="icons_original">기본 아이콘</string>
+    <string name="icons_themed">테마 아이콘</string>
 </resources>

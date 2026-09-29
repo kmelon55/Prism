@@ -24,6 +24,9 @@ class MainActivity : ComponentActivity() {
     private val homeRoleRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refreshHomeRole()
     }
+    private val glassBackgroundRequest = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let(model::setGlassBackground)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,6 +96,8 @@ class MainActivity : ComponentActivity() {
     }
 
     fun chooseWallpaper() = openSystem(Intent(Intent.ACTION_SET_WALLPAPER))
+
+    fun chooseGlassBackground() = glassBackgroundRequest.launch("image/*")
 
     fun setScreenLock(enabled: Boolean) {
         getSharedPreferences("launcher", MODE_PRIVATE).edit().putBoolean("screenLock", enabled).apply()

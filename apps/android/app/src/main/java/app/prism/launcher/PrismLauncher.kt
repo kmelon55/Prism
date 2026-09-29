@@ -104,9 +104,12 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
         if (model.launch(app)) home() else activity.message(R.string.open_failed)
     }
 
-    PrismTheme(state.prismEffects, state.prismIcons, state.themeAccent, state.wallpaperDim) {
+    val appearance = PrismAppearance.resolve(state.prismEffects, state.prismMaterial, Build.VERSION.SDK_INT >= 33)
+    PrismTheme(state.prismEffects, state.prismIcons, state.themeAccent,
+        if (appearance == PrismAppearance.Liquid) state.glassWallpaperDim else state.wallpaperDim,
+        appearance, state.glassBackgroundRevision) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, contentColor = Paper) {
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().glassViewport()) {
             PrismBackdrop(Modifier.matchParentSize())
             AnimatedContent(targetState = screen to searchFocused, modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
@@ -252,6 +255,15 @@ internal fun AppRow(app: LauncherApp, alias: String?, modifier: Modifier = Modif
 internal fun AppIcon(app: LauncherApp) {
     val context = LocalContext.current
     val themed = LocalPrismIcons.current
+    val accent = if (PrismAccent == themeAccent("neutral")) prismIconAccent(app.id) else PrismAccent
+    val iconColor = remember(themed, accent) {
+        if (themed) ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
+            .213f * accent.red, .715f * accent.red, .072f * accent.red, 0f, 0f,
+            .213f * accent.green, .715f * accent.green, .072f * accent.green, 0f, 0f,
+            .213f * accent.blue, .715f * accent.blue, .072f * accent.blue, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ))) else null
+    }
     val cacheKey = "${app.id}:${app.iconRevision}:$themed"
     val bitmap by produceState<Bitmap?>(AppIcons.cache.get(cacheKey), cacheKey) {
         value = AppIcons.cache.get(cacheKey)
@@ -260,7 +272,8 @@ internal fun AppIcon(app: LauncherApp) {
                 val drawable = context.getSystemService(LauncherApps::class.java).getActivityList(app.component.packageName, app.user)
                     .find { it.componentName == app.component }?.getBadgedIcon(context.resources.displayMetrics.densityDpi)
                 val mono = if (themed && Build.VERSION.SDK_INT >= 33) (drawable as? AdaptiveIconDrawable)?.monochrome else null
-                val icon = mono?.mutate()?.apply { setTint(android.graphics.Color.WHITE) } ?: drawable
+                val icon = mono?.mutate()?.apply { setTint(android.graphics.Color.WHITE) }
+                    ?: if (themed && drawable is AdaptiveIconDrawable) drawable.foreground else drawable
                 icon?.toBitmap(96, 96)?.also { AppIcons.cache.put(cacheKey, it) }
             }.getOrNull()
         }
@@ -270,8 +283,8 @@ internal fun AppIcon(app: LauncherApp) {
         val rendered = bitmap
         if (rendered != null) Image(rendered.asImageBitmap(), null,
             Modifier.size(if (themed) 27.dp else 36.dp).clip(RoundedCornerShape(if (themed) 7.dp else 10.dp)),
-            colorFilter = if (themed) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null)
-        else Text(app.label.take(1), color = PrismAccent, fontSize = 16.sp)
+            colorFilter = iconColor)
+        else Text(app.label.take(1), color = if (themed) accent else PrismAccent, fontSize = 16.sp)
     }
 }
 
@@ -321,6 +334,7 @@ private fun ActiveHomeWidget(widgets: WidgetController) {
 
 @Composable
 private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: LauncherState, onBack: () -> Unit, onAddWidget: () -> Unit, onEditHome: () -> Unit) {
+    val appearance = LocalPrismAppearance.current
     val isHome by activity.defaultHome.collectAsStateWithLifecycle()
     val widgetId by activity.widgets.activeId.collectAsStateWithLifecycle()
     val lockRequested by activity.lockRequested.collectAsStateWithLifecycle()
@@ -336,6 +350,36 @@ private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: 
             PrismPanel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SettingsLabel(R.string.prism_theme, R.string.prism_theme_hint)
+                    Text(stringResource(R.string.surface_style), color = Muted)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(PrismAppearance.Flat to R.string.surface_flat, PrismAppearance.Matte to R.string.surface_matte,
+                            PrismAppearance.Liquid to R.string.surface_liquid).forEach { (mode, label) ->
+                            FilterChip(selected = appearance == mode, onClick = { model.setAppearance(mode) },
+                                enabled = mode != PrismAppearance.Liquid || Build.VERSION.SDK_INT >= 33,
+                                modifier = Modifier.testTag("appearance-${mode.key}"), label = { Text(stringResource(label)) })
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT < 33) Text(stringResource(R.string.glass_requires_android), color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.icon_style), color = Muted)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !state.prismIcons, onClick = { model.setPrismIcons(false) },
+                            modifier = Modifier.testTag("icons-original"), label = { Text(stringResource(R.string.icons_original)) })
+                        FilterChip(selected = state.prismIcons, onClick = { model.setPrismIcons(true) },
+                            modifier = Modifier.testTag("icons-themed"), label = { Text(stringResource(R.string.icons_themed)) })
+                    }
+                    if (appearance == PrismAppearance.Liquid) {
+                        Text(stringResource(R.string.glass_hint), color = Muted, style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.glass_background_hint), color = Muted, style = MaterialTheme.typography.bodySmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = activity::chooseGlassBackground, enabled = !state.glassBackgroundLoading,
+                                modifier = Modifier.testTag("glass-choose-image")) { Text(stringResource(R.string.glass_choose_image)) }
+                            TextButton(onClick = { model.setGlassBackground(null) }, enabled = !state.glassBackgroundLoading) {
+                                Text(stringResource(R.string.glass_default_image))
+                            }
+                        }
+                        if (state.glassBackgroundLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        if (state.glassBackgroundError) Text(stringResource(R.string.glass_image_error), color = MaterialTheme.colorScheme.error)
+                    }
                     Text(stringResource(R.string.theme_accent), color = Muted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("neutral" to R.string.accent_neutral, "blue" to R.string.accent_blue,
@@ -347,23 +391,16 @@ private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: 
                         }
                     }
                     Text(stringResource(R.string.wallpaper_dim), color = Muted)
-                    Slider(value = state.wallpaperDim, onValueChange = model::setWallpaperDim, valueRange = .35f..1f,
+                    Slider(value = if (appearance == PrismAppearance.Liquid) state.glassWallpaperDim else state.wallpaperDim,
+                        onValueChange = { if (appearance == PrismAppearance.Liquid) model.setGlassWallpaperDim(it) else model.setWallpaperDim(it) },
+                        valueRange = if (appearance == PrismAppearance.Liquid) 0f.. .8f else .35f..1f,
                         modifier = Modifier.testTag("wallpaper-dim").semantics { contentDescription = activity.getString(R.string.wallpaper_dim) })
-                    TextButton(onClick = activity::chooseWallpaper) { Text(stringResource(R.string.choose_wallpaper)) }
+                    if (appearance != PrismAppearance.Liquid) TextButton(onClick = activity::chooseWallpaper) { Text(stringResource(R.string.choose_wallpaper)) }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.show_clock), Modifier.weight(1f))
                         Switch(state.showClock, model::setShowClock, modifier = Modifier.testTag("show-clock"))
                     }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.prism_effects), Modifier.weight(1f))
-                        Switch(state.prismEffects, model::setPrismEffects,
-                            modifier = Modifier.semantics { contentDescription = activity.getString(R.string.prism_effects) })
-                    }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.prism_icons), Modifier.weight(1f))
-                        Switch(state.prismIcons, model::setPrismIcons,
-                            modifier = Modifier.semantics { contentDescription = activity.getString(R.string.prism_icons) })
-                    }
+
                 }
             }
             SettingsLabel(R.string.default_launcher, if (isHome) R.string.default_active else R.string.default_launcher_hint)

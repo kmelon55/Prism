@@ -402,6 +402,38 @@ class LauncherFlowTest {
         } finally { rule.mainClock.autoAdvance = true }
     }
 
+    @Test fun surfaceModesPersistIndependentlyOfIconAndWallpaperPreferences() {
+        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 33)
+        home()
+        catalog()
+        val model = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+        val previous = model.state.value
+        try {
+            openSearch()
+            rule.onNode(hasSetTextAction()).performTextInput(text(R.string.settings))
+            rule.onNodeWithTag("palette-command-Settings").performClick()
+            for (appearance in listOf(PrismAppearance.Liquid, PrismAppearance.Matte, PrismAppearance.Flat, PrismAppearance.Liquid)) {
+                rule.onNodeWithTag("appearance-${appearance.key}").performScrollTo().performClick()
+                rule.activityRule.scenario.recreate()
+                rule.onNodeWithTag("appearance-${appearance.key}").performScrollTo().assertIsSelected()
+                val current = ViewModelProvider(rule.activity)[LauncherModel::class.java].state.value
+                org.junit.Assert.assertEquals(appearance, PrismAppearance.resolve(current.prismEffects, current.prismMaterial))
+                org.junit.Assert.assertEquals(previous.prismIcons, current.prismIcons)
+                org.junit.Assert.assertEquals(previous.wallpaperDim, current.wallpaperDim)
+            }
+            screenshot("liquid-mode-settings.png")
+            home()
+            screenshot("liquid-mode-home.png")
+        } finally {
+            rule.runOnIdle {
+                val current = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+                current.setAppearance(if (previous.prismMaterial == "liquid") PrismAppearance.Liquid else PrismAppearance.Matte)
+                current.setPrismEffects(previous.prismEffects)
+            }
+            home()
+        }
+    }
+
     @Test fun prismThemePersistsAndRendersLauncherSurfaces() {
         home()
         val apps = catalog().take(5)
@@ -410,7 +442,7 @@ class LauncherFlowTest {
         var folderId: String? = null
         try {
             rule.runOnIdle {
-                model.setPrismEffects(true)
+                model.setAppearance(PrismAppearance.Matte)
                 model.setPrismIcons(true)
                 apps.filterNot { it.id in model.state.value.favorites }.forEach { model.toggleFavorite(it.id) }
                 model.saveFolder(null, "Prism preview", apps.take(3).map { it.id })
@@ -430,20 +462,22 @@ class LauncherFlowTest {
             screenshot("prism-theme-search.png")
             rule.onNode(hasSetTextAction()).performTextInput(text(R.string.settings))
             rule.onNodeWithTag("palette-command-Settings").performClick()
-            rule.onNodeWithContentDescription(text(R.string.prism_effects)).performScrollTo().performClick()
-            rule.onNodeWithContentDescription(text(R.string.prism_icons)).performScrollTo().performClick()
+            rule.onNodeWithTag("appearance-flat").performScrollTo().performClick()
+            rule.onNodeWithTag("icons-original").performScrollTo().performClick()
             rule.activityRule.scenario.recreate()
-            rule.onNodeWithContentDescription(text(R.string.prism_effects)).performScrollTo().assertIsOff()
-            rule.onNodeWithContentDescription(text(R.string.prism_icons)).performScrollTo().assertIsOff()
+            rule.onNodeWithTag("appearance-flat").performScrollTo().assertIsSelected()
+            rule.onNodeWithTag("icons-original").performScrollTo().assertIsSelected()
             val preferences = rule.activity.getSharedPreferences("launcher", android.content.Context.MODE_PRIVATE)
             org.junit.Assert.assertFalse(preferences.getBoolean("prismEffects", true))
             org.junit.Assert.assertFalse(preferences.getBoolean("prismIcons", true))
-            rule.onNodeWithContentDescription(text(R.string.prism_effects)).performScrollTo().performClick()
-            rule.onNodeWithContentDescription(text(R.string.prism_icons)).performScrollTo().performClick()
+            screenshot("prism-theme-settings-flat.png")
+            rule.onNodeWithTag("appearance-matte").performScrollTo().performClick()
+            rule.onNodeWithTag("icons-themed").performScrollTo().performClick()
             screenshot("prism-theme-settings.png")
         } finally {
             rule.runOnIdle {
                 val current = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+                current.setAppearance(if (previous.prismMaterial == "liquid") PrismAppearance.Liquid else PrismAppearance.Matte)
                 current.setPrismEffects(previous.prismEffects)
                 current.setPrismIcons(previous.prismIcons)
                 current.state.value.favorites.filterNot { it in previous.favorites }.forEach { current.toggleFavorite(it) }

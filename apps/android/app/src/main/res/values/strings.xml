@@ -105,4 +105,17 @@
     <string name="wallpaper_dim">Background darkness</string>
     <string name="show_clock">Built-in clock</string>
     <string name="search_widgets">Search apps and widgets</string>
+    <string name="surface_style">Surface style</string>
+    <string name="surface_flat">Flat</string>
+    <string name="surface_matte">Matte depth</string>
+    <string name="surface_liquid">Liquid Glass</string>
+    <string name="glass_requires_android">Liquid Glass requires Android 13 or later.</string>
+    <string name="glass_hint">The background bends through the glass edges, giving the surface depth.</string>
+    <string name="glass_background_hint">Uses its own background for refraction. Choose a photo or keep the built-in background; your system wallpaper stays unchanged.</string>
+    <string name="glass_choose_image">Choose glass background</string>
+    <string name="glass_default_image">Use default background</string>
+    <string name="glass_image_error">Could not open this image. Your previous background is unchanged.</string>
+    <string name="icon_style">Icon style</string>
+    <string name="icons_original">Original icons</string>
+    <string name="icons_themed">Themed icons</string>
 </resources>
