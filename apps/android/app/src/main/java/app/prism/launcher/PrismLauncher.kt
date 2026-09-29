@@ -138,7 +138,7 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                     onLock = activity::lockScreen,
                     defaultHome = defaultHome, onChooseHome = activity::chooseHome,
                 )
-                "favorites" -> FavoritesPicker(state, model::toggleFavorite, onDone = ::home)
+                "favorites" -> FavoritesPicker(state, model::toggleFavorite, model::moveFavorite, onDone = ::home)
                 "apps" -> if (route.second) PrismSearchScreen(state, query, { query = it }, launch,
                     onSelect = { keyboard?.hide(); selectedId = it.id }, onBack = ::home, onRetry = model::refresh,
                     onCommand = { command ->
@@ -149,7 +149,7 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                             PaletteCommand.ChooseFavorites -> screen = "favorites"
                             PaletteCommand.EditHome -> { home(); editingHome = true }
                             PaletteCommand.Wallpaper -> activity.chooseWallpaper()
-                            PaletteCommand.AllApps -> { query = ""; browseSection = null; searchFocused = false }
+                            PaletteCommand.AllApps -> { query = ""; browseSection = null; searchFocused = false; screen = "apps" }
                         }
                     })
                 else AlphabetApps(state, browseSection, browseAnchor, browsePosition, railDragging, launch,

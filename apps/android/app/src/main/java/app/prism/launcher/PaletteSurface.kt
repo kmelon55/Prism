@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.sp
 
 internal enum class PaletteCommand(val title: Int, val keywords: String, val icon: ImageVector) {
     Settings(R.string.settings, "settings 설정", Icons.Rounded.Tune),
-    ChooseFavorites(R.string.add_favorites, "favorites add apps 즐겨찾기 추가 앱 선택", Icons.Rounded.Star),
-    EditHome(R.string.edit_home, "edit favorites home 즐겨찾기 편집 홈", Icons.Rounded.StarOutline),
+    ChooseFavorites(R.string.manage_favorites, "favorites edit add apps 즐겨찾기 편집 추가 앱 선택", Icons.Rounded.Star),
+    EditHome(R.string.edit_home, "edit home folders 홈 편집 폴더", Icons.Rounded.DashboardCustomize),
     Wallpaper(R.string.choose_wallpaper, "wallpaper background 배경화면", Icons.Rounded.Wallpaper),
     Widgets(R.string.add_widget, "widgets add 위젯 추가", Icons.Rounded.Widgets),
     AllApps(R.string.all_apps, "all apps 전체 앱 목록", Icons.Rounded.Apps),
@@ -157,15 +157,16 @@ private fun PaletteAction(title: String, icon: ImageVector, onClick: () -> Unit,
 
 
 @Composable
-internal fun FavoritesPicker(state: LauncherState, onToggle: (String) -> Unit, onDone: () -> Unit) {
+internal fun FavoritesPicker(state: LauncherState, onToggle: (String) -> Unit, onMove: (String, Int) -> Unit, onDone: () -> Unit) {
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
-    val apps = remember(state.apps, state.aliases, query) {
+    val apps = remember(state.apps, state.aliases, state.favorites, query) {
         state.apps.filter { query.isBlank() || AppSearch.score(SearchableApp(it.id, it.label, state.aliases[it.id].orEmpty()), query) != null }
+            .sortedBy { state.favorites.indexOf(it.id).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
     }
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().testTag("favorites-picker")) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
-            Text(stringResource(R.string.favorites), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.manage_favorites), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             TextButton(onClick = onDone, modifier = Modifier.testTag("favorites-done")) { Text(stringResource(R.string.done)) }
         }
         OutlinedTextField(query, { query = it }, singleLine = true,
@@ -188,6 +189,16 @@ internal fun FavoritesPicker(state: LauncherState, onToggle: (String) -> Unit, o
                         Icon(if (favorite) Icons.Rounded.Star else Icons.Rounded.StarOutline,
                             stringResource(if (favorite) R.string.remove_favorite else R.string.add_favorite),
                             tint = if (favorite) PrismAccent else Muted)
+                    }
+                    if (favorite && query.isBlank()) {
+                        IconButton(onClick = { onMove(app.id, -1) }, enabled = state.favorites.indexOf(app.id) > 0,
+                            modifier = Modifier.testTag("favorite-up-${app.id}")) {
+                            Icon(Icons.Rounded.KeyboardArrowUp, stringResource(R.string.move_up))
+                        }
+                        IconButton(onClick = { onMove(app.id, 1) }, enabled = state.favorites.indexOf(app.id) < state.favorites.lastIndex,
+                            modifier = Modifier.testTag("favorite-down-${app.id}")) {
+                            Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.move_down))
+                        }
                     }
                 }
             }

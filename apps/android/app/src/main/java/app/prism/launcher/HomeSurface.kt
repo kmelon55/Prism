@@ -88,7 +88,7 @@ internal fun HomeScreen(
     val threshold = with(LocalDensity.current) { 56.dp.toPx() }
     val searchLabel = stringResource(R.string.search_apps)
     val latestSearch by rememberUpdatedState(onSearch)
-    val latestSettings by rememberUpdatedState(onSettings)
+    val enterEditing by rememberUpdatedState({ if (!editing) onEdit() })
     val latestLock by rememberUpdatedState(onLock)
     val searchScroll = remember(threshold) {
         object : NestedScrollConnection {
@@ -111,7 +111,7 @@ internal fun HomeScreen(
         val topSpace = (maxHeight * .07f).coerceIn(24.dp, 52.dp)
         LazyColumn(
             Modifier.fillMaxSize().padding(end = 52.dp, bottom = 40.dp)
-                .testTag("home-list").favoriteDrag(drag, state.favorites, onMove, onSettings),
+                .testTag("home-list").favoriteDrag(drag, state.favorites, onMove, enterEditing),
             state = listState,
             contentPadding = PaddingValues(start = 24.dp, top = topSpace, bottom = 24.dp),
         ) {
@@ -165,13 +165,13 @@ internal fun HomeScreen(
                     if (editing || dragging) Icon(Icons.Rounded.DragHandle, null, tint = Muted, modifier = Modifier.size(20.dp))
                 }
             }
-            item("add-favorites") {
+            if (editing || (!state.loading && favorites.isEmpty())) item("add-favorites") {
                 TextButton(onClick = onChooseFavorites, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
                     .testTag("add-favorites").prismPanel(LocalPrismEffects.current, 20.dp, luminous = false),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp)) {
                     Icon(Icons.Rounded.Add, null, Modifier.size(20.dp), tint = Muted)
                     Spacer(Modifier.width(20.dp))
-                    Text(stringResource(R.string.add_favorites), Modifier.weight(1f), color = Paper, fontSize = 14.sp)
+                    Text(stringResource(if (favorites.isEmpty()) R.string.add_favorites else R.string.manage_favorites), Modifier.weight(1f), color = Paper, fontSize = 14.sp)
                 }
             }
             items(state.folders, key = { "folder:${it.id}" }) { folder ->
@@ -201,7 +201,7 @@ internal fun HomeScreen(
             .testTag("home-search-gesture").semantics {
                 onClick(label = searchLabel) { latestSearch(); true }
             }.pointerInput(Unit) {
-                detectTapGestures(onLongPress = { latestSettings() }, onDoubleTap = { latestLock() })
+                detectTapGestures(onLongPress = { enterEditing() }, onDoubleTap = { latestLock() })
             }.pointerInput(threshold) {
                 var distance = 0f
                 detectVerticalDragGestures(onDragStart = { distance = 0f },

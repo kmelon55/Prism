@@ -58,7 +58,7 @@
     <string name="section_label">Jump to %1$s</string>
     <string name="widget_provider">%1$s · %2$s</string>
     <string name="system_action_failed">This system screen is not available on your device.</string>
-    <string name="edit_home">Edit favorites</string>
+    <string name="edit_home">Edit home</string>
     <string name="empty_apps">No launchable apps found.</string>
     <string name="choose_favorites">Choose your favorites</string>
     <string name="jump_to_letter">Browse apps starting with %1$s</string>
@@ -118,4 +118,5 @@
     <string name="icon_style">Icon style</string>
     <string name="icons_original">Original icons</string>
     <string name="icons_themed">Themed icons</string>
+    <string name="manage_favorites">Manage favorites</string>
 </resources>

@@ -58,7 +58,7 @@
     <string name="section_label">%1$s 항목으로 이동</string>
     <string name="widget_provider">%1$s · %2$s</string>
     <string name="system_action_failed">이 기기에서 해당 시스템 화면을 열 수 없어요.</string>
-    <string name="edit_home">즐겨찾기 편집</string>
+    <string name="edit_home">홈 편집</string>
     <string name="empty_apps">실행할 수 있는 앱이 없어요.</string>
     <string name="choose_favorites">즐겨찾는 앱 고르기</string>
     <string name="jump_to_letter">%1$s(으)로 시작하는 앱 탐색</string>
@@ -118,4 +118,5 @@
     <string name="icon_style">아이콘 스타일</string>
     <string name="icons_original">기본 아이콘</string>
     <string name="icons_themed">테마 아이콘</string>
+    <string name="manage_favorites">즐겨찾기 관리</string>
 </resources>

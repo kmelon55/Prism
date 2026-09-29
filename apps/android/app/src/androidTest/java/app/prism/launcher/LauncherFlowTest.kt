@@ -107,7 +107,7 @@ class LauncherFlowTest {
             org.junit.Assert.assertEquals(recent, model.state.value.recent)
             rule.activityRule.scenario.recreate()
             org.junit.Assert.assertEquals(apps[0].id, ViewModelProvider(rule.activity)[LauncherModel::class.java].state.value.favorites[2])
-            rule.onNodeWithTag("add-favorites").performScrollTo().assertIsDisplayed()
+            rule.onNodeWithTag("add-favorites").assertDoesNotExist()
             screenshot("minimal-home.png")
         } finally {
             rule.runOnIdle {
@@ -362,11 +362,9 @@ class LauncherFlowTest {
         home()
         openSearch()
         rule.onNode(hasSetTextAction()).performTextInput("즐겨찾기 편집")
-        rule.onNode(hasText(text(R.string.edit_home)) and !hasSetTextAction()).performClick()
-        // System IME dismissal can finish after Compose has become idle.
-        rule.waitUntil(5_000) { runCatching { rule.onNodeWithTag("home-surface").assertIsDisplayed() }.isSuccess }
-        rule.onNodeWithTag("home-surface").assertIsDisplayed()
-        rule.onNodeWithText(text(R.string.done)).assertIsDisplayed()
+        rule.onNodeWithTag("palette-command-ChooseFavorites").performClick()
+        rule.onNodeWithTag("favorites-picker").assertIsDisplayed()
+        rule.onNodeWithTag("favorites-done").performClick()
         home()
     }
 
@@ -401,10 +399,19 @@ class LauncherFlowTest {
             val saved = org.json.JSONArray(rule.activity.getSharedPreferences("launcher", android.content.Context.MODE_PRIVATE)
                 .getString("favorites", "[]"))
             org.junit.Assert.assertEquals(apps.map { it.id }.toSet(), (0 until saved.length()).map { saved.getString(it) }.toSet())
+            rule.onNodeWithTag("add-favorites").assertDoesNotExist()
             screenshot("glass-home-favorites.png")
+            rule.onNodeWithTag("home-list").performTouchInput { longClick(Offset(centerX, 4f)) }
+            rule.onNodeWithText(text(R.string.done)).assertIsDisplayed()
+            rule.onNodeWithTag("add-favorites").performScrollTo().assertIsDisplayed()
+            // Holding empty space again must keep editing active rather than toggle it off.
+            rule.onNodeWithTag("home-search-gesture").performTouchInput { longClick() }
+            rule.onNodeWithTag("add-favorites").assertIsDisplayed()
+            rule.onNodeWithText(text(R.string.done)).performScrollTo().performClick()
+            rule.onNodeWithTag("add-favorites").assertDoesNotExist()
             // The command provides the same picker even after the empty-home prompt is gone.
             openSearch()
-            rule.onNode(hasSetTextAction()).performTextInput(text(R.string.add_favorites))
+            rule.onNode(hasSetTextAction()).performTextInput(text(R.string.manage_favorites))
             rule.onNodeWithTag("palette-command-ChooseFavorites").performClick()
             rule.onNodeWithTag("favorites-picker").assertIsDisplayed()
             completed = true
