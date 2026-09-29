@@ -43,7 +43,7 @@
     <string name="wallpaper_hint">Android에서 배경화면을 선택해요.</string>
     <string name="choose_wallpaper">배경화면 선택</string>
     <string name="widgets">위젯 스택</string>
-    <string name="widget_hint">즐겨찾기 위에 위젯을 추가하고 전환해요. 위젯마다 높이를 조절할 수 있어요.</string>
+    <string name="widget_hint">위젯을 좌우로 넘겨 전환해요. 위젯마다 높이를 조절할 수 있어요.</string>
     <string name="add_widget">위젯 추가</string>
     <string name="remove_widget">위젯 삭제</string>
     <string name="remove_widget_confirm">홈 화면에서 이 위젯을 삭제할까요?</string>

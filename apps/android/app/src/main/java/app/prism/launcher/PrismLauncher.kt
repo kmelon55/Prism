@@ -292,9 +292,8 @@ internal fun AppIcon(app: LauncherApp) {
 internal fun HomeWidget(widgets: WidgetController) {
     val stack by widgets.stack.collectAsStateWithLifecycle()
     PrismPanel(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            ActiveHomeWidget(widgets)
-            if (stack.slots.size > 1) WidgetStackControls(widgets)
+        Box(Modifier.padding(16.dp)) {
+            WidgetPager(stack, widgets::select) { slot -> HomeWidgetPage(widgets, slot) }
         }
     }
 }
@@ -311,9 +310,9 @@ private fun WidgetStackControls(widgets: WidgetController) {
 }
 
 @Composable
-private fun ActiveHomeWidget(widgets: WidgetController) {
-    val id by widgets.activeId.collectAsStateWithLifecycle()
-    val height by widgets.height.collectAsStateWithLifecycle()
+private fun HomeWidgetPage(widgets: WidgetController, slot: WidgetSlot) {
+    val id = slot.id
+    val height = slot.height
     if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
     val info = widgets.manager.getAppWidgetInfo(id)
     if (info == null) {

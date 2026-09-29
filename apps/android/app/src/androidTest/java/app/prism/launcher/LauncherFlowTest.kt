@@ -193,6 +193,41 @@ class LauncherFlowTest {
         }
     }
 
+    @Test fun installedWidgetPagesSwipeAndPersistSelection() {
+        home()
+        val widgets = rule.activity.widgets
+        val previous = widgets.stack.value
+        val provider = widgets.manager.getInstalledProvidersForProfile(android.os.Process.myUserHandle())
+            .first { it.configure == null && it.widgetCategory and android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN != 0 }
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val created = mutableListOf<Int>()
+        try {
+            automation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            repeat(2) {
+                val count = widgets.stack.value.slots.size
+                rule.runOnIdle { widgets.add(provider) }
+                rule.waitUntil(5_000) { widgets.stack.value.slots.size == count + 1 }
+                created += widgets.activeId.value
+            }
+            automation.dropShellPermissionIdentity()
+            rule.onNodeWithTag("widget-pager").performTouchInput { swipeRight(durationMillis = 600) }
+            rule.waitUntil(5_000) { widgets.activeId.value == created.first() }
+            rule.onNodeWithTag("widget-pager").performTouchInput { swipeLeft(durationMillis = 600) }
+            rule.waitUntil(5_000) { widgets.activeId.value == created.last() }
+            rule.activityRule.scenario.recreate()
+            org.junit.Assert.assertEquals(created.last(), rule.activity.widgets.activeId.value)
+            screenshot("widget-pager-home.png")
+        } finally {
+            automation.dropShellPermissionIdentity()
+            rule.runOnIdle {
+                val current = rule.activity.widgets
+                created.forEach { current.select(it); current.remove() }
+                previous.active?.let { current.select(it.id) }
+            }
+            home()
+        }
+    }
+
     @Test fun installedAndroidWidgetBindsAndRendersOnHome() {
         home()
         val widgets = rule.activity.widgets
