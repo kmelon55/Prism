@@ -228,6 +228,112 @@ class LauncherFlowTest {
         }
     }
 
+    @Test fun recentCategoryTracksLaunchesAndCoexistsWithTheAppsNormalCategory() {
+        home()
+        val app = catalog().first { it.component.packageName == "com.android.settings" }
+        val model = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+        val previousMode = model.state.value.browseByCategory
+        val preferences = rule.activity.getSharedPreferences("launcher", android.content.Context.MODE_PRIVATE)
+        val previousRecent = preferences.getString("recent", "[]")
+        try {
+            rule.runOnIdle {
+                model.setBrowseByCategory(true)
+                org.junit.Assert.assertTrue(model.launch(app))
+            }
+            home()
+            rule.activityRule.scenario.recreate()
+            val current = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+            catalog()
+            org.junit.Assert.assertEquals(app.id, current.state.value.recent.first())
+            org.junit.Assert.assertEquals(1, current.state.value.recent.count { it == app.id })
+            val groups = categoryBrowseGroups(current.state.value)
+            org.junit.Assert.assertEquals(RECENT_BROWSE_SECTION, groups.first().first)
+            org.junit.Assert.assertEquals(app.id, groups.first().second.first().id)
+            org.junit.Assert.assertTrue(groups.all { it.second.isNotEmpty() })
+            val normal = "category:${appCategory(app, current.state.value.categoryOverrides).key}"
+            org.junit.Assert.assertTrue(groups.first { it.first == normal }.second.any { it.id == app.id })
+            val sections = browseSections(current.state.value)
+            val index = sections.indexOf(RECENT_BROWSE_SECTION)
+            val rail = rule.onNodeWithTag("alphabet-rail")
+            rail.performTouchInput { down(Offset(centerX, height * (index + .5f) / sections.size)) }
+            rule.onNodeWithTag("browse-app:$RECENT_BROWSE_SECTION:${app.id}").assertIsDisplayed()
+            rail.performTouchInput { up() }
+            rule.onNodeWithTag("alphabet-app-list").performScrollToKey(app.id)
+            rule.onNodeWithTag("browse-app:$normal:${app.id}").assertIsDisplayed()
+            rule.onNodeWithTag("alphabet-app-list").performScrollToKey("recent:${app.id}")
+            rule.onNodeWithTag("browse-app:$RECENT_BROWSE_SECTION:${app.id}").assertIsDisplayed()
+            screenshot("recent-category.png")
+        } finally {
+            rule.runOnIdle {
+                preferences.edit().putString("recent", previousRecent).commit()
+                ViewModelProvider(rule.activity)[LauncherModel::class.java].setBrowseByCategory(previousMode)
+            }
+            rule.activityRule.scenario.recreate()
+            home()
+        }
+    }
+
+    @Test fun categoryRailReplacesLettersAndPersistsCategoryEdits() {
+        home()
+        val apps = catalog()
+        val model = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+        val previousMode = model.state.value.browseByCategory
+        val app = apps.first { appCategory(it, model.state.value.categoryOverrides) == AppCategory.Tools }
+        val original = model.state.value.categoryOverrides[app.id]
+        try {
+            openSearch()
+            rule.onNode(hasSetTextAction()).performTextInput(text(R.string.settings))
+            rule.onNodeWithTag("palette-command-Settings").performClick()
+            rule.onNodeWithTag("browse-categories").performScrollTo().performClick()
+            rule.activityRule.scenario.recreate()
+            rule.onNodeWithTag("browse-categories").performScrollTo().assertIsSelected()
+            home()
+            rule.onNodeWithTag("open-app-drawer").assertDoesNotExist()
+            rule.onNodeWithTag("alphabet-letter-A").assertDoesNotExist()
+            val sections = browseSections(ViewModelProvider(rule.activity)[LauncherModel::class.java].state.value)
+            val index = sections.indexOf("category:tools")
+            for (tag in listOf("alphabet-rail", "alphabet-rail-left")) {
+                home()
+                val rail = rule.onNodeWithTag(tag)
+                rail.performTouchInput { down(Offset(centerX, height * (index + .5f) / sections.size)) }
+                val target = rule.onNodeWithTag("browse-app:category:tools:${app.id}")
+                target.assertIsDisplayed()
+                val top = target.fetchSemanticsNode().boundsInRoot.top
+                val surface = rule.onNodeWithTag("alphabet-apps").fetchSemanticsNode().boundsInRoot
+                org.junit.Assert.assertTrue(top in (surface.top + surface.height * .32f)..(surface.top + surface.height * .43f))
+                rail.performTouchInput { up() }
+                org.junit.Assert.assertEquals(top, target.fetchSemanticsNode().boundsInRoot.top, 2f)
+                val neighbor = apps.first { appCategory(it, model.state.value.categoryOverrides) != AppCategory.Tools }
+                rule.onNodeWithTag("alphabet-app-list").performScrollToKey(neighbor.id)
+                rule.onNodeWithTag("browse-app:category:${appCategory(neighbor, model.state.value.categoryOverrides).key}:${neighbor.id}").assertIsDisplayed()
+            }
+            rule.onNodeWithTag("alphabet-app-list").performScrollToKey(app.id)
+            rule.onNodeWithTag("browse-app:category:tools:${app.id}").performTouchInput { longClick() }
+            rule.onNodeWithTag("change-app-category").performScrollTo().performClick()
+            rule.onNodeWithTag("category-picker").performScrollToNode(hasTestTag("category-choice-games"))
+            rule.onNodeWithTag("category-choice-games").performClick()
+            rule.activityRule.scenario.recreate()
+            val current = ViewModelProvider(rule.activity)[LauncherModel::class.java]
+            org.junit.Assert.assertEquals("games", current.state.value.categoryOverrides[app.id])
+            home()
+            rule.onNodeWithTag("alphabet-letter-category:games").assertIsDisplayed().performClick()
+            rule.onNodeWithTag("browse-app:category:games:${app.id}").assertIsDisplayed()
+            screenshot("category-rail.png")
+            rule.onNodeWithTag("browse-app:category:games:${app.id}").performTouchInput { longClick() }
+            rule.onNodeWithTag("change-app-category").performScrollTo().performClick()
+            rule.onNodeWithTag("category-picker").performScrollToNode(hasTestTag("category-choice-automatic"))
+            rule.onNodeWithTag("category-choice-automatic").performClick()
+            rule.runOnIdle { org.junit.Assert.assertFalse(current.state.value.categoryOverrides.containsKey(app.id)) }
+        } finally {
+            rule.runOnIdle {
+                ViewModelProvider(rule.activity)[LauncherModel::class.java].apply {
+                    setAppCategory(app.id, original); setBrowseByCategory(previousMode)
+                }
+            }
+            home()
+        }
+    }
+
     @Test fun installedAndroidWidgetBindsAndRendersOnHome() {
         home()
         val widgets = rule.activity.widgets
@@ -684,10 +790,10 @@ class LauncherFlowTest {
             org.junit.Assert.assertTrue(preferences.getBoolean("selectedIndexOnly", false))
             home()
             rule.onNodeWithTag("alphabet-letter-ㄱ").assertDoesNotExist()
-            val translated = apps.first {
+            val translated = apps.firstOrNull {
                 AppSearch.section(it.label) in "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ".map(Char::toString) &&
                     AppSearch.section(it.englishLabel) in ('A'..'Z').map(Char::toString)
-            }
+            } ?: apps.first { AppSearch.section(it.englishLabel) in ('A'..'Z').map(Char::toString) }
             val letter = AppIndex.section(translated.label, translated.englishLabel, false)
             val sections = listOf("★") + AppIndex.order(false)
             val rail = rule.onNodeWithTag("alphabet-rail")

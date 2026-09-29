@@ -2,6 +2,10 @@ package app.prism.launcher
 
 internal data class BrowseStop(val position: Float, val offset: Float)
 
+/** A stable thumb-height origin; leave a complete row visible on short/large-text screens. */
+internal fun selectedBrowseAnchor(contentHeight: Float, viewportHeight: Float, rowHeight: Float): Float =
+    (contentHeight * .35f).coerceIn(0f, (viewportHeight - rowHeight).coerceAtLeast(0f))
+
 /** Select the actual lazy item so a large jump never measures every preceding app. */
 internal fun browseItemAt(offsets: List<Float>, offset: Float): Int {
     val match = offsets.binarySearch(offset)

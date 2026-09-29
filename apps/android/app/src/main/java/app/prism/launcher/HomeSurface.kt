@@ -8,6 +8,8 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.background
@@ -67,6 +69,14 @@ internal fun alphabetSections(labels: List<String>, showAll: Boolean = true, sho
 internal fun alphabetLabel(section: String, syllables: Boolean): String {
     val index = "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ".indexOf(section)
     return if (syllables && index >= 0 && section.length == 1) "가나다라마바사아자차카타파하"[index].toString() else section
+}
+
+@Composable
+internal fun browseLabel(section: String, syllables: Boolean, compact: Boolean = false): String {
+    if (section == RECENT_BROWSE_SECTION) return stringResource(if (compact) R.string.rail_recent else R.string.category_recent)
+    val category = if (section.startsWith("category:")) AppCategory.fromKey(section.removePrefix("category:")) else null
+    return if (category != null) stringResource(if (compact) category.railTitle else category.title)
+        else alphabetLabel(section, syllables)
 }
 
 @Composable
@@ -266,7 +276,7 @@ private fun HomeClock() {
 internal fun AlphabetRail(
     sections: List<String>, selected: String?, dragging: Boolean, modifier: Modifier = Modifier,
     onDragging: (Boolean) -> Unit, onSection: (String, Float, Float) -> Unit,
-    fromStart: Boolean = false, koreanSyllables: Boolean = true,
+    fromStart: Boolean = false, koreanSyllables: Boolean = true, categoryMode: Boolean = false,
 ) {
     val latestSelect by rememberUpdatedState(onSection)
     val latestDragging by rememberUpdatedState(onDragging)
@@ -274,11 +284,12 @@ internal fun AlphabetRail(
     val density = LocalDensity.current
     val railHeight = (LocalConfiguration.current.screenHeightDp.dp * .72f).coerceIn(300.dp, 660.dp)
     val railWidth = LocalConfiguration.current.screenWidthDp.dp
-    val expandedFontSize = minOf(17f, railHeight.value / sections.size.coerceAtLeast(1) * .9f)
+    val expandedFontSize = minOf(if (categoryMode) 13f else 17f, railHeight.value / sections.size.coerceAtLeast(1) * .9f)
     val restingFontSize = minOf(12f, expandedFontSize)
     var railTop by remember { mutableFloatStateOf(0f) }
-    val hitWidth = if (fromStart) 24.dp else 48.dp
-    val restX = railWidth.value - 24f
+    val hitWidth = if (fromStart) 24.dp else if (categoryMode) 64.dp else 48.dp
+    val labelWidth = if (categoryMode) 64.dp else 40.dp
+    val restX = railWidth.value - if (categoryMode) 32f else 24f
     var fingerX by remember { mutableFloatStateOf(restX) }
     var fingerY by remember { mutableFloatStateOf(railHeight.value / 2f) }
     val openness by animateFloatAsState(if (dragging) 1f else 0f,
@@ -286,19 +297,28 @@ internal fun AlphabetRail(
     Box(modifier.width(railWidth).height(railHeight).onGloballyPositioned { railTop = it.positionInRoot().y }.testTag(if (fromStart) "alphabet-wave-left" else "alphabet-wave")) {
         // Keep a quiet alphabet visible on the right so the browsing gesture is discoverable.
         sections.forEachIndexed { index, section ->
-            val point = AlphabetWave.letter(index, sections.size, railHeight.value, restX,
-                fingerX, fingerY, openness)
+            val label = browseLabel(section, koreanSyllables, compact = true)
             val description = if (section == "★") stringResource(R.string.favorites)
-                else stringResource(R.string.jump_to_letter, section)
-            Box(Modifier.offset { IntOffset(with(density) { ((if (fromStart) railWidth.value - point.x else point.x) - 20f).dp.toPx() }.roundToInt(),
-                    with(density) { (point.y - 20f).dp.toPx() }.roundToInt()) }
-                .size(40.dp).testTag("alphabet-letter-${if (fromStart) "left-" else ""}$section").graphicsLayer { alpha = if (fromStart) openness.coerceIn(0f, 1f) else .35f + .65f * openness.coerceIn(0f, 1f) }
+                else if (categoryMode) stringResource(R.string.jump_to_category, label) else stringResource(R.string.jump_to_letter, section)
+            // Pointer and spring values are read during layer placement, so dragging does not
+            // recompose or remeasure every label on every input event.
+            Box(Modifier.width(labelWidth).height(40.dp)
+                .testTag("alphabet-letter-${if (fromStart) "left-" else ""}$section").graphicsLayer {
+                    val point = AlphabetWave.letter(index, sections.size, railHeight.value, restX,
+                        fingerX, fingerY, openness)
+                    translationX = with(density) { ((if (fromStart) railWidth.value - point.x else point.x) - labelWidth.value / 2).dp.toPx() }
+                    translationY = with(density) { (point.y - 20f).dp.toPx() }
+                    alpha = if (fromStart) openness.coerceIn(0f, 1f) else .35f + .65f * openness.coerceIn(0f, 1f)
+                }
                 .semantics(mergeDescendants = true) {
                     contentDescription = description; role = Role.Button
                     onClick { latestSelect(section, railTop + with(density) { railHeight.toPx() } / 2f, index.toFloat()); true }
                 }.then(if (fromStart && !dragging) Modifier.clearAndSetSemantics {} else Modifier), contentAlignment = Alignment.Center) {
-                Text(alphabetLabel(section, koreanSyllables),
-                    fontSize = ((restingFontSize + (expandedFontSize - restingFontSize) * openness.coerceIn(0f, 1f)) / density.fontScale.coerceAtLeast(1f)).sp,
+                Text(label, modifier = Modifier.graphicsLayer {
+                    val scale = (restingFontSize + (expandedFontSize - restingFontSize) * openness.coerceIn(0f, 1f)) / expandedFontSize
+                    scaleX = scale; scaleY = scale
+                },
+                    fontSize = (expandedFontSize / density.fontScale.coerceAtLeast(1f)).sp,
                     lineHeight = (26f / density.fontScale.coerceAtLeast(1f)).sp,
                     maxLines = 1, overflow = TextOverflow.Visible,
                     style = androidx.compose.ui.text.TextStyle(platformStyle =
@@ -306,12 +326,12 @@ internal fun AlphabetRail(
                     color = if (section == selected) PrismAccent else Paper, fontWeight = FontWeight.Normal)
             }
         }
-        if (dragging && selected != null) {
+        if (dragging && selected != null && !categoryMode) {
             val index = sections.indexOf(selected).coerceAtLeast(0)
-            val point = AlphabetWave.letter(index, sections.size, railHeight.value, restX, fingerX, fingerY, openness)
-            val previewX = (if (fromStart) railWidth.value - point.x + 36f else point.x - 36f)
-                .coerceIn(22f, railWidth.value - 22f)
             Box(Modifier.offset {
+                val point = AlphabetWave.letter(index, sections.size, railHeight.value, restX, fingerX, fingerY, openness)
+                val previewX = (if (fromStart) railWidth.value - point.x + 36f else point.x - 36f)
+                    .coerceIn(22f, railWidth.value - 22f)
                 IntOffset(with(density) { (previewX - 22f).dp.roundToPx() }, with(density) { (point.y - 22f).dp.roundToPx() })
             }.size(44.dp).semantics(mergeDescendants = true) {}
                 .testTag(if (fromStart) "alphabet-preview-left" else "alphabet-preview"), contentAlignment = Alignment.Center) {
@@ -359,20 +379,25 @@ internal fun AlphabetApps(
     val listState = rememberLazyListState()
     val latestSettings by rememberUpdatedState(onSettings)
     var listTop by remember { mutableFloatStateOf(0f) }
-    val allGroups = remember(state.apps, state.showKoreanIndex) {
+    val groups = remember(state.apps, state.showKoreanIndex, state.browseByCategory, state.categoryOverrides, state.recent) {
+        if (state.browseByCategory) categoryBrowseGroups(state) else {
         val order = AppIndex.order(state.showKoreanIndex)
         state.apps.groupBy { AppIndex.section(it.label, it.englishLabel, state.showKoreanIndex) }
             .toList().sortedBy { order.indexOf(it.first) }.map { (letter, apps) ->
                 letter to if (state.showKoreanIndex) apps else apps.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.englishLabel })
             }
+        }
     }
-    val selectedOnly = state.selectedIndexOnly && section != null
-    val groups = remember(allGroups, section, selectedOnly) {
-        if (selectedOnly) listOf(section!! to (allGroups.firstOrNull { it.first == section }?.second ?: emptyList()))
-        else allGroups
-    }
-    val sections = remember(state.apps, state.showAllIndexLetters, state.showKoreanIndex) {
-        alphabetSections(state.apps.map { if (state.showKoreanIndex) it.label else it.englishLabel }, state.showAllIndexLetters, state.showKoreanIndex)
+    val fixedAnchor = (state.selectedIndexOnly || state.browseByCategory) && section != null
+    val selectedOnly = fixedAnchor && dragging
+    var previouslyDragging by remember { mutableStateOf(false) }
+    val neighborsAlpha = animateFloatAsState(
+        targetValue = if (selectedOnly) 0f else 1f,
+        animationSpec = if (selectedOnly) snap() else tween(180),
+        label = "browse-neighbors",
+    )
+    val sections = remember(state.apps, state.showAllIndexLetters, state.showKoreanIndex, state.browseByCategory, state.categoryOverrides, state.recent) {
+        browseSections(state)
     }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().testTag("alphabet-apps")) {
         val density = LocalDensity.current
@@ -400,18 +425,26 @@ internal fun AlphabetApps(
             }
         }
         val anchorPx = with(density) {
-            val desired = if (anchorY > 0f) anchorY - listTop - rowHeight.toPx() * 2f else viewportHeight.toPx() * .45f
+            val desired = if (fixedAnchor) selectedBrowseAnchor(maxHeight.toPx(), viewportHeight.toPx(), rowHeight.toPx())
+                else if (anchorY > 0f) anchorY - listTop - rowHeight.toPx() * 2f else viewportHeight.toPx() * .45f
             desired.coerceIn(0f, (viewportHeight - rowHeight).coerceAtLeast(0.dp).toPx()).roundToInt()
         }
-        LaunchedEffect(section, stops, anchorPx, railPosition, selectedOnly) {
-            if (selectedOnly) {
-                listState.scrollToItem(0)
-            } else if (section != null && stops.isNotEmpty()) {
-                val offset = interpolateBrowseOffset(stops, railPosition) - anchorPx / density.density
+        // Keep the same items and geometry while held and released. Releasing only reveals
+        // neighbors; it never reconstructs the list or corrects its scroll after a frame.
+        DisposableEffect(section, stops, anchorPx, if (fixedAnchor) 0f else railPosition, dragging) {
+            val released = previouslyDragging && !dragging
+            previouslyDragging = dragging
+            if (!released && section != null && stops.isNotEmpty()) {
+                val target = if (fixedAnchor) (stops.firstOrNull { it.position >= sections.indexOf(section) }
+                    ?: stops.last()).offset else interpolateBrowseOffset(stops, railPosition)
+                val offset = target - anchorPx / density.density
                 val item = browseItemAt(itemOffsets, offset)
                 val withinItem = with(density) { (offset - itemOffsets[item]).dp.toPx() }.roundToInt()
-                listState.scrollToItem(item + 1, withinItem)
+                // Apply the selection and position in the next measure together; a suspended
+                // post-composition scroll can expose the new mask at the old list position.
+                listState.requestScrollToItem(item + 1, withinItem)
             }
+            onDispose { }
         }
         Column(Modifier.fillMaxSize().padding(end = 64.dp, bottom = 72.dp).pointerInput(Unit) {
             detectTapGestures(onLongPress = { latestSettings() })
@@ -421,28 +454,52 @@ internal fun AlphabetApps(
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { listTop = it.positionInRoot().y }.testTag("alphabet-app-list"),
                 contentPadding = PaddingValues(start = 40.dp, end = 8.dp, bottom = 24.dp)) {
                 item("leading-space") { Spacer(Modifier.height(when {
-                    selectedOnly -> (with(density) { anchorPx.toDp() } - headerHeight).coerceAtLeast(0.dp)
                     section == null -> 32.dp
                     else -> edgeSpace
                 })) }
                 groups.forEach { (letter, apps) ->
                     item("section:$letter") {
-                        Text(alphabetLabel(letter, state.koreanIndexSyllables), Modifier.height(headerHeight).padding(start = 8.dp, top = 6.dp), color = Muted,
-                            fontSize = 14.sp, fontWeight = FontWeight.Normal)
+                        BrowseGroupVisibility(letter == section, selectedOnly, neighborsAlpha) {
+                            Text(browseLabel(letter, state.koreanIndexSyllables), Modifier.height(headerHeight).padding(start = 8.dp, top = 6.dp), color = Muted,
+                                fontSize = 14.sp, fontWeight = FontWeight.Normal)
+                        }
                     }
-                    items(apps, key = LauncherApp::id) { app ->
-                        AppRow(app, null, Modifier.height(rowHeight), large = true, onClick = { onLaunch(app) }, onLongClick = { onSelect(app) })
-                    }
-                    if (selectedOnly && apps.isEmpty()) item("empty-section") {
-                        Text(stringResource(R.string.empty_index_section), Modifier.padding(start = 8.dp, top = 12.dp), color = Muted)
+                    items(apps, key = { if (letter == RECENT_BROWSE_SECTION) "recent:${it.id}" else it.id }) { app ->
+                        BrowseGroupVisibility(letter == section, selectedOnly, neighborsAlpha) {
+                            val interactive = !selectedOnly || letter == section
+                            AppRow(app, null, Modifier.height(rowHeight).testTag("browse-app:$letter:${app.id}"), large = true,
+                                onClick = { if (interactive) onLaunch(app) }, onLongClick = { if (interactive) onSelect(app) })
+                        }
                     }
                 }
-                item("trailing-space") { Spacer(Modifier.height(if (selectedOnly) 24.dp else edgeSpace)) }
+                item("trailing-space") {
+                    // Even a one-app group can be moved upward without scrolling its last row away.
+                    Spacer(Modifier.height(edgeSpace))
+                }
                 if (!state.loading && state.apps.isEmpty()) item { Text(stringResource(R.string.empty_apps), color = Muted) }
             }
         }
-        if (!dragging) IconButton(onClick = onSearch, modifier = Modifier.align(Alignment.BottomStart).padding(start = 40.dp, bottom = 16.dp)) {
-            Icon(Icons.Rounded.Search, stringResource(R.string.search_apps), tint = Muted, modifier = Modifier.size(21.dp))
+        if (selectedOnly && groups.none { it.first == section }) {
+            Column(Modifier.padding(start = 48.dp, end = 72.dp)
+                .offset(y = with(density) { anchorPx.toDp() } - headerHeight)) {
+                Text(browseLabel(section!!, state.koreanIndexSyllables), Modifier.height(headerHeight).padding(top = 6.dp),
+                    color = Muted, fontSize = 14.sp)
+                Text(stringResource(R.string.empty_index_section), Modifier.padding(top = 12.dp), color = Muted)
+            }
         }
+        Row(Modifier.align(Alignment.BottomStart).padding(start = 40.dp, bottom = 16.dp)
+            .graphicsLayer { alpha = if (dragging) 0f else neighborsAlpha.value }
+            .then(if (dragging) Modifier.clearAndSetSemantics {} else Modifier)) {
+            IconButton(onClick = onSearch, enabled = !dragging) { Icon(Icons.Rounded.Search, stringResource(R.string.search_apps), tint = Muted, modifier = Modifier.size(21.dp)) }
+        }
+    }
+}
+
+/** Hide surrounding groups without removing their lazy slots, icons, or scroll geometry. */
+@Composable
+private fun BrowseGroupVisibility(selected: Boolean, isolated: Boolean, neighborsAlpha: State<Float>, content: @Composable () -> Unit) {
+    Box(Modifier.graphicsLayer { alpha = if (selected) 1f else if (isolated) 0f else neighborsAlpha.value }
+        .then(if (isolated && !selected) Modifier.clearAndSetSemantics {} else Modifier)) {
+        content()
     }
 }

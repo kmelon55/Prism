@@ -75,6 +75,7 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     var editFolderId by rememberSaveable { mutableStateOf<String?>(null) }
     var folderEditor by rememberSaveable { mutableStateOf(false) }
     var aliasId by rememberSaveable { mutableStateOf<String?>(null) }
+    var categoryAppId by rememberSaveable { mutableStateOf<String?>(null) }
     var widgetPicker by rememberSaveable { mutableStateOf(false) }
     var editingHome by rememberSaveable { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -83,13 +84,13 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
     var railFromStart by remember { mutableStateOf(false) }
     var browseAnchor by remember { mutableFloatStateOf(0f) }
     var browsePosition by remember { mutableFloatStateOf(0f) }
-    val railSections = remember(state.apps, state.showAllIndexLetters, state.showKoreanIndex) {
-        alphabetSections(state.apps.map { if (state.showKoreanIndex) it.label else it.englishLabel }, state.showAllIndexLetters, state.showKoreanIndex)
+    val railSections = remember(state.apps, state.showAllIndexLetters, state.showKoreanIndex, state.browseByCategory, state.categoryOverrides, state.recent) {
+        browseSections(state)
     }
 
     fun home() {
         screen = "home"; query = ""; searchFocused = false; browseSection = null
-        selectedId = null; folderId = null; folderEditor = false; editFolderId = null; aliasId = null; widgetPicker = false; editingHome = false
+        selectedId = null; folderId = null; folderEditor = false; editFolderId = null; aliasId = null; categoryAppId = null; widgetPicker = false; editingHome = false
         keyboard?.hide()
     }
     // The initial composition should not erase state restored after widget binding/configuration.
@@ -164,12 +165,17 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                 for (fromStart in listOf(false, true)) {
                     AlphabetRail(railSections, browseSection, railDragging && railFromStart == fromStart,
                         modifier = Modifier.align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd).safeDrawingPadding(),
-                        fromStart = fromStart, koreanSyllables = state.koreanIndexSyllables,
+                        fromStart = fromStart, koreanSyllables = state.koreanIndexSyllables, categoryMode = state.browseByCategory,
                         onDragging = { railDragging = it; if (it) railFromStart = fromStart },
                         onSection = { section, anchor, position ->
                             keyboard?.hide()
                             if (section == "★") home() else {
-                                browseSection = section; browseAnchor = anchor; browsePosition = position
+                                browseSection = section
+                                // Fixed-origin browsing only changes the list at section boundaries.
+                                // The rail owns its continuous finger tracking locally.
+                                if (!state.selectedIndexOnly && !state.browseByCategory) {
+                                    browseAnchor = anchor; browsePosition = position
+                                }
                                 query = ""; searchFocused = false; screen = "apps"
                             }
                         })
@@ -198,12 +204,19 @@ fun PrismLauncher(model: LauncherModel, activity: MainActivity) {
                     TextButton(onClick = { aliasId = selected.id; selectedId = null }) {
                         Icon(Icons.Rounded.Edit, null); Spacer(Modifier.width(12.dp)); Text(stringResource(R.string.edit_alias))
                     }
+                    TextButton(onClick = { categoryAppId = selected.id; selectedId = null }, modifier = Modifier.testTag("change-app-category")) {
+                        Icon(Icons.Rounded.Category, null); Spacer(Modifier.width(12.dp)); Text(stringResource(R.string.change_category))
+                    }
                     TextButton(onClick = { activity.appInfo(selected); selectedId = null }) {
                         Icon(Icons.Rounded.Info, null); Spacer(Modifier.width(12.dp)); Text(stringResource(R.string.app_info))
                     }
                     Spacer(Modifier.height(24.dp))
                 }
             }
+        }
+        state.apps.find { it.id == categoryAppId }?.let { app ->
+            AppCategoryPicker(app, state.categoryOverrides[app.id],
+                onChoose = { model.setAppCategory(app.id, it); categoryAppId = null }, onDismiss = { categoryAppId = null })
         }
         state.folders.find { it.id == folderId }?.let { folder ->
             FolderPopup(folder, state, onDismiss = { folderId = null },
@@ -405,6 +418,14 @@ private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: 
             SettingsLabel(R.string.default_launcher, if (isHome) R.string.default_active else R.string.default_launcher_hint)
             FilledTonalButton(onClick = activity::chooseHome) { Text(stringResource(R.string.choose_home)) }
             SettingsDivider()
+            SettingsLabel(R.string.browse_grouping, R.string.category_browse_hint)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !state.browseByCategory, onClick = { model.setBrowseByCategory(false) },
+                    modifier = Modifier.testTag("browse-alphabet"), label = { Text(stringResource(R.string.alphabet_list)) })
+                FilterChip(selected = state.browseByCategory, onClick = { model.setBrowseByCategory(true) },
+                    modifier = Modifier.testTag("browse-categories"), label = { Text(stringResource(R.string.category_browse)) })
+            }
+            if (!state.browseByCategory) {
             SettingsLabel(R.string.alphabet_settings, R.string.alphabet_settings_hint)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.alphabet_show_all), Modifier.weight(1f))
@@ -434,6 +455,7 @@ private fun SettingsScreen(activity: MainActivity, model: LauncherModel, state: 
                     label = { Text(stringResource(R.string.index_browse_all)) })
                 FilterChip(selected = state.selectedIndexOnly, onClick = { model.setSelectedIndexOnly(true) },
                     label = { Text(stringResource(R.string.index_browse_selected)) })
+            }
             }
             SettingsDivider()
             SettingsLabel(R.string.widgets, R.string.widget_hint)

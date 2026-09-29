@@ -24,7 +24,7 @@ import org.json.JSONObject
 import java.text.Collator
 import java.util.Locale
 
-data class LauncherApp(val id: String, val label: String, val component: ComponentName, val user: UserHandle, val iconRevision: Int, val englishLabel: String = label)
+data class LauncherApp(val id: String, val label: String, val component: ComponentName, val user: UserHandle, val iconRevision: Int, val englishLabel: String = label, val category: String = "other")
 data class LauncherFolder(val id: String, val name: String, val appIds: List<String>)
 
 data class LauncherState(
@@ -32,11 +32,13 @@ data class LauncherState(
     val favorites: List<String> = emptyList(),
     val folders: List<LauncherFolder> = emptyList(),
     val aliases: Map<String, String> = emptyMap(),
+    val categoryOverrides: Map<String, String> = emptyMap(),
     val recent: List<String> = emptyList(),
     val showAllIndexLetters: Boolean = true,
     val koreanIndexSyllables: Boolean = true,
     val showKoreanIndex: Boolean = true,
     val selectedIndexOnly: Boolean = false,
+    val browseByCategory: Boolean = false,
     val themeAccent: String = "neutral",
     val wallpaperDim: Float = .95f,
     val showClock: Boolean = true,
@@ -57,10 +59,12 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     private val users = application.getSystemService(UserManager::class.java)
     private val mutableState = MutableStateFlow(LauncherState(
         folders = readFolders(), favorites = readList("favorites"), recent = readList("recent"), aliases = readAliases(),
+        categoryOverrides = readCategoryOverrides(),
         showAllIndexLetters = preferences.getBoolean("showAllIndexLetters", true),
         koreanIndexSyllables = preferences.getBoolean("koreanIndexSyllables", true),
         showKoreanIndex = preferences.getBoolean("showKoreanIndex", true),
         selectedIndexOnly = preferences.getBoolean("selectedIndexOnly", false),
+        browseByCategory = preferences.getBoolean("browseByCategory", false),
         themeAccent = preferences.getString("themeAccent", "neutral") ?: "neutral",
         wallpaperDim = preferences.getFloat("wallpaperDim", .95f).coerceIn(.35f, 1f),
         showClock = preferences.getBoolean("showClock", true),
@@ -108,6 +112,21 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
         }.distinctBy { it.id }
     }.getOrDefault(emptyList())
 
+    private fun readCategoryOverrides(): Map<String, String> = runCatching {
+        val json = JSONObject(preferences.getString("appCategories", "{}") ?: "{}")
+        json.keys().asSequence().mapNotNull { id ->
+            AppCategory.fromKey(json.optString(id))?.let { id to it.key }
+        }.toMap()
+    }.getOrDefault(emptyMap())
+
+    fun setAppCategory(id: String, category: String?) {
+        if (category != null && AppCategory.fromKey(category) == null) return
+        val next = mutableState.value.categoryOverrides.toMutableMap()
+        if (category == null) next.remove(id) else next[id] = category
+        preferences.edit().putString("appCategories", JSONObject(next.toMap()).toString()).apply()
+        mutableState.value = mutableState.value.copy(categoryOverrides = next)
+    }
+
     private fun persistFolders(folders: List<LauncherFolder>) {
         val json = JSONArray().apply { folders.forEach {
             put(JSONObject().put("id", it.id).put("name", it.name).put("apps", JSONArray(it.appIds)))
@@ -151,6 +170,9 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
 
     fun launchShortcut(shortcut: ShortcutInfo): Boolean = runCatching {
         launcher.startShortcut(shortcut, null, null)
+        mutableState.value.apps.firstOrNull { it.user == shortcut.userHandle &&
+            (if (shortcut.activity != null) it.component == shortcut.activity else it.component.packageName == shortcut.`package`) }
+            ?.let { recordLaunch(it.id) }
     }.isSuccess
 
     fun refresh() {
@@ -184,7 +206,8 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                         .map {
                             val displayLabel = label(it, locale)
                             val englishLabel = if (locale.language == "en") displayLabel else label(it, Locale.ENGLISH)
-                            LauncherApp("$serial:${it.componentName.flattenToString()}", displayLabel, it.componentName, user, iconRevision, englishLabel)
+                            LauncherApp("$serial:${it.componentName.flattenToString()}", displayLabel, it.componentName, user, iconRevision, englishLabel,
+                                inferAppCategory(it.applicationInfo.category, englishLabel, it.componentName.packageName, displayLabel).key)
                         }
                         .sortedWith { left, right ->
                             val group = AppSearch.sectionOrder.indexOf(AppSearch.section(left.label))
@@ -231,6 +254,11 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setShowAllIndexLetters(enabled: Boolean) {
         preferences.edit().putBoolean("showAllIndexLetters", enabled).apply()
         mutableState.value = mutableState.value.copy(showAllIndexLetters = enabled)
+    }
+
+    fun setBrowseByCategory(enabled: Boolean) {
+        preferences.edit().putBoolean("browseByCategory", enabled).apply()
+        mutableState.value = mutableState.value.copy(browseByCategory = enabled)
     }
 
     fun setKoreanIndexSyllables(enabled: Boolean) {
@@ -306,10 +334,14 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
 
     fun launch(app: LauncherApp): Boolean = runCatching {
         launcher.startMainActivity(app.component, app.user, null, null)
-        val next = (listOf(app.id) + mutableState.value.recent.filterNot { it == app.id }).take(12)
+        recordLaunch(app.id)
+    }.onFailure { refresh() }.isSuccess
+
+    private fun recordLaunch(id: String) {
+        val next = (listOf(id) + mutableState.value.recent.filterNot { it == id }).take(12)
         preferences.edit().putString("recent", JSONArray(next).toString()).apply()
         mutableState.value = mutableState.value.copy(recent = next)
-    }.onFailure { refresh() }.isSuccess
+    }
 
     override fun onCleared() {
         launcher.unregisterCallback(callback)
