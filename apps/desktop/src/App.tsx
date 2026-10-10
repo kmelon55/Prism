@@ -274,6 +274,8 @@ function initialPrismCommands(preferences: Preferences): CommandItem[] {
     prismCommandIds.preferences,
     prismCommandIds.clipboardHistory,
     prismCommandIds.library,
+    prismCommandIds.notes,
+    prismCommandIds.newNote,
     prismCommandIds.links,
     prismCommandIds.snippets,
     prismCommandIds.files,
@@ -642,7 +644,7 @@ export function App() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [scriptView, setScriptView] = useState<ScriptCommandSummary>();
   const [libraryRun, setLibraryRun] = useState<{ entry: LibraryEntry; action: LibraryRunAction }>();
-  const [libraryTab, setLibraryTab] = useState<"links"|"snippets"|"files"|"favorites">("links");
+  const [libraryTab, setLibraryTab] = useState<"links"|"snippets"|"notes"|"files"|"favorites">("links");
   const [fileEntryQuery, setFileEntryQuery] = useState("");
   const [fileEntrySystem, setFileEntrySystem] = useState(false);
   const [libraryEntry, setLibraryEntry] = useState<LibraryEntry>();
@@ -1630,6 +1632,13 @@ export function App() {
       else if (action.id === "prism-update:run") { await paletteUpdate.run(); }
       else if (action.id === prismActionIds.openEmoji) { setEmojiOpen(true); }
       else if (action.id === "files-search-broader") { setLibraryTab("files"); setFileEntryQuery(String(item.data?.query ?? query)); setFileEntrySystem(true); setLibraryEntry(undefined); setLibraryOpen(true); }
+      else if (action.id === prismActionIds.openNotes || action.id === prismActionIds.newNote) {
+        setLibraryTab("notes");
+        setFileEntryQuery("");
+        setFileEntrySystem(false);
+        setLibraryEntry(action.id === prismActionIds.newNote ? { id: crypto.randomUUID(), kind: "note", title: "", value: "" } : undefined);
+        setLibraryOpen(true);
+      }
       else if([prismActionIds.openLibrary,prismActionIds.openLinks,prismActionIds.openSnippets,prismActionIds.openFiles].includes(action.id as never)){setLibraryTab(action.id===prismActionIds.openSnippets?"snippets":action.id===prismActionIds.openFiles?"files":"links");setFileEntryQuery("");setFileEntrySystem(false);setLibraryEntry(undefined);setLibraryOpen(true);}
       else if(action.id==="toggle-favorite"){
         await invoke("library_set_favorite",{favorite:{id:item.id,title:item.title},enabled:!libraryData.favorites.some(f=>f.id===item.id)});reloadLibrary();

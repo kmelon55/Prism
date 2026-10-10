@@ -12,7 +12,7 @@ const restore = vi.fn();
 const preferences: SettingsPreferences = { language: "en", theme: "dark", reduceMotion: false, backgroundOpacity: 97, backgroundBlur: 44, showApplicationIcons: true, commandAliases: {}, disabledCommandIds: [], scriptDirectories: [] };
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.setItem("prism:preferences", JSON.stringify({ language: "en" }));
-  review = { token: "first-token", pathReferences: [], missingFavorites: [], summary: { snippets: { total: 3, added: 1, conflicts: 2, skipped: 0 }, quicklinks: { total: 0, added: 0, conflicts: 0, skipped: 0 }, pathLinks: { total: 0, added: 0, conflicts: 0, skipped: 0 }, favorites: { total: 1, added: 0, conflicts: 0, skipped: 1 } }, preferences: null };
+  review = { token: "first-token", pathReferences: [], missingFavorites: [], summary: { notes: { total: 0, added: 0, conflicts: 0, skipped: 0 }, snippets: { total: 3, added: 1, conflicts: 2, skipped: 0 }, quicklinks: { total: 0, added: 0, conflicts: 0, skipped: 0 }, pathLinks: { total: 0, added: 0, conflicts: 0, skipped: 0 }, favorites: { total: 1, added: 0, conflicts: 0, skipped: 1 } }, preferences: null };
   invoke.mockImplementation(async command => command === "backup_preview_import" ? structuredClone(review) : command === "backup_export" ? true : review.summary);
   restore.mockResolvedValue(undefined);
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
@@ -77,7 +77,7 @@ describe("backup review lifecycle", () => {
   it("renders native-only boundaries and disables empty selections", async () => {
     await mount(false); expect([...container.querySelectorAll("button")].every(button => button.disabled)).toBe(true);
     expect(invoke).not.toHaveBeenCalled(); expect(container.textContent).toContain("desktop app");
-    await mount(true); await toggle("Snippets"); await toggle("Quicklinks"); await toggle("Favorites");
+    await mount(true); await toggle("Notes"); await toggle("Snippets"); await toggle("Quicklinks"); await toggle("Favorites");
     expect(button("Export backup").disabled).toBe(true); expect(button("Choose backup to review").disabled).toBe(true);
   });
   it("keeps path portability opt-in and shows missing targets and skipped favorite identities", async () => {

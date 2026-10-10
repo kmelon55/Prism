@@ -14,7 +14,7 @@ import {
 } from "./native";
 export interface LibraryEntry {
   id: string;
-  kind: "link" | "path" | "snippet";
+  kind: "link" | "path" | "snippet" | "note";
   title: string;
   value: string;
   keyword?: string;
@@ -91,30 +91,33 @@ export const previewFile = (id: string) =>
   invoke<FilePreview>("library_preview_file", { id });
 export function entryItem(entry: LibraryEntry): CommandItem {
   const snippet = entry.kind === "snippet";
+  const note = entry.kind === "note";
   return {
     id: `library:${entry.id}`,
     providerId: "library",
     title: entry.title,
-    subtitle: snippet ? entry.value.slice(0, 140) : entry.value,
-    section: snippet ? t("스니펫") : t("저장된 링크"),
+    subtitle: snippet || note ? entry.value.slice(0, 140) : entry.value,
+    section: note ? t("Notes") : snippet ? t("스니펫") : t("저장된 링크"),
     kind: "command",
-    icon: snippet
+    icon: note ? "file" : snippet
       ? "clipboard"
       : entry.kind === "path"
         ? "folder-open"
         : "globe",
-    keywords: [snippet ? "snippet 스니펫 문구" : "quicklink 링크 바로가기"],
+    keywords: note ? ["note notes memo 노트 메모", entry.value] : [snippet ? "snippet 스니펫 문구" : "quicklink 링크 바로가기"],
     searchAliases: snippet && entry.keyword ? [entry.keyword] : undefined,
     data: { entryId: entry.id, entryKind: entry.kind },
     actions: [
       {
-        id: snippet ? "library-copy" : "library-open",
-        title: snippet ? t("복사") : t("열기"),
+        id: note ? "library-edit" : snippet ? "library-copy" : "library-open",
+        title: note ? t("열기") : snippet ? t("복사") : t("열기"),
       },
-      ...(snippet
+      ...(note
+        ? [{ id: "library-copy", title: t("복사") }]
+        : snippet
         ? [{ id: "library-paste", title: t("붙여넣기") }]
         : [{ id: "library-copy", title: t("주소 복사") }]),
-      { id: "library-edit", title: t("편집") },
+      ...(!note ? [{ id: "library-edit", title: t("편집") }] : []),
     ],
   };
 }

@@ -1,9 +1,26 @@
 # Local library and clipboard actions
 
-Search **Quicklinks / 링크** or **Snippets / 스니펫** to open that feature directly, or **Library / 보관함** to manage them. Its links, snippets, files and favorites tabs share a
-compact search/list editor. Saved entries also appear directly in launcher search. Select a row to
-edit, use its explicit open/copy control to execute, and confirm deletion. Closing an unsaved editor
-asks whether to save, discard or keep editing; a failed save preserves the input.
+Search **Notes / 노트**, **Quicklinks / 링크** or **Snippets / 스니펫** to open that feature directly, or **Library / 보관함** to manage them. Saved entries also appear directly in launcher search.
+Links and snippets use the compact library editor; closing an unsaved editor asks whether to save,
+discard or keep editing. A failed save preserves the input.
+
+Notes open a dedicated two-pane workspace: a searchable list and one borderless Markdown document.
+**New note / 새 노트** opens a blank document directly. The first nonempty line supplies the list title
+(with Markdown heading markers removed). There is no separate title field. The eye button previews
+headings, lists, task lists, tables and code blocks; returning to editing preserves the exact source.
+Legacy separate titles are retained as a Markdown heading when the note is edited.
+
+Every edit starts an automatic SQLite save. Writes run serially and coalesce newer pending edits;
+typing remains enabled during saves. Switching notes or using Back/Escape waits for the latest write,
+without Save/Cancel buttons or a discard dialog. A failed save retains the editor and exposes Retry
+save; subsequent editing also retries. Heading-only notes and clearing existing notes are supported.
+Untouched blank notes are not created. Pending writes continue on surface unmount; crash recovery
+for failed writes is not implemented. Markdown source is stored in the library, not as separate `.md` files.
+
+Root search matches the complete body, including text beyond the 140-character result preview,
+using the shared Korean-aware matcher. Selecting a note opens its editor; the launcher Copy action
+copies its literal body. Notes do not expand snippet placeholders or accept snippet abbreviations.
+They share the library capacity limits below and can be favorited through the launcher action menu.
 
 Links accept HTTP(S) without embedded credentials or an absolute file/folder path. File and folder
 buttons use the native picker. Snippets store literal text and expose copy/paste in launcher actions.
@@ -35,8 +52,11 @@ bypasses directory caches. Actions revalidate issued IDs, current roots and cano
 removal never deletes files. Search neither reads file contents nor grants AI permission.
 See [file-search details and limits](file-search-improvements.md).
 
-Versioned backup/recovery supports snippets, HTTP(S) quicklinks and favorites, with a reviewed
+Versioned backup/recovery supports notes, snippets, HTTP(S) quicklinks and favorites, with a reviewed
 conservative import and a separate allowlisted preference restore. See [backup recovery](backup-recovery.md).
+Notes are selected by default for backup. Exports containing notes use format version 3; exports
+without notes retain version 2, and this app can still import versions 1 and 2. Older apps reject
+version 3 with an update-required error rather than silently losing notes.
 
 ## Clipboard and paste
 
@@ -48,6 +68,14 @@ injection and restores Prism; copy remains available. Clipboard contents may alr
 when a late activation error occurs, which the error explains. Other platforms expose Copy fallback.
 
 ## Verification
+
+The notes tests cover serial autosave, continued typing during persistence, switching notes and
+closing after the latest write, failed-save retention/retry, first-line titles, legacy title preservation,
+untouched blank documents, clearing notes, Markdown rendering/source retention, deletion, Korean
+normalization/composition, command navigation, SQLite limits and backup compatibility.
+The Orca browser preview on the existing Vite server uses isolated localStorage and mocked IPC;
+it does not modify the installed application's library. Native installed-app interaction remains
+unverified. No app replacement or release was made.
 
 React tests use mocked IPC for save failure, unsaved-editor recovery, deletion, stale file results,
 pinning/restoration and clipboard copy/delete. Rust tests use isolated SQLite and temporary files for

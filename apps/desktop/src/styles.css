@@ -2464,6 +2464,8 @@ kbd {
 .library-editor { display: flex; flex-direction: column; gap: 14px; padding: 20px; overflow: auto; }
 .library-editor label { display: grid; gap: 7px; font-size: 12px; }
 .library-editor textarea { min-height: 100px; resize: vertical; max-height: 240px; }
+.note-save-status { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+.library-note-editor textarea { min-height: 220px; max-height: 50vh; line-height: 1.65; }
 .library-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 9px; font-size: 11px; }
 .library-buttons button, .library-confirm button { background: var(--surface); border: 1px solid var(--line-strong); }
 .library-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); font-size: 12px; }

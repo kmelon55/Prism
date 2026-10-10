@@ -6113,5 +6113,22 @@
   [
     "Connect another display to move this window.",
     "창을 옮기려면 다른 디스플레이를 연결하세요."
-  ]
+  ],
+  ["Notes", "노트"],
+  ["New note", "새 노트"],
+  ["Write and search local notes", "로컬 노트 작성과 검색"],
+  ["Capture a thought", "생각을 빠르게 기록하세요"],
+  ["Edit note", "노트 편집"],
+  ["Note content", "노트 내용"],
+  ["Write your first note.", "첫 노트를 작성하세요."],
+  ["Title (optional)", "제목 (선택)"],
+  ["Retry save", "다시 저장"],
+  ["Close notes", "노트 닫기"],
+  ["Search notes", "노트 검색"],
+  ["Preview Markdown", "Markdown 미리보기"],
+  ["Edit Markdown", "Markdown 편집"],
+  ["Markdown preview", "Markdown 미리보기"],
+  ["Start writing…", "내용을 입력하세요…"],
+  ["Delete note", "노트 삭제"],
+  ["Delete this note?", "이 노트를 삭제할까요?"]
 ]

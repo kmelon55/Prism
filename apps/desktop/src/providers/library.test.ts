@@ -55,3 +55,14 @@ it("finds a snippet by its saved abbreviation for manual reuse", async () => {
   expect(items[0].id).toBe("library:greeting");
   expect(items[0].actions.map(action => action.id)).toContain("library-copy");
 });
+
+it("finds notes beyond their preview, normalizes Korean, and opens the editor first", async () => {
+  const body = "앞부분 ".repeat(80) + "회의 결론: 다음 주 배포 {clipboard}";
+  const provider = libraryProvider({ ...emptyLibrary, entries: [
+    { id: "meeting", kind: "note", title: "Meeting", value: body },
+  ] }, []);
+  const items = await provider.search("회의 결론".normalize("NFD"), new AbortController().signal);
+  expect(items.map(item => item.id)).toEqual(["library:meeting"]);
+  expect(items[0].subtitle).not.toContain("회의 결론");
+  expect(items[0].actions.map(action => action.id)).toEqual(["library-edit", "library-copy"]);
+});

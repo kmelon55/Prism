@@ -181,3 +181,37 @@ claims were not adopted as acceptance fixtures; Prism's original fixtures and bu
 Deliverables from this planning review: [product specification](product-spec.md),
 [sequenced implementation plan](delivery-plan.md), and [quality gates](quality-gates.md).
 These establish intended behavior; screenshots, native execution and measurements remain Not run.
+
+## 2026-10-10: Notes and the next desktop workflows
+
+The current checkout already implements local library entries, clipboard history, file search,
+snippets, scripts, window commands and AI chat. Its README mentioned notes, but the library entry
+contract and UI did not contain a note type. This change adds plain-text notes to the existing library,
+with direct commands, body search, automatic save, copy, favorites and reviewed backup support.
+
+The following are observations from upstream source or official documentation, followed by Prism
+recommendations. These are not claims of runtime benchmarking or compatibility. No upstream code
+was copied and no integrations were installed.
+
+| Source inspected | Observation | Recommended Prism application |
+| --- | --- | --- |
+| [Sol scratchpad source at bf78cca](https://github.com/ospfranco/sol/blob/bf78ccadca30b0130c2706ff39a7215a9facd326/src/widgets/scratchpad.widget.tsx) | A focused multiline editor temporarily releases launcher Enter/arrow listeners while writing | Keep capture immediate and keep launcher keyboard handling out of the editor; give multiple saved notes search and recovery |
+| [Vicinae browser source at 28ac1ef](https://github.com/vicinaehq/vicinae/blob/28ac1efa8865b080bf223b337e1e99df63c2d4b2/src/browser-extension/chrome/background.js), [official browser guide](https://docs.vicinae.com/browser-extension) | Native messaging carries browser data; tab events trigger debounced updates, and actions can activate tabs or turn them into shortcuts | Add an opt-in browser companion for tab search, tab switching and saving the current URL; use events rather than polling |
+| [CopyQ repository](https://github.com/hluk/CopyQ) | Clipboard items support editing, notes, tags and scripted commands | Add explicit Save as note and Append to note actions to existing clipboard results before adding another management surface |
+| [Joplin repository](https://github.com/laurent22/joplin) | Offline-first notes use Markdown, full-text search and portable import/export | Follow up with Markdown file export/import and recoverable editing history; evaluate FTS when measured note volume requires it |
+
+Recommended sequence after this notes foundation:
+
+1. Connect clipboard capture to notes and add draft recovery. Measure invocation-to-edit time and
+   verify save failure, app restart and multi-window editing before promising seamless capture.
+2. Add optional browser tab search/switch and save-link actions. Start with a narrow supported browser
+   set, explicit permission, private-window exclusion and disconnect recovery.
+3. Add user-defined workspace commands that reopen chosen apps, files and links using existing
+   actions. Keep the set reviewable and handle missing targets individually.
+4. Expand the extension contract only after these everyday workflows are reliable. A marketplace,
+   broad Raycast compatibility and cross-device synchronization each need a separate implementation
+   and verification scope; none is necessary to make the next version useful.
+
+The product recommendation is a fast local entry point for capturing information and resuming work.
+Search-to-action latency, saved-data recovery, keyboard focus and native permission behavior are more
+useful acceptance criteria for this direction than feature counts alone.

@@ -122,7 +122,7 @@ fn validate_entry(entry: &Entry) -> Result<(), String> {
     if !valid_id(&entry.id)
         || entry.title.trim().is_empty()
         || entry.title.len() > 300
-        || entry.value.is_empty()
+        || (entry.value.is_empty() && entry.kind != "note")
         || entry.value.len() > 128 * 1024
     {
         return Err("이름과 내용을 확인하세요. 내용은 최대 128 KB입니다.".into());
@@ -141,7 +141,7 @@ fn validate_entry(entry: &Entry) -> Result<(), String> {
         }
     }
     match entry.kind.as_str() {
-        "snippet" => {}
+        "snippet" | "note" => {}
         "link" => {
             validate_link_template(&entry.value)?;
         }
@@ -915,6 +915,39 @@ async fn execute_entry(app: tauri::AppHandle, entry: Entry, action: String) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn notes_roundtrip_literal_text_and_reject_snippet_keywords() {
+        let db = Connection::open_in_memory().unwrap();
+        schema(&db).unwrap();
+        let mut note = Entry {
+            id: "note".into(),
+            kind: "note".into(),
+            title: "회의 기록".into(),
+            value: "# 결정\n{clipboard} {date}\n  들여쓰기  ".into(),
+            keyword: None,
+        };
+        save(&db, &note).unwrap();
+        let stored = read(&db).unwrap().entries.remove(0);
+        assert_eq!(stored.kind, "note");
+        assert_eq!(stored.value, note.value);
+        assert!(!dynamic_entry(&stored));
+        note.value = "수정한 메모".into();
+        save(&db, &note).unwrap();
+        assert_eq!(read(&db).unwrap().entries[0].value, note.value);
+        note.keyword = Some(";note".into());
+        assert!(save(&db, &note).is_err());
+        note.keyword = None;
+        note.value = "가".repeat(128 * 1024);
+        assert!(save(&db, &note).is_err());
+        assert_eq!(read(&db).unwrap().entries[0].value, "수정한 메모");
+        note.value.clear();
+        save(&db, &note).unwrap();
+        let cleared = read(&db).unwrap().entries.remove(0);
+        assert_eq!(cleared.title, "회의 기록");
+        assert_eq!(cleared.value, "");
+        note.kind = "snippet".into();
+        assert!(save(&db, &note).is_err());
+    }
     #[test]
     fn legacy_library_migrates_without_losing_text_and_keywords_are_unique() {
         let db = Connection::open_in_memory().unwrap();

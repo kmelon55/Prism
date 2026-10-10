@@ -28,6 +28,8 @@ const WRITE_ERROR: &str = "The backup could not be saved. The existing file was 
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Categories {
     snippets: bool,
+    #[serde(default)]
+    notes: bool,
     quicklinks: bool,
     #[serde(default)]
     path_links: bool,
@@ -36,10 +38,16 @@ pub struct Categories {
 }
 impl Categories {
     fn any(&self) -> bool {
-        self.snippets || self.quicklinks || self.path_links || self.favorites || self.preferences
+        self.notes
+            || self.snippets
+            || self.quicklinks
+            || self.path_links
+            || self.favorites
+            || self.preferences
     }
     fn includes(&self, kind: &str) -> bool {
-        (kind == "snippet" && self.snippets)
+        (kind == "note" && self.notes)
+            || (kind == "snippet" && self.snippets)
             || (kind == "link" && self.quicklinks)
             || (kind == "path" && self.path_links)
     }
@@ -120,11 +128,11 @@ struct Document {
 }
 impl Document {
     fn validate(&self) -> Result<(), String> {
-        if self.version > 2 {
+        if self.version > 3 {
             return Err(NEWER.into());
         }
         if self.format != "prism-backup"
-            || ![1, 2].contains(&self.version)
+            || ![1, 2, 3].contains(&self.version)
             || self.entries.len() > 1000
             || self.favorites.len() > 50
             || self.entries.iter().map(|e| e.value.len()).sum::<usize>() > 16 * 1024 * 1024
@@ -133,8 +141,12 @@ impl Document {
         }
         let mut ids = HashSet::new();
         for entry in &self.entries {
-            if !["snippet", "link", "path"].contains(&entry.kind.as_str()) || !ids.insert(&entry.id)
+            if !["snippet", "note", "link", "path"].contains(&entry.kind.as_str())
+                || !ids.insert(&entry.id)
             {
+                return Err(INVALID.into());
+            }
+            if entry.kind == "note" && self.version < 3 {
                 return Err(INVALID.into());
             }
             super::validate_entry(&entry.entry()).map_err(|_| INVALID.to_owned())?;
@@ -168,6 +180,7 @@ pub struct Counts {
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
     snippets: Counts,
+    notes: Counts,
     quicklinks: Counts,
     path_links: Counts,
     favorites: Counts,
@@ -251,7 +264,7 @@ fn parse(bytes: &[u8]) -> Result<Document, String> {
             INVALID
         }
     })?;
-    if header.version > 2 {
+    if header.version > 3 {
         return Err(NEWER.into());
     }
     let document: Document = serde_json::from_slice(bytes).map_err(|error| {
@@ -314,6 +327,7 @@ fn prepare(
         }
         let counts = match entry.kind.as_str() {
             "snippet" => &mut prepared.summary.snippets,
+            "note" => &mut prepared.summary.notes,
             "path" => &mut prepared.summary.path_links,
             _ => &mut prepared.summary.quicklinks,
         };
@@ -514,7 +528,11 @@ pub async fn backup_export(
             .collect();
         let document = Document {
             format: "prism-backup".into(),
-            version: 2,
+            version: if entries.iter().any(|entry| entry.kind == "note") {
+                3
+            } else {
+                2
+            },
             entries,
             favorites,
             preferences: if categories.preferences {
@@ -603,11 +621,36 @@ mod tests {
     fn categories() -> Categories {
         Categories {
             snippets: true,
+            notes: true,
             quicklinks: true,
             path_links: false,
             favorites: true,
             preferences: false,
         }
+    }
+    #[test]
+    fn notes_backup_roundtrips_and_obeys_category_selection() {
+        let db = db();
+        let mut doc = document();
+        doc.version = 3;
+        doc.entries[0].kind = "note".into();
+        doc.entries[0].value = "# 메모\n{clipboard}".into();
+        let bytes = serde_json::to_vec(&doc).unwrap();
+        let parsed = parse(&bytes).unwrap();
+        let (prepared, _) = prepare(&db, parsed, &categories()).unwrap();
+        assert_eq!(prepared.summary.notes.added, 1);
+        assert_eq!(prepared.summary.snippets.added, 0);
+        let mut selected = categories();
+        selected.notes = false;
+        let (prepared, _) = prepare(&db, parse(&bytes).unwrap(), &selected).unwrap();
+        assert_eq!(prepared.summary.notes.total, 0);
+        super::super::save(&db, &doc.entries[0].entry()).unwrap();
+        let (prepared, _) = prepare(&db, parse(&bytes).unwrap(), &categories()).unwrap();
+        assert_eq!(prepared.summary.notes.conflicts, 1);
+        doc.entries[0].value.clear();
+        assert!(parse(&serde_json::to_vec(&doc).unwrap()).is_ok());
+        doc.version = 2;
+        assert!(doc.validate().is_err());
     }
     fn document() -> Document {
         Document {
@@ -743,7 +786,7 @@ mod tests {
         assert!(parse(b"{").is_err());
         assert!(parse(&vec![b' '; MAX_BYTES + 1]).is_err());
         let mut doc = document();
-        doc.version = 3;
+        doc.version = 4;
         assert!(doc.validate().is_err());
         doc.version = 1;
         doc.entries.push(doc.entries[0].clone());
@@ -760,6 +803,7 @@ mod tests {
         doc.entries[0].value = "relative/path".into();
         let selected = Categories {
             snippets: false,
+            notes: false,
             quicklinks: false,
             path_links: false,
             favorites: true,

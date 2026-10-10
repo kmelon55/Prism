@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { beforeEach, afterEach, it, expect, vi } from "vitest";
+import { beforeAll, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { LibraryPanel } from "./LibraryPanel";
 import { emptyLibrary, type LibraryData } from "./providers/library";
 const native = vi.hoisted(() => ({ invoke: vi.fn(), indexChanged: null as (() => void) | null, stopIndex: vi.fn() }));
@@ -14,6 +14,7 @@ vi.mock("./providers/library", async (importOriginal) => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
 let root: Root, container: HTMLDivElement, data: LibraryData;
 const close = vi.fn();
+beforeAll(async () => { await import("./library/NotesWorkspace"); });
 beforeEach(() => {
   Object.defineProperty(navigator, "language", {
     configurable: true,
@@ -97,6 +98,99 @@ it("creates and edits durable snippets and deletes only the confirmed item", asy
   expect(data.entries).toHaveLength(1);
   await click("삭제");
   expect(data.entries).toHaveLength(0);
+});
+
+it("writes a single Markdown document, previews, reloads, searches and deletes it", async () => {
+  await mount(); await click("노트");
+  expect(container.querySelector('[aria-label="항목 이름"]')).toBeNull();
+  expect(container.querySelector(".library-tabs")).toBeNull();
+  const source = "# 회의 기록\n\n- [x] 다음 주 배포\n\n```js\nconst value = '{clipboard}';\n```";
+  await type("노트 내용", source);
+  expect(data.entries[0]).toMatchObject({ kind: "note", title: "회의 기록", value: source });
+  expect(button("저장")).toBeUndefined();
+  await click("Markdown 미리보기");
+  expect(container.querySelector(".notes-markdown h1")?.textContent).toBe("회의 기록");
+  expect(container.querySelector<HTMLInputElement>('.notes-markdown input[type="checkbox"]')?.checked).toBe(true);
+  expect(container.querySelector(".notes-markdown code")?.textContent).toContain("{clipboard}");
+  await click("Markdown 편집");
+  expect(container.querySelector("textarea")?.value).toBe(source);
+  await click("노트 닫기"); expect(close).toHaveBeenCalledOnce();
+  await act(async () => root.unmount()); root = createRoot(container);
+  await mount(); await click("노트");
+  expect(container.querySelector("textarea")?.value).toBe(source);
+  await type("노트 검색", "배포".normalize("NFD"));
+  expect(container.querySelector(".notes-list-item")?.textContent).toContain("회의 기록");
+  await type("노트 내용", source.replace("회의 기록", "수정한 제목"));
+  expect(data.entries[0].title).toBe("수정한 제목");
+  await type("노트 검색", "없는 검색어");
+  await click("노트 삭제"); expect(data.entries).toHaveLength(1);
+  await click("삭제"); expect(data.entries).toHaveLength(0);
+  expect(container.querySelector("textarea")?.value).toBe("");
+});
+
+it("preserves a failed draft, ignores composing Escape and retries before closing", async () => {
+  await act(async () => root.render(<LibraryPanel nativeRuntime onClose={close} onChange={() => {}}
+    initialEntry={{ id: "draft", kind: "note", title: "", value: "" }} />));
+  const original = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "library_save_entry") throw "저장 실패";
+    return original(command, args);
+  });
+  await type("노트 내용", "기록할 내용");
+  expect(container.textContent).toContain("저장 실패");
+  await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", isComposing: true })));
+  expect(close).not.toHaveBeenCalled();
+  await click("새 노트");
+  expect(container.querySelector("textarea")?.value).toBe("기록할 내용");
+  await click("노트 닫기"); expect(close).not.toHaveBeenCalled();
+  native.invoke.mockImplementation(original);
+  await click("다시 저장");
+  expect(data.entries[0]).toMatchObject({ title: "기록할 내용", value: "기록할 내용" });
+  await click("노트 닫기"); expect(close).toHaveBeenCalledOnce();
+});
+
+it("keeps typing enabled during autosave and flushes the latest edit before switching notes", async () => {
+  await mount(); await click("노트");
+  const original = native.invoke.getMockImplementation()!;
+  const complete: (() => void)[] = [];
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "library_save_entry") await new Promise<void>(resolve => complete.push(resolve));
+    return original(command, args);
+  });
+  await type("노트 내용", "처음");
+  expect(container.querySelector("textarea")?.disabled).toBe(false);
+  await type("노트 내용", "마지막 입력"); expect(complete).toHaveLength(1);
+  await click("새 노트");
+  expect(container.querySelector("textarea")?.value).toBe("마지막 입력");
+  await act(async () => complete[0]()); expect(complete).toHaveLength(2);
+  expect(container.querySelector("textarea")?.value).toBe("마지막 입력");
+  await act(async () => complete[1]());
+  expect(data.entries[0]).toMatchObject({ title: "마지막 입력", value: "마지막 입력" });
+  expect(container.querySelector("textarea")?.value).toBe("");
+  await act(async () => container.querySelector<HTMLButtonElement>('.notes-list-item:not([aria-current])')!.click());
+  expect(container.querySelector("textarea")?.value).toBe("마지막 입력");
+});
+
+it("does not create untouched empty notes and supports a heading-only or cleared note", async () => {
+  await mount(); await click("노트");
+  await click("새 노트"); expect(data.entries).toHaveLength(0);
+  await type("노트 내용", "# 제목만 있는 메모");
+  expect(data.entries[0]).toMatchObject({ title: "제목만 있는 메모", value: "# 제목만 있는 메모" });
+  await type("노트 내용", "");
+  expect(data.entries[0]).toMatchObject({ title: "새 노트", value: "" });
+});
+
+it("does not let a late initial library read replace an autosaved note", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let finishLoad!: (value: LibraryData) => void;
+  native.invoke.mockImplementation(async (command, args) => command === "library_load"
+    ? new Promise<LibraryData>(resolve => { finishLoad = resolve; })
+    : original(command, args));
+  await act(async () => root.render(<LibraryPanel nativeRuntime onClose={close} onChange={() => {}}
+    initialEntry={{ id: "draft", kind: "note", title: "", value: "" }} />));
+  await type("노트 내용", "방금 저장한 내용");
+  await act(async () => finishLoad(structuredClone(emptyLibrary)));
+  expect(container.querySelector(".notes-list-item")?.textContent).toContain("방금 저장한 내용");
 });
 it("preserves editing state on a failed save and requires a decision before dismissing a dirty editor", async () => {
   await mount();

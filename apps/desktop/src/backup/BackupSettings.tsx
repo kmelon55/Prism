@@ -13,7 +13,7 @@ export interface BackupSettingsProps {
   onRestorePreferences: (safe: SafePreferences) => void | Promise<void>;
 }
 type Operation = "export" | "review" | "apply" | "preferences";
-const labels: Record<keyof BackupCategories, string> = { snippets: "Snippets", quicklinks: "Quicklinks", pathLinks: "Path references", favorites: "Favorites", preferences: "Safe preferences" };
+const labels: Record<keyof BackupCategories, string> = { notes: "Notes", snippets: "Snippets", quicklinks: "Quicklinks", pathLinks: "Path references", favorites: "Favorites", preferences: "Safe preferences" };
 export function BackupSettings({ nativeRuntime, preferences, onRestorePreferences }: BackupSettingsProps) {
   useLocale();
   const [categories, setCategories] = useState<BackupCategories>({ ...defaultCategories });
@@ -58,7 +58,7 @@ export function BackupSettings({ nativeRuntime, preferences, onRestorePreference
   }
   const disabled = !nativeRuntime || Boolean(busy);
   const empty = !Object.values(categories).some(Boolean);
-  const rows = review ? (["snippets", "quicklinks", "pathLinks", "favorites"] as const).filter(key => categories[key]) : [];
+  const rows = review ? (["snippets", "notes", "quicklinks", "pathLinks", "favorites"] as const).filter(key => categories[key]) : [];
   const aliasPreview = review?.preferences ? previewPreferenceAliases(preferences, review.preferences) : null;
   const additions = review ? rows.reduce((total, key) => total + review.summary[key].added, 0) : 0;
   return <div className="backup-settings">

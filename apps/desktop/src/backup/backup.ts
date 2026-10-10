@@ -3,12 +3,12 @@ import { normalizeBackgroundBlur } from "../settings/appearance";
 import type { SettingsPreferences } from "../settings/SettingsView";
 
 export type SafePreferences = Pick<SettingsPreferences, "language" | "theme" | "reduceMotion" | "backgroundOpacity" | "backgroundBlur" | "showApplicationIcons" | "commandAliases">;
-export interface BackupCategories { snippets: boolean; quicklinks: boolean; pathLinks: boolean; favorites: boolean; preferences: boolean }
+export interface BackupCategories { notes: boolean; snippets: boolean; quicklinks: boolean; pathLinks: boolean; favorites: boolean; preferences: boolean }
 export interface BackupCounts { total: number; added: number; conflicts: number; skipped: number }
-export interface BackupSummary { snippets: BackupCounts; quicklinks: BackupCounts; pathLinks: BackupCounts; favorites: BackupCounts }
+export interface BackupSummary { notes: BackupCounts; snippets: BackupCounts; quicklinks: BackupCounts; pathLinks: BackupCounts; favorites: BackupCounts }
 export interface BackupPathReference { id: string; title: string; path: string; status: "existing" | "missing" | "unavailable"; conflict: boolean }
 export interface BackupReview { token: string; summary: BackupSummary; pathReferences: BackupPathReference[]; missingFavorites: { id: string; title: string }[]; preferences: SafePreferences | null }
-export const defaultCategories: BackupCategories = { snippets: true, quicklinks: true, pathLinks: false, favorites: true, preferences: false };
+export const defaultCategories: BackupCategories = { notes: true, snippets: true, quicklinks: true, pathLinks: false, favorites: true, preferences: false };
 const safeKeys = ["language", "theme", "reduceMotion", "backgroundOpacity", "backgroundBlur", "showApplicationIcons", "commandAliases"] as const;
 const byteLength = (value: string) => new TextEncoder().encode(value).length;
 const safeId = (id: string) => id.length > 0 && byteLength(id) <= 512 && !/[\p{Cc}]/u.test(id) && !["__proto__", "prototype", "constructor"].includes(id);

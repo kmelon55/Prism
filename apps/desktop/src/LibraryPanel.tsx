@@ -2,7 +2,7 @@ import { LibraryEntryEditor } from "./library/LibraryEntryEditor";
 import { FileBrowser } from "./library/FileBrowser";
 import { LibraryRunDialog, needsLibraryRun } from "./library/LibraryRunDialog";
 import { t, t as translate, useLocale, currentLocale } from "./i18n";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
@@ -23,8 +23,12 @@ import {
   type LibraryEntry,
 } from "./providers/library";
 import { isCompositionKey } from "./interaction/usePaletteKeyboard";
-export type LibraryTab = "links" | "snippets" | "files" | "favorites";
+import { createNoteAutosave, noteForStorage, type NoteSaveStatus } from "./library/noteAutosave";
+import { noteForEditing } from "./library/noteMarkdown";
+const NotesWorkspace = lazy(() => import("./library/NotesWorkspace"));
+export type LibraryTab = "links" | "snippets" | "notes" | "files" | "favorites";
 const tabs: Record<LibraryTab, string> = {
+  notes: "Notes",
   links: "링크",
   snippets: "스니펫",
   files: "파일 검색",
@@ -52,16 +56,17 @@ export function LibraryPanel({
 }) {
   useLocale();
   const [tab, setTab] = useState<LibraryTab>(
-    initialEntry?.kind === "snippet" ? "snippets" : initialTab,
+    initialEntry?.kind === "note" ? "notes" : initialEntry?.kind === "snippet" ? "snippets" : initialEntry ? "links" : initialTab,
   );
-  const [showLibraryTabs, setShowLibraryTabs] = useState(initialTab !== "files");
+  const [showLibraryTabs, setShowLibraryTabs] = useState(Boolean(initialEntry) || initialTab !== "files");
   const [data, setData] = useState<LibraryData>(emptyLibrary);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState(initialQuery);
   const [editor, setEditor] = useState<LibraryEntry | null>(
-    initialEntry ?? null,
+    initialEntry ? noteForEditing(initialEntry) : null,
   );
   const [original, setOriginal] = useState<LibraryEntry | null>(
     initialEntry ?? null,
@@ -74,21 +79,42 @@ export function LibraryPanel({
   const lock = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const host = useRef<HTMLElement>(null);
+  const noteAutosave = useRef<ReturnType<typeof createNoteAutosave> | null>(null);
+  const readGeneration = useRef(0);
+  const mounted = useRef(false);
+  const [noteSaveStatus, setNoteSaveStatus] = useState<NoteSaveStatus>("idle");
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Pending IPC writes continue when another command replaces this surface.
+      void noteAutosave.current?.flush();
+    };
+  }, []);
   const dirty = editor && JSON.stringify(editor) !== JSON.stringify(original);
   const refresh = async () => {
+    const generation = ++readGeneration.current;
     const next = await loadLibrary();
-    setData(next);
+    if (generation === readGeneration.current) setData(next);
     onChange();
   };
   useEffect(() => {
     if (!nativeRuntime) return;
     let active = true;
+    const generation = readGeneration.current;
     void loadLibrary()
       .then((v) => {
-        if (active) setData(v);
+        if (active && generation === readGeneration.current) {
+          // The initial read may predate notes already autosaved while it was pending.
+          setData(current => ({ ...v, entries: [
+            ...current.entries,
+            ...v.entries.filter(entry => !current.entries.some(saved => saved.id === entry.id)),
+          ] }));
+          setLoaded(true);
+        }
       })
       .catch((e) => {
-        if (active) setError(errorText(e));
+        if (active && generation === readGeneration.current) setError(errorText(e));
       });
     return () => {
       active = false;
@@ -97,8 +123,13 @@ export function LibraryPanel({
   useEffect(() => {
     input.current?.focus();
   }, [tab, editor?.id, running]);
+  useEffect(() => {
+    if (tab === "notes" && loaded && !editor && !busy) {
+      start(data.entries.find(entry => entry.kind === "note"));
+    }
+  }, [tab, loaded, editor, busy, data.entries]);
 
-  function leave() {
+  async function leave() {
     if (busy || running) return;
     if (deleting) {
       setDeleting(null);
@@ -109,6 +140,17 @@ export function LibraryPanel({
       return;
     }
     if (editor) {
+      if (editor.kind === "note") {
+        setBusy(true);
+        const saved = await (noteAutosave.current?.flush() ?? Promise.resolve(true));
+        if (!mounted.current) return;
+        setBusy(false);
+        if (saved) {
+          noteAutosave.current = null;
+          onClose();
+        }
+        return;
+      }
       if (dirty) setDiscard(true);
       else setEditor(null);
       return;
@@ -146,28 +188,94 @@ export function LibraryPanel({
   }
   async function save() {
     if (!editor) return;
+    if (editor.kind === "note") {
+      await noteAutosave.current?.flush();
+      return;
+    }
     await work(async () => {
       await invoke("library_save_entry", { entry: editor });
       setEditor(null);
       setDiscard(false);
     }, t("저장했습니다."));
   }
+  function updateEditor(next: LibraryEntry | null) {
+    setEditor(next);
+    if (next?.kind !== "note" || !nativeRuntime) return;
+    if (!noteAutosave.current) {
+      noteAutosave.current = createNoteAutosave(editor!, async (snapshot) => {
+        const stored = noteForStorage(snapshot, t("New note"));
+        await invoke("library_save_entry", { entry: stored });
+        if (mounted.current) {
+          setData(current => ({ ...current, entries: [stored, ...current.entries.filter(entry => entry.id !== stored.id)] }));
+          onChange();
+        }
+      }, (status, cause) => {
+        if (!mounted.current) return;
+        setNoteSaveStatus(status);
+        setError(status === "error" ? errorText(cause) : "");
+      });
+    }
+    noteAutosave.current.update(next);
+  }
   function start(entry?: LibraryEntry) {
-    const next = entry ?? {
+    const next: LibraryEntry = entry ? noteForEditing(entry) : {
       id: crypto.randomUUID(),
-      kind: tab === "snippets" ? "snippet" : "link",
+      kind: tab === "notes" ? "note" : tab === "snippets" ? "snippet" : "link",
       title: "",
       value: "",
     };
     setEditor(next);
     setOriginal(next);
     setError("");
+    setNotice("");
+    setNoteSaveStatus("idle");
+    noteAutosave.current = null;
+  }
+  async function selectNote(entry?: LibraryEntry) {
+    if (lock.current || busy || entry?.id === editor?.id) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      if (!(await (noteAutosave.current?.flush() ?? Promise.resolve(true)))) return;
+      if (mounted.current) { start(entry); if (!entry) setQuery(""); }
+    } finally {
+      lock.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
+  async function deleteNote() {
+    if (!deleting || lock.current || !nativeRuntime) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      if (!(await (noteAutosave.current?.flush() ?? Promise.resolve(true)))) return;
+      await invoke("library_delete_entry", { id: deleting });
+      await refresh();
+      if (mounted.current) {
+        noteAutosave.current = null;
+        setDeleting(null);
+        setEditor(null);
+        setError("");
+      }
+    } catch (cause) {
+      if (mounted.current) setError(errorText(cause));
+    } finally {
+      lock.current = false;
+      if (mounted.current) setBusy(false);
+    }
   }
   const entries = data.entries.filter(
     (e) =>
-      (tab === "snippets" ? e.kind === "snippet" : e.kind !== "snippet") &&
-      `${e.title} ${e.value}`.toLowerCase().includes(query.toLowerCase()),
+      (tab === "notes" ? e.kind === "note" : tab === "snippets" ? e.kind === "snippet" : e.kind === "link" || e.kind === "path") &&
+      `${e.title} ${e.value}`.normalize("NFKC").toLowerCase().includes(query.normalize("NFKC").toLowerCase()),
   );
+  if (tab === "notes") return <Suspense fallback={<div className="workspace-loading" role="status">{t("Loading…")}</div>}>
+    <NotesWorkspace entries={entries} editor={editor} query={query} busy={busy} persisted={data.entries.some(entry => entry.id === editor?.id)} nativeRuntime={nativeRuntime}
+      status={noteSaveStatus} error={error} deleting={Boolean(deleting)}
+      onQuery={setQuery} onSelect={entry => void selectNote(entry)} onCreate={() => void selectNote()}
+      onEdit={updateEditor} onClose={() => void leave()} onRetry={() => void save()}
+      onDelete={() => setDeleting(editor?.id ?? null)} onConfirmDelete={() => void deleteNote()} onCancelDelete={() => setDeleting(null)}/>
+  </Suspense>;
   if (running)
     return (
       <LibraryRunDialog
@@ -214,7 +322,10 @@ export function LibraryPanel({
         >
           <ArrowLeft size={17} />
         </button>
-        <strong>{editor ? t("항목 편집") : t(tabs[tab])}</strong>
+        <strong>{editor ? t(editor.kind === "note" ? "Edit note" : "항목 편집") : t(tabs[tab])}</strong>
+        {editor?.kind === "note" && (noteSaveStatus === "saving" || noteSaveStatus === "saved") && (
+          <span className="note-save-status" role="status">{t(noteSaveStatus === "saving" ? "Saving…" : "Saved")}</span>
+        )}
         {!editor && initialTab === "files" && <button aria-expanded={showLibraryTabs} onClick={() => setShowLibraryTabs((value) => !value)}>{t("보관함")}</button>}
       </header>
       {!nativeRuntime && (
@@ -225,7 +336,7 @@ export function LibraryPanel({
       {editor ? (
         <LibraryEntryEditor
           editor={editor}
-          setEditor={setEditor}
+          setEditor={updateEditor}
           busy={busy}
           nativeRuntime={nativeRuntime}
           input={input}
@@ -388,7 +499,7 @@ export function LibraryPanel({
                       <small>{entry.value}</small>
                     </button>
                     <button
-                      aria-label={`${entry.title} ${entry.kind === "snippet" ? t("복사") : t("열기")}`}
+                      aria-label={`${entry.title} ${(entry.kind === "snippet" || entry.kind === "note") ? t("복사") : t("열기")}`}
                       disabled={busy}
                       onClick={() => {
                         if (needsLibraryRun(entry)) setRunning(entry);
@@ -398,13 +509,13 @@ export function LibraryPanel({
                               invoke("library_entry_action", {
                                 id: entry.id,
                                 action:
-                                  entry.kind === "snippet" ? "copy" : "open",
+                                  (entry.kind === "snippet" || entry.kind === "note") ? "copy" : "open",
                               }),
-                            entry.kind === "snippet" ? t("복사했습니다.") : "",
+                            (entry.kind === "snippet" || entry.kind === "note") ? t("복사했습니다.") : "",
                           );
                       }}
                     >
-                      {entry.kind === "snippet" ? (
+                      {(entry.kind === "snippet" || entry.kind === "note") ? (
                         <Copy size={14} />
                       ) : (
                         <FolderOpen size={14} />
@@ -455,9 +566,9 @@ export function LibraryPanel({
           {t(error)}
           <button
             disabled={busy}
-            onClick={() => void work(() => Promise.resolve())}
+            onClick={() => editor?.kind === "note" ? void save() : void work(() => Promise.resolve())}
           >
-            {t("다시 불러오기")}
+            {t(editor?.kind === "note" ? "Retry save" : "다시 불러오기")}
           </button>
         </div>
       )}

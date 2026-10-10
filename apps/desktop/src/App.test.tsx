@@ -23,6 +23,7 @@ let root: Root;
 let container: HTMLDivElement;
 
 beforeAll(async () => {
+  await import("./library/NotesWorkspace");
   Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
   App = (await import("./App")).App;
   await import("./settings/SettingsView");
@@ -1145,6 +1146,15 @@ it("opens snippets and quicklinks directly from their own commands",async()=>{
  expect(container.querySelector('.library-heading strong')?.textContent).toBe("Snippets");
  await key("Escape",{},window);await type("links");await key("Enter");
  expect(container.querySelector('.library-heading strong')?.textContent).toBe("Quicklinks");
+});
+it("opens notes and starts a new note directly from launcher search", async () => {
+ await mount(); await type("Notes"); await key("Enter"); await settle();
+ expect(container.querySelector('.notes-sidebar-header strong')?.textContent).toBe("Notes");
+ await key("Escape", {}, window); await settle();
+ await type("New note"); await key("Enter"); await settle();
+ expect(container.querySelector('.notes-sidebar-header strong')?.textContent).toBe("Notes");
+ expect(container.querySelector('[aria-label="Note content"]')).not.toBeNull();
+ expect(container.querySelector('[aria-label="Note content"]')).toBe(document.activeElement);
 });
 it("applies language notifications from the separate native settings window without clearing the query",async()=>{
  await mount();await type("settings");

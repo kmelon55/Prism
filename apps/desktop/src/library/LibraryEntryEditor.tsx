@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n";
 import type { LibraryEntry } from "../providers/library";
+import { isCompositionKey } from "../interaction/usePaletteKeyboard";
 import { snippetCopy, validSnippetKeyword } from "../snippets/copy";
 
 export function LibraryEntryEditor({
@@ -27,13 +28,22 @@ export function LibraryEntryEditor({
   setDiscard(value: boolean): void;
   work(fn: () => Promise<unknown>, message?: string): Promise<void>;
 }) {
+  const textEntry = editor.kind === "snippet" || editor.kind === "note";
+  const note = editor.kind === "note";
+  const canSave = nativeRuntime && !busy && (note || (Boolean(editor.title.trim()) && Boolean(editor.value)));
   const keywordValid = editor.kind !== "snippet" || validSnippetKeyword(editor.keyword);
   return (
     <form
-      className="library-editor"
+      className={`library-editor${editor.kind === "note" ? " library-note-editor" : ""}`}
+      onKeyDown={(event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s" && !isCompositionKey(event.nativeEvent)) {
+          event.preventDefault();
+          if (!event.repeat && canSave && keywordValid) event.currentTarget.requestSubmit();
+        }
+      }}
       onSubmit={(e) => {
         e.preventDefault();
-        if (keywordValid) void save();
+        if (canSave && keywordValid) void save();
       }}
     >
       <label>
@@ -43,11 +53,12 @@ export function LibraryEntryEditor({
           aria-label={t("항목 이름")}
           value={editor.title}
           maxLength={100}
-          disabled={busy}
+          disabled={busy || (note && !nativeRuntime)}
+          placeholder={note ? t("Title (optional)") : undefined}
           onChange={(e) => setEditor({ ...editor, title: e.target.value })}
         />
       </label>
-      {editor.kind !== "snippet" && (
+      {!textEntry && (
         <label>
           {t("종류")}
           <select
@@ -68,16 +79,17 @@ export function LibraryEntryEditor({
         </label>
       )}
       <label>
-        {editor.kind === "snippet"
+        {textEntry
           ? t("내용")
           : editor.kind === "path"
             ? t("경로")
             : t("주소")}
-        {editor.kind === "snippet" ? (
+        {textEntry ? (
           <textarea
-            aria-label={t("스니펫 내용")}
+            aria-label={t(editor.kind === "note" ? "Note content" : "스니펫 내용")}
+            rows={editor.kind === "note" ? 12 : undefined}
             value={editor.value}
-            disabled={busy}
+            disabled={busy || (note && !nativeRuntime)}
             maxLength={128000}
             onChange={(e) => setEditor({ ...editor, value: e.target.value })}
           />
@@ -144,23 +156,23 @@ export function LibraryEntryEditor({
           ))}
         </div>
       )}
-      <div className="library-buttons">
+      {!note && <div className="library-buttons">
         <button type="button" onClick={leave} disabled={busy}>
           {t("취소")}
         </button>
         <button
           type="submit"
           disabled={
-            busy || !nativeRuntime || !editor.title.trim() || !editor.value || !keywordValid
+            !canSave || !keywordValid
           }
         >
           {t("저장")}
         </button>
-      </div>
-      {discard && (
+      </div>}
+      {!note && discard && (
         <div className="library-confirm" role="alert">
           <span>{t("변경 내용을 저장할까요?")}</span>
-          <button type="button" onClick={() => void save()} disabled={busy || !keywordValid}>
+          <button type="button" onClick={() => void save()} disabled={!canSave || !keywordValid}>
             {t("저장")}
           </button>
           <button

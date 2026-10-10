@@ -9,6 +9,8 @@ import {
 
 export const prismCommandIds = {
   library: "prism:library",
+  notes: "prism:notes",
+  newNote: "prism:new-note",
   links: "prism:links",
   snippets: "prism:snippets",
   files: "prism:files",
@@ -53,6 +55,8 @@ export const prismCommandIds = {
 
 export const prismActionIds = {
   openLibrary: "open-library",
+  openNotes: "open-notes",
+  newNote: "new-note",
   openLinks: "open-links",
   openSnippets: "open-snippets",
   openFiles: "open-files",
@@ -110,6 +114,8 @@ const manageableBuiltInManagement: CommandManagement = {
 };
 
 const commonDefinitions: readonly CommandDefinition[] = [
+  { id: prismCommandIds.notes, get title() { return t("Notes"); }, get subtitle() { return t("Write and search local notes"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["notes", "memo", "노트", "메모"], icon: "file", actions: [{ id: prismActionIds.openNotes, get title() { return t("열기"); } }], management: manageableBuiltInManagement },
+  { id: prismCommandIds.newNote, get title() { return t("New note"); }, get subtitle() { return t("Capture a thought"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["new note", "write", "메모 작성", "새 노트"], icon: "file", actions: [{ id: prismActionIds.newNote, get title() { return t("New note"); } }], management: manageableBuiltInManagement },
   { id: prismCommandIds.captureAi, get title() { return t("Capture and Ask AI"); }, get subtitle() { return t("Select a screen region and start a conversation"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["screenshot", "screen", "capture", "region", "quick ai", "캡처", "화면", "영역", "스크린샷"], icon: "scan", accent: "violet", actions: [{ id: prismActionIds.captureAi, get title() { return t("Capture screen region"); } }], management: manageableBuiltInManagement },
   { id: prismCommandIds.dictation, get title() { return t("음성 받아쓰기"); }, get subtitle() { return t("녹음 시작 · 다시 실행하면 전사 후 입력"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "whisp", "voice", "speech", "transcribe", "음성", "받아쓰기", "녹음", "전사"], icon: "mic", actions: [{ id: prismActionIds.toggleDictation, get title() { return t("받아쓰기 시작 / 종료"); } }], management: manageableBuiltInManagement },
   { id: prismCommandIds.dictationPrompt, get title() { return t("Structure prompt"); }, get subtitle() { return t("Speak to create a clear prompt · Run again to insert"); }, get section() { return t("Productivity"); }, kind: "command", keywords: ["dictation", "prompt", "프롬프트", "정리", "음성"], icon: "mic", actions: [{ id: prismActionIds.toggleDictationPrompt, get title() { return t("Structure prompt"); } }], management: manageableBuiltInManagement },
