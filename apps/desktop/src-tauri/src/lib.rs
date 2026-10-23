@@ -1,4 +1,5 @@
 mod updates;
+mod login_item;
 #[cfg(target_os = "macos")]
 mod app_menu;
 #[cfg(target_os = "macos")]
@@ -617,6 +618,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             quit_prism,
+            login_item::get_login_item_status,
+            login_item::set_login_item_enabled,
+            login_item::open_login_item_settings,
             reveal_palette,
             updates::get_update_status,
             updates::set_automatic_updates,

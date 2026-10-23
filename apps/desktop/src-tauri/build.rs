@@ -23,6 +23,8 @@ fn build_dictation() {
                 .is_some_and(|extension| extension == "swift")
         })
         .collect();
+    println!("cargo:rerun-if-changed=native/login-item");
+    sources.push(PathBuf::from("native/login-item/LoginItem.swift"));
     sources.sort();
     let status = Command::new("xcrun")
         .args([
@@ -64,6 +66,7 @@ fn build_dictation() {
         "AppKit",
         "SwiftUI",
         "ApplicationServices",
+        "ServiceManagement",
     ] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }

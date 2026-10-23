@@ -2,6 +2,7 @@ import { settingsTargets, searchSettingsTargets, type SettingsTarget } from "./s
 import { SettingsSelect } from "./SettingsSelect";
 import { InterfaceMotion } from "./InterfaceMotion";
 import { SettingsSlider } from "./SettingsSlider";
+import { LoginItemSettings } from "./LoginItemSettings";
 import { Updates } from "../Updates";
 import { useEffect, useLayoutEffect, useRef, useState, useId, type ComponentType, type ReactNode } from "react";
 import { ArrowLeft, Check, Clipboard, ExternalLink, FolderOpen, MoonStar, Plus, RefreshCw, Search, ShieldCheck, Sun, SunMoon, Terminal, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react";
@@ -624,6 +625,7 @@ export function SettingsView(props: SettingsViewProps) {
           {activeSection === "general" ? (
             <>
               <Updates />
+              <LoginItemSettings />
               <div className="settings-group" role="group" aria-label={t("Language")}>
                 <div className="settings-row">
                   <div className="preference-copy"><strong>{t("Language")}</strong></div>

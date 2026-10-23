@@ -3,6 +3,7 @@ import type { PreferencesSection } from "./SettingsView";
 
 export interface SettingsTarget { id: string; section: PreferencesSection; label: string; control: string; keywords?: string[]; commandId?: string }
 export const settingsTargets: SettingsTarget[] = [
+  { id: "launch-at-login", section: "general", label: "Launch at login", control: "Launch at login", keywords: ["startup autostart login", "로그인 자동 실행 시작"] },
   { id: "language", section: "general", label: "App language", control: "App language", keywords: ["language", "언어"] },
   { id: "theme", section: "general", label: "Theme", control: "Appearance", keywords: ["dark light system", "테마 다크 라이트"] },
   { id: "opacity", section: "general", label: "Background opacity", control: "Background opacity" },

@@ -35,7 +35,8 @@ notarization are separate checks. See [signing setup](docs/releases.md#signing-a
 ## Updates and everyday use
 
 Prism runs in the background when its palette is hidden. Opening it again brings
-back the existing instance. To start it when you sign in, add **Prism.app** in
+back the existing instance. To start it when you sign in, enable **Settings → General → Launch at login**.
+Prism reads the actual macOS registration and shows when approval is needed in
 **System Settings → General → Login Items**.
 
 The installed app checks GitHub for updates at startup and every six hours. A new

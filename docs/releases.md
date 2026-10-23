@@ -10,7 +10,7 @@ release build. Preserve running development servers and unrelated worktree chang
    `apps/desktop/src-tauri/tauri.conf.json`, and `apps/desktop/src-tauri/Cargo.toml`.
    Refresh the Prism package entry in `Cargo.lock`.
 2. Update `docs/release-notes.md` in English. Run `pnpm typecheck`, `pnpm test`,
-   `pnpm build`, `bash scripts/test-dictation-native.sh`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
+   `pnpm build`, `bash scripts/test-dictation-native.sh`, `bash scripts/test-login-item-native.sh`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
    and `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`.
 3. Build and verify the complete release before publishing. Commit in English,
    push `main`, then push an annotated version tag such as `v0.1.2`.
@@ -128,6 +128,17 @@ authorization when the user starts the feature. Settings also provide an explici
 **Allow key use** action. Status reads remain silent and fall back to metadata when
 access is denied. Successfully opened
 keys stay in zeroizing process memory, and no credentials move to plaintext settings.
+
+## Launch at login
+
+The implementation uses Apple's [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice) API.
+
+Settings → General reads and changes `SMAppService.mainApp` registration. No separate
+local preference or startup registration is used. Approval remains a user action in
+macOS Login Items. Only release builds installed at `/Applications/Prism.app` may
+register; the stable bundle identifier, install path, and signing identity are kept
+across updates. Native service tests use a fake service and never change host login
+items. Actual registration and login after an update require separate runtime proof.
 
 ## Cleanup
 
