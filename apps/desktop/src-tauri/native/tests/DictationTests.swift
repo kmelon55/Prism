@@ -174,7 +174,29 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         precondition(isolatedClipboard.types?.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) != true)
         print("PASS: native clipboard write/readback without history exclusion (isolated pasteboard; user clipboard unchanged)")
         let app = NSRunningApplication.current
-        let target = TextInsertionTarget(processIdentifier: ProcessInfo.processInfo.processIdentifier, focusedElement: nil, application: app)
+        let prismPID = ProcessInfo.processInfo.processIdentifier
+        var capturedPIDs: [pid_t] = []
+        var captureForeground: pid_t? = prismPID
+        let captureEnvironment = TextInjector.Environment(running: { _ in true }, permission: { true }, frontmostPID: { captureForeground },
+            focused: { pid in capturedPIDs.append(pid); return nil }, application: { _ in app })
+        let prismTarget = TextInjector.captureTarget(fallbackPID: prismPID, environment: captureEnvironment)
+        precondition(prismTarget?.processIdentifier == prismPID && capturedPIDs == [prismPID],
+            "Dictation started in Prism must capture Prism, even without an AX text element")
+        precondition(TextInjector.captureTarget(fallbackPID: 0, environment: captureEnvironment) == nil,
+            "A launcher command with no previous app must not accidentally target Prism")
+        let previousPID: pid_t = prismPID + 1
+        precondition(TextInjector.captureTarget(fallbackPID: previousPID, environment: captureEnvironment)?.processIdentifier == previousPID,
+            "Launcher commands must still capture the previous external app")
+        captureForeground = previousPID
+        precondition(TextInjector.captureTarget(fallbackPID: prismPID, environment: captureEnvironment)?.processIdentifier == previousPID,
+            "A shortcut in another app must capture that foreground app")
+        let missingForeground = TextInjector.Environment(frontmostPID: { nil })
+        precondition(TextInjector.captureTarget(fallbackPID: prismPID, environment: missingForeground) == nil)
+        let noPermission = TextInjector.Environment(running: { _ in true }, permission: { false }, frontmostPID: { prismPID },
+            focused: { _ in preconditionFailure("Do not query AX without permission") }, application: { _ in app })
+        precondition(TextInjector.captureTarget(fallbackPID: prismPID, environment: noPermission)?.processIdentifier == prismPID)
+        print("PASS: in-app dictation target capture, missing previous app and permission boundaries (no focus changes)")
+        let target = prismTarget!
         var posted: [String] = []
         var foreground: pid_t? = target.processIdentifier
         var pasteboardRevision = 1

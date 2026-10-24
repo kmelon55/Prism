@@ -198,6 +198,19 @@ async function key(key: string, init: KeyboardEventInit = {}, target: EventTarge
 function selectedId() { return input().getAttribute("aria-activedescendant"); }
 
 describe("mounted palette keyboard flows with mocked native IPC", () => {
+  it.each([
+    ["음성 받아쓰기", "dictation_toggle"],
+    ["Structure prompt", "dictation_prompt_toggle"],
+  ])("hands %s launcher commands back to the previous app explicitly", async (query, command) => {
+    const original = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation(async (name, args) => name === command ? undefined : original(name, args));
+    await mount();
+    await type(query);
+    await key("Enter", {}, input());
+    expect(native.invoke).toHaveBeenCalledWith(command, { targetPreviousApp: true });
+    expect(input().value).toBe("");
+  });
+
   it.each(["q", "w"])("Cmd+%s hides the launcher without quitting, including from AI Chat", async shortcut => {
     await mount();
     await type("AI Chat");

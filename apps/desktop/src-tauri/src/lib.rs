@@ -237,11 +237,11 @@ fn reveal_palette(app: AppHandle) {
 #[cfg(desktop)]
 fn dispatch_command_hotkey(app: &AppHandle, command_id: &str) {
     if command_id == "prism:dictation-prompt" {
-        let _ = dictation::dictation_prompt_toggle(app.clone());
+        let _ = dictation::dictation_prompt_toggle(app.clone(), None);
         return;
     }
     if command_id == "prism:dictation" {
-        let _ = dictation::dictation_toggle(app.clone());
+        let _ = dictation::dictation_toggle(app.clone(), None);
         return;
     }
     let presentation_id = if command_id == "clipboard:open-history" {

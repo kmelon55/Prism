@@ -660,41 +660,65 @@ pub fn dictation_set_ui_language(app: tauri::AppHandle, locale: String) -> Resul
     }
 }
 #[tauri::command]
-pub fn dictation_toggle(app: tauri::AppHandle) -> Result<(), String> {
-    toggle_mode(app, false)
+pub fn dictation_toggle(app: tauri::AppHandle, target_previous_app: Option<bool>) -> Result<(), String> {
+    toggle_mode(app, false, target_previous_app.unwrap_or(false))
 }
 #[tauri::command]
-pub fn dictation_prompt_toggle(app: tauri::AppHandle) -> Result<(), String> {
-    toggle_mode(app, true)
+pub fn dictation_prompt_toggle(
+    app: tauri::AppHandle,
+    target_previous_app: Option<bool>,
+) -> Result<(), String> {
+    toggle_mode(app, true, target_previous_app.unwrap_or(false))
 }
-fn toggle_mode(app: tauri::AppHandle, prompt_mode: bool) -> Result<(), String> {
+
+#[cfg(any(target_os = "macos", test))]
+fn dictation_target_pid(
+    palette_focused: bool,
+    target_previous_app: bool,
+    previous_pid: i32,
+    prism_pid: i32,
+) -> i32 {
+    if target_previous_app {
+        previous_pid
+    } else if palette_focused {
+        prism_pid
+    } else {
+        0
+    }
+}
+
+fn toggle_mode(app: tauri::AppHandle, prompt_mode: bool, target_previous_app: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let host = app.clone();
         app.run_on_main_thread(move || {
-            let pid = if host
+            let palette_focused = host
                 .get_webview_window("main")
-                .is_some_and(|window| window.is_focused().unwrap_or(false))
-            {
+                .is_some_and(|window| window.is_focused().unwrap_or(false));
+            let pid = dictation_target_pid(
+                palette_focused,
+                target_previous_app,
                 host.state::<crate::window_management::WindowManager>()
                     .target_pid
-                    .load(std::sync::atomic::Ordering::Acquire)
-            } else {
-                0
-            };
+                    .load(std::sync::atomic::Ordering::Acquire),
+                std::process::id() as i32,
+            );
             unsafe {
                 if prompt_mode { prism_dictation_prompt_toggle(pid); } else { prism_dictation_toggle(pid); }
             }
-            // Capture AX before hiding Prism, and keep the panel nonactivating.
-            if let Some(window) = host.get_webview_window("main") {
-                let _ = window.hide();
+            // Only a launcher command hands input back to the previous app.
+            // Shortcuts keep Prism's search/chat input and its focus intact.
+            if target_previous_app {
+                if let Some(window) = host.get_webview_window("main") {
+                    let _ = window.hide();
+                }
             }
         })
         .map_err(|_| "받아쓰기를 시작하지 못했습니다.".into())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = app;
+        let _ = (app, prompt_mode, target_previous_app);
         Err("받아쓰기는 현재 macOS에서 지원합니다.".into())
     }
 }
@@ -780,6 +804,15 @@ pub async fn dictation_pick_file(kind: String) -> Result<Option<String>, String>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn shortcuts_target_the_focused_input_instead_of_the_previous_app() {
+        assert_eq!(super::dictation_target_pid(true, false, 41, 42), 42);
+        assert_eq!(super::dictation_target_pid(false, false, 41, 42), 0);
+        assert_eq!(super::dictation_target_pid(true, true, 41, 42), 41);
+        assert_eq!(super::dictation_target_pid(false, true, 41, 42), 41);
+        assert_eq!(super::dictation_target_pid(true, true, 0, 42), 0);
+    }
+
     #[test]
     fn both_enhancements_survive_roundtrip_without_changing_profiles() {
         let mut settings = super::DictationSettings::default();

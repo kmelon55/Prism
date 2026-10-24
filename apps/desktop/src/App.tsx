@@ -1672,7 +1672,7 @@ export function App() {
       }
       else if (action.id === prismActionIds.toggleDictation || action.id === prismActionIds.toggleDictationPrompt) {
         if (!nativeRuntime) { setToast(t("받아쓰기는 macOS용 Prism 앱에서 사용할 수 있습니다.")); return; }
-        await invoke(action.id === prismActionIds.toggleDictationPrompt ? "dictation_prompt_toggle" : "dictation_toggle"); resetPaletteState();
+        await invoke(action.id === prismActionIds.toggleDictationPrompt ? "dictation_prompt_toggle" : "dictation_toggle", { targetPreviousApp: true }); resetPaletteState();
       }
       else if (action.id === prismActionIds.captureAi) {
         if (!nativeRuntime) { setToast(t("Screen region capture is available in the macOS app.")); return; }

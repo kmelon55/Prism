@@ -86,6 +86,7 @@ enum TextInjector {
         var paste: @MainActor (pid_t) -> Bool = { TextInjector.postPasteShortcut(to: $0) }
         var enter: @MainActor (pid_t) -> Bool = { TextInjector.postEnterKey(to: $0) }
         var revision: @MainActor () -> Int = { NSPasteboard.general.changeCount }
+        var application: @MainActor (pid_t) -> NSRunningApplication? = { NSRunningApplication(processIdentifier: $0) }
     }
 
     @discardableResult
@@ -110,21 +111,24 @@ enum TextInjector {
         return pasteboard.writeObjects([item]) && pasteboard.string(forType: .string) == text
     }
 
-    static func captureTarget(fallbackPID: pid_t = 0) -> TextInsertionTarget? {
-        guard let application = NSWorkspace.shared.frontmostApplication else {
+    static func captureTarget(fallbackPID: pid_t = 0, environment: Environment = Environment()) -> TextInsertionTarget? {
+        guard let frontmostPID = environment.frontmostPID() else {
             logger.error("Capture failed: no frontmost application")
             return nil
         }
-        let pid = application.processIdentifier == ProcessInfo.processInfo.processIdentifier ? fallbackPID : application.processIdentifier
-        guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier else {
-            logger.error("Capture failed: Prism is frontmost")
+        // The host explicitly supplies Prism's PID for in-app dictation, or the
+        // remembered external PID when invoked from the launcher command list.
+        let pid = frontmostPID == ProcessInfo.processInfo.processIdentifier ? fallbackPID : frontmostPID
+        guard pid > 0 else {
+            logger.error("Capture failed: no input target")
             return nil
         }
 
-        guard let targetApplication = NSRunningApplication(processIdentifier: pid), !targetApplication.isTerminated else { return nil }
-        let element = hasAccessibilityPermission ? focusedElement(for: pid) : nil
+        guard let targetApplication = environment.application(pid), environment.running(targetApplication) else { return nil }
+        let trusted = environment.permission()
+        let element = trusted ? environment.focused(pid) : nil
         logger.notice(
-            "Captured target pid=\(pid, privacy: .public), trusted=\(hasAccessibilityPermission, privacy: .public), element=\(element != nil, privacy: .public)"
+            "Captured target pid=\(pid, privacy: .public), trusted=\(trusted, privacy: .public), element=\(element != nil, privacy: .public)"
         )
 
         return TextInsertionTarget(
@@ -249,7 +253,7 @@ enum TextInjector {
         if NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier {
             let systemWideElement = AXUIElementCreateSystemWide()
             if let element = elementAttribute(kAXFocusedUIElementAttribute, from: systemWideElement),
-               !belongsToCurrentProcess(element) {
+               (processIdentifier == ProcessInfo.processInfo.processIdentifier || !belongsToCurrentProcess(element)) {
                 return element
             }
         }
