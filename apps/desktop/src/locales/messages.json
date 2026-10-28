@@ -6170,5 +6170,14 @@
   ["Markdown preview", "Markdown 미리보기"],
   ["Start writing…", "내용을 입력하세요…"],
   ["Delete note", "노트 삭제"],
-  ["Delete this note?", "이 노트를 삭제할까요?"]
+  ["Delete this note?", "이 노트를 삭제할까요?"],
+  ["USD / 1M tokens · Price bands: $0 / <$0.1 / <$0.5 / <$2 / <$10 / $10+", "USD / 100만 토큰 · 가격 단계: $0 / <$0.1 / <$0.5 / <$2 / <$10 / $10+"],
+  [" · Prices vary by tier and route", " · 구간·경로에 따라 요금 변동"],
+  ["First token", "첫 토큰"],
+  ["Actual response time varies by request and route.", "실제 응답 시간은 요청과 경로에 따라 달라져요."],
+  ["Comparable public speed data is unavailable.", "비교 가능한 공개 속도 자료가 없어요."],
+  ["Reference speed", "참고 속도"],
+  ["USD / 1M tokens · More bars mean higher prices or faster generation. — Unavailable", "USD / 100만 토큰 · 칸이 많을수록 높은 가격·빠른 생성 속도예요. — 정보 없음"],
+  ["Speed: Vercel public data · 2026-10-28 · Not actual wait time.", "속도: Vercel 공개 자료 · 2026-10-28 · 실제 대기 시간과 달라요."],
+  ["Context", "컨텍스트"]
 ]

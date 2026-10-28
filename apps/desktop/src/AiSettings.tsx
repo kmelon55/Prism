@@ -1,7 +1,7 @@
 import { CompatibleApiSettings } from "./ai/CompatibleApiSettings";
 import { AiUsage } from "./AiUsage";
-import { AnimatePresence } from "motion/react";
-import { AnimatedPanel } from "./settings/InterfaceMotion";
+import { ModelPickerDialog } from "./model-picker/ModelPickerDialog";
+import { ModelColumns, ModelPrice, ModelSpeed, ModelMetricLegend } from "./model-picker/ModelMetrics";
 import { t, useLocale } from "./i18n";
 import { AiToolSettings } from "./AiToolSettings";
 import { useEffect, useRef, useState } from "react";
@@ -90,6 +90,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
   }, [modelsOpen]);
+  useEffect(() => { selector.current?.querySelector(".model-catalog-list")?.scrollTo({top: 0}); }, [query, provider, sort]);
   function closeModels() { setModelsOpen(false); modelTrigger.current?.focus(); }
   function changeProvider(next: AiProvider) {
     if (next === provider || mutation.current) return;
@@ -150,7 +151,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
   const activeModel = saved.provider === provider ? models.find((entry) => entry.id === saved.model) : undefined;
   const busy = savingKey || Boolean(savingModel);
 
-  const modelMenu = modelsOpen ? (<AnimatedPanel className="ai-model-settings ai-settings-model-popover" role="dialog" aria-label={t("기본 모델 선택")} onKeyDown={(event) => {
+  const modelMenu = modelsOpen ? (<ModelPickerDialog returnFocusRef={modelTrigger} onDismiss={closeModels} aria-label={t("기본 모델 선택")} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeModels(); }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -163,26 +164,26 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       <div className="ai-section-heading"><h3>{t("기본 모델")}<small>{loaded ? t("{0}개", {"0": models.length}) : ""}</small></h3><button type="button" aria-label={t("모델 목록 새로고침")} disabled={!canLoad || loading || busy} onClick={() => setCatalogRevision((value) => value + 1)}><RefreshCw size={13} className={loading ? "ai-spinning" : ""} />{loading ? t("불러오는 중") : t("새로고침")}</button><button type="button" aria-label={t("모델 선택 닫기")} onClick={closeModels}><X size={15}/></button></div>
       <div className="ai-picker-providers" role="group" aria-label={t("모델 제공업체")}>{(Object.keys(aiProviders) as AiProvider[]).map(id => <button key={id} type="button" aria-pressed={provider === id} disabled={busy} onClick={() => changeProvider(id)}>{id === "vercel" ? "Vercel" : aiProviders[id].name}</button>)}</div>
       <label className="ai-model-search"><Search size={15} /><input ref={modelSearch} type="search" aria-label={t("모델 검색")} placeholder={t("모델 이름이나 제작사 검색")} value={query} onChange={(event) => { setQuery(event.target.value); setLimit(40); }} /></label>
-      <p className="ai-price-unit">{t("USD / 100만 토큰 · 기본 요금")}</p>
-      <div className="ai-model-columns"><button type="button" aria-pressed={sort === "name"} onClick={() => setSort("name")}>{t("모델")}{sort === "name" ? " ↑" : ""}</button><button type="button" aria-pressed={sort === "input"} onClick={() => setSort("input")}>{t("입력")}{sort === "input" ? " ↑" : ""}</button><button type="button" aria-pressed={sort === "output"} onClick={() => setSort("output")}>{t("출력")}{sort === "output" ? " ↑" : ""}</button></div>
+      <ModelColumns sort={sort} onSort={setSort}/>
       {error && <p role="alert" className="ai-settings-error">{t(error)}</p>}
       {modelError && <p role="alert" className="ai-settings-error">{t(modelError)} {t("새로고침으로 다시 시도하세요.")}</p>}
       {!nativeRuntime ? <p className="ai-settings-note">{t("데스크톱 앱에서 실제 모델 목록을 불러옵니다.")}</p>
         : provider === "openai" && (!keyInfo?.configured || keyInfo.unlocked === false) ? <p className="ai-settings-note">{t("OpenAI는 API 키를 저장하거나 키 사용을 허용하면 모델을 불러옵니다.")}</p>
         : !loading && loaded && !filtered.length ? <p role="status" className="ai-settings-note">{models.length ? t("검색 결과가 없습니다.") : t("사용 가능한 텍스트 모델이 없습니다.")}</p> : null}
-      <div className="ai-model-list" aria-label={t("사용할 AI 모델")} aria-busy={loading}>
+      <div className="ai-model-list model-catalog-list" aria-label={t("사용할 AI 모델")} aria-busy={loading}>
         {filtered.slice(0, limit).map((entry) => {
           const selected = saved.provider === provider && saved.model === entry.id;
-          return <button type="button" className={`ai-model-option${selected ? " selected" : ""}`} key={entry.id} aria-label={t("{0} 선택", {"0": entry.name})} aria-pressed={selected} disabled={busy || !ready} onClick={() => void selectModel(entry)}>
-            <span className="ai-model-name"><strong>{entry.name}{selected && <Check size={14} />}</strong><small>{entry.id}{entry.contextWindow ? t(" · {0} 토큰", {"0": new Intl.NumberFormat("ko-KR", { notation: "compact" }).format(entry.contextWindow)}) : ""}</small>{savingModel === entry.id && <small>{t("저장 중…")}</small>}</span>
-            <span className="ai-model-price" title={entry.pricingVariable ? t("사용량 구간이나 제공 경로에 따라 요금이 달라집니다.") : undefined}>{formatAiPrice(entry.inputPrice)}{entry.pricingVariable && entry.inputPrice != null ? "*" : ""}</span><span className="ai-model-price" title={entry.pricingVariable ? t("사용량 구간이나 제공 경로에 따라 요금이 달라집니다.") : undefined}>{formatAiPrice(entry.outputPrice)}{entry.pricingVariable && entry.outputPrice != null ? "*" : ""}</span>
+          return <button type="button" className={`ai-model-option model-catalog-row${selected ? " selected" : ""}`} key={entry.id} aria-label={t("{0} 선택", {"0": entry.name})} aria-pressed={selected} disabled={busy || !ready} onClick={() => void selectModel(entry)}>
+            <span className="model-catalog-name"><strong>{entry.name}{selected && <Check size={14} />}</strong><small>{entry.id}{entry.contextWindow ? t(" · {0} 토큰", {"0": new Intl.NumberFormat("ko-KR", { notation: "compact" }).format(entry.contextWindow)}) : ""}</small>{savingModel === entry.id && <small>{t("저장 중…")}</small>}</span>
+            <ModelPrice price={entry.inputPrice} variable={entry.pricingVariable}/><ModelPrice price={entry.outputPrice} variable={entry.pricingVariable}/><ModelSpeed model={entry.id} provider={provider}/>
           </button>;
         })}
         {filtered.length > limit && <button className="ai-model-more" type="button" onClick={() => setLimit((value) => value + 40)}>{t("더 보기 (")}{filtered.length - limit}{t("개)")}</button>}
       </div>
-      <p className="ai-settings-note ai-pricing-note">{t("USD / 100만 토큰 · 제공업체 API의 기본 요금입니다. * 구간·경로에 따라 요금 변동. 캐시 등 추가 조건은 별도입니다.")}{provider === "openai" && <> {t("OpenAI 목록 API는 가격을 제공하지 않습니다.")}<button type="button" onClick={() => openUrl("https://developers.openai.com/api/docs/pricing")}>{t("공식 요금표")}<ExternalLink size={11} /></button></>}</p>
+      <ModelMetricLegend/>
+      {provider === "openai" && <p className="ai-settings-note ai-pricing-note">{t("OpenAI 목록 API는 가격을 제공하지 않습니다.")}<button type="button" onClick={() => openUrl("https://developers.openai.com/api/docs/pricing")}>{t("공식 요금표")}<ExternalLink size={11}/></button></p>}
       {loaded && saved.provider === provider && saved.model && !activeModel && <p className="ai-settings-note">{t("저장한 모델이 현재 목록에 없습니다. 현재 선택은 유지되며 다른 모델로 바꿀 수 있습니다.")}</p>}
-    </AnimatedPanel>) : null;
+    </ModelPickerDialog>) : null;
 
   return <div className="ai-settings" aria-label={t("AI 설정")}>
     {!nativeRuntime && <p className="ai-settings-note">{t("브라우저 미리보기입니다. 키 저장과 모델 조회는 macOS 앱에서 사용할 수 있습니다.")}</p>}
@@ -194,7 +195,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
       {activeModel && <small>{t("입력")}{formatAiPrice(activeModel.inputPrice)} {t("· 출력")}{formatAiPrice(activeModel.outputPrice)} {t("/ 100만 토큰")}</small>}
       </div>
       <button ref={modelTrigger} type="button" className="ai-settings-model-trigger" aria-label={t("기본 모델 변경")} aria-haspopup="dialog" aria-expanded={modelsOpen} disabled={!ready || busy} onClick={() => {setQuery("");setLimit(40);setModelsOpen(value => !value);}}>{saved.model ? t("모델 변경") : t("모델 선택")}<ChevronDown size={14}/></button>
-      <AnimatePresence initial={false}>{modelMenu}</AnimatePresence>
+      {modelMenu}
     </section>
     <section className="ai-connection" aria-label={t("AI 연결")}>
       <div className="ai-section-heading"><h3>{t("제공업체")}</h3><span>{t("본인 API 키로 연결")}</span></div>

@@ -1,0 +1,114 @@
+.model-picker-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(880px, calc(100vw - 28px));
+  height: min(700px, calc(100dvh - 28px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  color: var(--text);
+  background: var(--panel, #292929);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  box-shadow: 0 24px 90px #0006;
+  text-align: left;
+}
+.model-picker-dialog::backdrop { background: #080b1266; }
+.model-picker-dialog .model-picker-surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 8px;
+  padding: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.model-picker-surface > * { flex-shrink: 0; }
+.model-picker-dialog button { color: var(--text); font-family: inherit; cursor: pointer; }
+.model-picker-dialog button:disabled { opacity: .5; cursor: default; }
+.model-picker-dialog :is(button, input, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.model-picker-dialog :is(.ai-picker-heading, .ai-section-heading) { display: flex; align-items: center; gap: 8px; margin: 0; min-height: 28px; }
+.model-picker-dialog :is(.ai-picker-heading > strong, .ai-section-heading h3) { flex: 1; font-size: 16px; font-weight: 600; }
+.model-picker-dialog .ai-section-heading h3 small { margin-left: 8px; }
+.model-picker-dialog .model-count { color: var(--text-muted); font-size: 11px; }
+.model-picker-dialog :is(.ai-picker-heading, .ai-section-heading) > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; padding: 6px; }
+.model-picker-dialog .ai-picker-providers { flex-wrap: wrap; margin: 0; gap: 3px; padding: 3px; }
+.model-picker-dialog .ai-picker-providers button { padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+.model-picker-dialog .ai-picker-providers button[aria-pressed="true"] { box-shadow: 0 1px 4px #0002; font-weight: 600; }
+.model-picker-dialog :is(.ai-picker-search, .ai-model-search) { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); }
+.model-picker-dialog :is(.ai-picker-search, .ai-model-search):focus-within { border-color: var(--accent); }
+.model-picker-dialog :is(.ai-picker-search, .ai-model-search) input { box-sizing: border-box; width: 100%; height: 40px; padding: 0; font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; outline: none; }
+.model-picker-dialog .model-catalog-columns,
+.model-picker-dialog .model-picker-surface .model-catalog-row { display: grid; grid-template-columns: minmax(0, 1fr) 82px 82px 86px; gap: 14px; align-items: center; }
+.model-picker-dialog .model-catalog-columns { padding: 0 12px; color: var(--text-secondary); font-size: 11px; }
+.model-picker-dialog .model-catalog-columns button { display: block; padding: 3px 0; text-align: right; background: transparent; border: 0; font-size: 11px; color: var(--text-secondary); }
+.model-picker-dialog .model-catalog-columns button:first-child { text-align: left; }
+.model-picker-dialog .model-catalog-columns > span { text-align: right; }
+.model-picker-dialog .model-catalog-columns button[aria-pressed="true"] { color: var(--accent); }
+.model-picker-dialog .model-picker-surface .model-catalog-list {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.model-picker-dialog .model-picker-surface .model-catalog-row {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 7px;
+  text-align: left;
+  background: transparent;
+}
+.model-picker-dialog .model-catalog-row:is(:hover, :focus-visible),
+.model-picker-dialog .model-picker-surface .model-catalog-row[aria-pressed="true"] { background: var(--surface-selected); }
+.model-picker-dialog .model-catalog-row[aria-pressed="true"] { box-shadow: inset 3px 0 var(--accent); }
+.model-picker-dialog .model-catalog-name { display: grid; gap: 3px; min-width: 0; }
+.model-picker-dialog .model-catalog-name strong { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }
+.model-picker-dialog .model-catalog-name strong svg { color: var(--accent); flex-shrink: 0; }
+.model-picker-dialog .model-catalog-name small { display: block; font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-picker-dialog .model-capabilities { display: flex; gap: 8px; flex-wrap: wrap; color: var(--text-muted); font-size: 10px; }
+.model-picker-dialog .model-metric { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-picker-dialog .model-meter { display: flex; gap: 3px; }
+.model-meter i { width: 8px; height: 5px; border-radius: 2px; background: var(--line-strong); }
+.model-meter-price i[data-filled="true"] { background: var(--text-secondary); }
+.model-meter-speed i[data-filled="true"] { background: var(--accent); }
+.model-picker-dialog .model-metric-legend { margin: 0; font-size: 10px; color: var(--text-muted); line-height: 1.6; }
+.model-metric-legend > span { display: block; }
+.model-picker-dialog .model-catalog-more { justify-content: center; text-align: center; width: 100%; padding: 12px; color: var(--accent); background: transparent; border: 0; }
+.model-picker-dialog .ai-picker-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0; padding: 4px 0 0; border: 0; color: var(--text-secondary); }
+.model-picker-dialog .ai-picker-footer button { font-size: 11px; white-space: nowrap; }
+.model-picker-dialog :is(.ai-error, .ai-settings-error) { margin: 0; max-height: 60px; overflow: auto; overscroll-behavior: contain; }
+.model-picker-dialog .ai-pricing-note { margin: 0; font-size: 10px; }
+.model-picker-dialog .model-picker-speech-content { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.model-picker-dialog .dictation-model-list { max-height: none; overflow: visible; padding: 0; }
+.model-picker-dialog .dictation-model { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 14px; gap: 7px; border: 1px solid var(--line-strong); border-radius: 9px; }
+.model-picker-dialog .dictation-model-heading strong { font-size: 14px; }
+.model-picker-dialog .dictation-model-description { font-size: 12px; line-height: 1.65; }
+.model-picker-dialog .dictation-model-id { font-size: 11px; }
+.model-picker-dialog .dictation-model-picker { padding: 0; }
+.model-picker-dialog .dictation-model-picker > .ai-model-search { position: sticky; top: 0; z-index: 1; background: var(--panel, #292929); }
+@media (max-height: 560px) {
+  .model-picker-dialog .model-picker-surface { padding: 12px 16px; gap: 5px; }
+  .model-picker-dialog .model-picker-surface .model-catalog-row { min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
+  .model-picker-dialog .model-capabilities { display: none; }
+}
+@media (max-width: 580px) {
+  .model-picker-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
+  .model-picker-dialog .model-picker-surface { padding: 12px; }
+  .model-picker-dialog .model-catalog-columns,
+  .model-picker-dialog .model-picker-surface .model-catalog-row { grid-template-columns: minmax(0, 1fr) 56px 56px 62px; gap: 8px; padding-left: 8px; padding-right: 8px; }
+  .model-picker-dialog .model-catalog-name strong { font-size: 12px; }
+  .model-picker-dialog .model-metric { font-size: 11px; }
+}

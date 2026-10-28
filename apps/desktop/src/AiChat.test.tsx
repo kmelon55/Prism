@@ -141,7 +141,7 @@ it("changes the model in the composer without losing messages and persists befor
   native.invoke.mockImplementation(async(command:string,args:any)=>command==="ai_list_models"?[model]:base(command,args));
   await mount();await type(composer(),"Existing question");await click("메시지 전송");
   await click("대화 모델 변경");
-  expect(container.textContent).toContain("$0.15 / $0.5");
+  expect([...container.querySelectorAll(".model-metric:not(.model-speed)")].map(cell => cell.textContent)).toEqual(["$0.15", "$0.5"]);
   await click("GLM 5.3 Flash 사용");
   expect(container.querySelectorAll("article")).toHaveLength(2);
   expect(container.querySelector('[aria-label="대화 모델 변경"]')?.textContent).toContain("GLM 5.3 Flash");
@@ -154,6 +154,22 @@ it("keeps the previous model and displays a failed model-save in the picker",asy
   await mount();await click("대화 모델 변경");await click("Next 사용");
   expect(container.querySelector('[aria-label="대화 모델 선택"]')?.textContent).toContain("저장 실패");
   expect(container.querySelector('[aria-label="대화 모델 변경"]')?.textContent).toContain("fixture-model");
+});
+it("sorts model prices with free models first and unknown prices last without making an inference request", async () => {
+  const models = [
+    {id:"unknown",name:"A unknown",inputPrice:null,outputPrice:null},
+    {id:"expensive",name:"B expensive",inputPrice:10,outputPrice:20},
+    {id:"cheap",name:"C cheap",inputPrice:0.1,outputPrice:0.4},
+    {id:"free",name:"Z free",inputPrice:0,outputPrice:0},
+  ];
+  native.invoke.mockImplementation(async (command:string,args:any) => command === "ai_list_models" ? models : base(command,args));
+  await mount(); await click("대화 모델 변경");
+  const list = container.querySelector<HTMLElement>(".model-catalog-list")!;
+  list.scrollTop = 200;
+  await click("입력");
+  expect([...list.querySelectorAll(".model-catalog-name strong")].map(row => row.textContent)).toEqual(["Z free", "C cheap", "B expensive", "A unknown"]);
+  expect(list.scrollTop).toBe(0);
+  expect(chatCalls()).toHaveLength(0);
 });
 it("keeps provider clicks available when the WebView blurs the search without a focus target", async () => {
   native.invoke.mockImplementation(async (command: string, args: any) => command === "ai_list_models"

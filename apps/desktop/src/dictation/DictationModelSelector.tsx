@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { AnimatePresence } from "motion/react";
-import { AnimatedPanel } from "../settings/InterfaceMotion";
+import { ModelPickerDialog } from "../model-picker/ModelPickerDialog";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, FolderOpen, X } from "lucide-react";
 import { t } from "../i18n";
@@ -40,7 +39,7 @@ export function DictationModelSelector({ settings, disabled, nativeRuntime, conf
   return <section ref={root} className="ai-settings ai-current-model dictation-current-model" aria-label={t("현재 받아쓰기 모델")}>
     <div className="ai-current-model-copy"><span className="ai-eyebrow">{t("현재 모델")}</span><strong>{label}</strong><small>{provider.name}</small></div>
     <button ref={trigger} className="ai-settings-model-trigger" aria-label={t("받아쓰기 모델 변경")} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}>{t("모델 변경")}<ChevronDown size={14} /></button>
-    <AnimatePresence initial={false}>{open && <AnimatedPanel className="ai-model-settings ai-settings-model-popover dictation-selector-popover" role="dialog" aria-label={t("받아쓰기 모델 선택")} onKeyDown={event => {
+    {open && <ModelPickerDialog returnFocusRef={trigger} className="model-picker-speech" onDismiss={close} aria-label={t("받아쓰기 모델 선택")} onKeyDown={event => {
       if (event.nativeEvent.isComposing) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
@@ -53,7 +52,7 @@ export function DictationModelSelector({ settings, disabled, nativeRuntime, conf
       <div className="ai-section-heading"><h3>{t("STT 모델")}</h3><button aria-label={t("모델 선택 닫기")} onClick={close}><X size={15} /></button></div>
       <div className="ai-picker-providers" role="group" aria-label={t("STT 제공자")}>{providers.map(provider => <button key={provider.id} disabled={disabled} aria-pressed={provider.id === settings.provider} onClick={() => onProvider(provider.id)}>{provider.id === "vercel" ? "Vercel" : provider.name}</button>)}</div>
       {error && <p role="alert" className="ai-settings-error">{error}</p>}
-      {settings.provider === "local" ? <div className="dictation-local-model">
+      <div className="model-picker-speech-content">{settings.provider === "local" ? <div className="dictation-local-model">
         <LocalModelPicker modelPath={settings.modelPath} whisperPath={settings.whisperPath} disabled={disabled} nativeRuntime={nativeRuntime} onSelect={async (model, path, whisperPath) => {
           onChange({ ...latestSettings.current, provider: "local", baseURL: "", model: model.name, modelPath: path, whisperPath });
           if (!await flush()) throw new Error(t("Settings could not be saved."));
@@ -65,6 +64,7 @@ export function DictationModelSelector({ settings, disabled, nativeRuntime, conf
         <button type="button" className="settings-toolbar-button" disabled={disabled || picking || !settings.modelPath || !settings.whisperPath} onClick={() => void flush().then(saved => { if (saved) close(); else setError(t("Settings could not be saved.")); })}>{t("Use local model")}</button>
         </details>
       </div> : <DictationModelPicker provider={settings.provider} baseURL={settings.baseURL} model={settings.model} configured={configured} keyEpoch={keyEpoch} nativeRuntime={nativeRuntime} disabled={disabled} onSelect={model => { setError(""); void onSelect(model).then(close).catch(error => setError(error instanceof Error ? error.message : String(error))); }} />}
-    </AnimatedPanel>}</AnimatePresence>
+      </div>
+    </ModelPickerDialog>}
   </section>;
 }

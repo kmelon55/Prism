@@ -1,7 +1,9 @@
+import { ModelPickerDialog } from "./model-picker/ModelPickerDialog";
+import { ModelColumns, ModelPrice, ModelSpeed, ModelMetricLegend, type ModelSort } from "./model-picker/ModelMetrics";
 import { t, useLocale } from "./i18n";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, Search, Sparkles, RefreshCw } from "lucide-react";
-import { aiErrorText, aiProviders, formatAiPrice, listAiModels, type AiSelection, type AiProvider, type AiModel } from "./providers/ai";
+import { Check, ChevronDown, Search, Sparkles, RefreshCw, X } from "lucide-react";
+import { aiErrorText, aiProviders, listAiModels, type AiSelection, type AiProvider, type AiModel } from "./providers/ai";
 export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, onSettings, purpose = "chat" }: { selection: AiSelection; disabled: boolean; nativeRuntime: boolean; onSelect(value: AiSelection): Promise<void>; onSettings(): void; purpose?: "chat" | "dictation" }) {
   useLocale();
   const [open,setOpen]=useState(false);
@@ -13,6 +15,7 @@ export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, on
   const [saving,setSaving]=useState(false);
   const [revision,setRevision]=useState(0);
   const [limit,setLimit]=useState(35);
+  const [sort,setSort]=useState<ModelSort>("name");
   const host=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const search=useRef<HTMLInputElement>(null);
@@ -29,22 +32,16 @@ export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, on
     void listAiModels(provider).then(v=>{if(alive)setModels(v);}).catch(e=>{if(alive)setError(aiErrorText(e));}).finally(()=>{if(alive)setLoading(false);});
     return()=>{alive=false;};
   },[open,provider,nativeRuntime,revision]);
-  const filtered=models.filter(m=>`${m.name} ${m.id}`.toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => { host.current?.querySelector(".model-catalog-list")?.scrollTo({top: 0}); }, [query, provider, sort]);
+  const filtered=models.filter(m=>`${m.name} ${m.id}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a,b)=>(sort === "input" ? (a.inputPrice ?? Infinity) - (b.inputPrice ?? Infinity) : sort === "output" ? (a.outputPrice ?? Infinity) - (b.outputPrice ?? Infinity) : 0) || a.name.localeCompare(b.name));
   async function select(model:AiModel){
     if(saving)return;setSaving(true);setError("");
     try{await onSelect({provider,model:model.id,modelName:model.name});setOpen(false);trigger.current?.focus();}catch(e){setError(aiErrorText(e));}finally{setSaving(false);}
   }
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!open || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-    if (event.key === "Tab") {
-      event.preventDefault();
-      event.stopPropagation();
-      const controls = [...host.current!.querySelectorAll<HTMLElement>(".ai-model-popover button:not(:disabled), .ai-model-popover input:not(:disabled)")];
-      const index = controls.indexOf(document.activeElement as HTMLElement);
-      const next = index < 0 ? (event.shiftKey ? controls.length - 1 : 0)
-        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
-      controls[next]?.focus();
-    } else if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
       event.preventDefault();
       const rows = [...host.current!.querySelectorAll<HTMLButtonElement>(".ai-picker-results > button:not(:disabled)")];
       const index = rows.indexOf(document.activeElement as HTMLButtonElement);
@@ -67,15 +64,22 @@ export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, on
     if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
   }}>
     <button ref={trigger} type="button" className="ai-model-trigger" aria-label={t(purpose === "dictation" ? "Change text processing model" : "대화 모델 변경")} aria-haspopup="dialog" aria-expanded={open} disabled={disabled || saving} onClick={()=>{setProvider(selection.provider);setQuery("");setLimit(35);setOpen(v=>!v);}}><Sparkles size={13}/><span>{selection.modelName||selection.model||t("모델 선택")}</span><ChevronDown size={13}/></button>
-    {open&&<div className="ai-model-popover ai-feedback-enter" role="dialog" aria-label={t(purpose === "dictation" ? "Text processing model" : "대화 모델 선택")}>
-      <div className="ai-picker-heading"><strong>{t(purpose === "dictation" ? "Text processing model" : "이 대화의 모델")}</strong><button type="button" aria-label={t("대화 모델 새로고침")} disabled={loading||saving} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={13} className={loading?"ai-spinning":""}/></button></div>
+    {open&&<ModelPickerDialog returnFocusRef={trigger} onDismiss={() => setOpen(false)} aria-label={t(purpose === "dictation" ? "Text processing model" : "대화 모델 선택")}>
+      <div className="ai-picker-heading"><strong>{t(purpose === "dictation" ? "Text processing model" : "이 대화의 모델")}</strong><span className="model-count">{!loading && t("{0}개", {0: filtered.length})}</span><button type="button" aria-label={t("대화 모델 새로고침")} disabled={loading||saving} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={15} className={loading?"ai-spinning":""}/></button><button type="button" aria-label={t("모델 선택 닫기")} onClick={() => setOpen(false)}><X size={18}/></button></div>
       <div className="ai-picker-providers" role="group" aria-label={t("대화 제공업체")}>{(Object.keys(aiProviders) as AiProvider[]).filter(p => purpose !== "dictation" || p !== "compatible").map(p=><button type="button" key={p} aria-pressed={provider===p} disabled={saving} onClick={()=>{setProvider(p);setLimit(35);}}>{p==="vercel"?"Vercel":aiProviders[p].name}</button>)}</div>
       <label className="ai-picker-search"><Search size={14}/><input ref={search} type="search" aria-label={t("대화 모델 검색")} placeholder={t("모델 이름 검색…")} value={query} onChange={e=>{setQuery(e.target.value);setLimit(35);}}/></label>
-      <div className="ai-picker-price-heading"><span>{t("모델")}</span><small>{t("입력 / 출력 · USD / 100만 토큰")}</small></div>
-      <div className="ai-picker-results" aria-busy={loading}>{filtered.slice(0,limit).map(m=><button type="button" key={m.id} disabled={saving} aria-label={`${m.name} 사용`} aria-pressed={selection.provider===provider&&selection.model===m.id} onClick={()=>void select(m)}><span><strong>{m.name}</strong><small>{m.id}{m.supportsTools ? t(" · 도구 지원") : m.supportsTools === false ? t(" · 텍스트 대화") : ""}</small></span><span className="ai-picker-cost">{formatAiPrice(m.inputPrice)} / {formatAiPrice(m.outputPrice)}{m.pricingVariable?"*":""}</span>{selection.provider===provider&&selection.model===m.id&&<Check size={13}/>}</button>)}{filtered.length>limit&&<button type="button" onClick={()=>setLimit(n=>n+35)}>{t("더 보기")}</button>}{loading&&<p role="status">{t("모델을 불러오는 중…")}</p>}{!loading&&!error&&!filtered.length&&<p>{nativeRuntime?t("일치하는 모델이 없습니다."):t("모델 목록은 데스크톱 앱에서 불러옵니다.")}</p>}</div>
+      <ModelColumns sort={sort} onSort={value => { setSort(value); setLimit(35); }}/>
+      <div className="ai-picker-results model-catalog-list" aria-busy={loading}>{filtered.slice(0,limit).map(m => {
+        const selected = selection.provider === provider && selection.model === m.id;
+        return <button type="button" className="model-catalog-row" key={m.id} disabled={saving} aria-label={`${m.name} 사용`} aria-pressed={selected} onClick={() => void select(m)}>
+          <span className="model-catalog-name"><strong>{m.name}{selected && <Check size={15}/>}</strong><small title={m.id}>{m.id}</small><span className="model-capabilities">{m.contextWindow ? <span>{new Intl.NumberFormat("en", {notation:"compact"}).format(m.contextWindow)} {t("컨텍스트")}</span> : null}{m.supportsImages && <span>{t("이미지")}</span>}{m.supportsTools && <span>{t("도구")}</span>}</span></span>
+          <ModelPrice price={m.inputPrice} variable={m.pricingVariable}/><ModelPrice price={m.outputPrice} variable={m.pricingVariable}/><ModelSpeed model={m.id} provider={provider}/>
+        </button>;
+      })}{filtered.length>limit&&<button type="button" className="model-catalog-more" onClick={()=>setLimit(n=>n+35)}>{t("더 보기")} · {filtered.length-limit}</button>}{loading&&<p role="status">{t("모델을 불러오는 중…")}</p>}{!loading&&!error&&!filtered.length&&<p>{nativeRuntime?t("일치하는 모델이 없습니다."):t("모델 목록은 데스크톱 앱에서 불러옵니다.")}</p>}</div>
+      <ModelMetricLegend/>
       {provider === "compatible" && query.trim() && !filtered.some(m => m.id === query.trim()) && <button type="button" disabled={saving || !nativeRuntime} onClick={() => void select({id: query.trim(), name: query.trim(), contextWindow: null})}>{t("Use model ID: {0}", {0: query.trim()})}</button>}
       {error&&<p className="ai-error" role="alert">{t(error)}</p>}
       <div className="ai-picker-footer"><small>{t(purpose === "dictation" ? "Applies only to this enhancement." : "기존 대화를 유지하고 다음 답변부터 적용합니다.")}</small><button type="button" onClick={()=>{setOpen(false);onSettings();}}>{t("API 키·도구 설정")}</button></div>
-    </div>}
+    </ModelPickerDialog>}
   </div>;
 }

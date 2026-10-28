@@ -80,7 +80,7 @@ describe("AI connection settings", () => {
     expect(native.invoke).toHaveBeenCalledWith("ai_list_models", { provider: "vercel" });
     expect(container.querySelector(".ai-model-list")).toBeNull();
     await click("기본 모델 변경");
-    expect(container.textContent).toContain("$0"); expect(container.textContent).toContain("$15*"); expect(container.textContent).toContain("미제공");
+    expect(container.textContent).toContain("$0"); expect(container.textContent).toContain("$15*"); expect(button("Unknown price 선택").querySelector(".model-metric")?.textContent).toBe("—");
     await type('input[type="search"]', "smart");
     expect(container.querySelectorAll(".ai-model-option")).toHaveLength(1);
     await click("Smart Chat 선택");
