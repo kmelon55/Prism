@@ -1,5 +1,6 @@
 //! Whisp-backed native dictation with local recovery; keys stay in Keychain.
 pub mod catalog;
+pub mod local_models;
 pub mod processing;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

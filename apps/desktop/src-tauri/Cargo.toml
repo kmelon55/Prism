@@ -1,6 +1,6 @@
 [package]
 name = "prism-desktop"
-version = "0.1.16"
+version = "0.1.17"
 description = "Prism desktop command palette"
 authors = ["Prism contributors"]
 edition = "2021"
@@ -25,6 +25,7 @@ tokio = { version = "1", features = ["sync", "macros", "time", "process", "io-ut
 rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tauri = { version = "2", features = ["macos-private-api"] }
 unicode-normalization = "0.1"
 tauri-plugin-updater = "2"

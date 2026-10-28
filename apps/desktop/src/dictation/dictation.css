@@ -73,3 +73,15 @@
 
 .dictation-model-caption { display:flex; justify-content:space-between; gap:8px; margin-bottom:7px; color:var(--text-muted); font-size:11px; }
 .dictation-model-caption small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
+
+.dictation-local-catalog { display:grid; gap:10px; }
+.dictation-selector-popover .dictation-local-catalog .dictation-model-description { display:block; font-size:11px; line-height:1.5; }
+.dictation-selector-popover .dictation-local-catalog .dictation-model-list { max-height:340px; }
+.dictation-engine-status { padding:10px; border:1px solid var(--line); border-radius:8px; font-size:12px; }
+.dictation-engine-status > span { font-weight:600; }
+.dictation-engine-status p { color:var(--text-secondary); font-size:11px; line-height:1.5; }
+.dictation-engine-status button + button { margin-left:8px; }
+.dictation-download { display:grid; gap:7px; }
+.dictation-download progress { width:100%; accent-color:var(--accent); }
+.dictation-download button { justify-self:start; }
+.dictation-local-model > details > .settings-toolbar-button { margin:8px 18px; }

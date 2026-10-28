@@ -15,6 +15,8 @@ beforeEach(() => {
   settings = changeProvider(defaultSettings, "openai");
   invoke.mockReset().mockImplementation(async (command, args) => {
     if (command === "dictation_get_settings") return settings;
+    if (command === "dictation_local_models") return { models: [{ id: "large-v3", name: "Whisper Large v3", description: "Supports Korean", bytes: 3095033483, path: "/models/ggml-large-v3.bin" }], whisperPath: "/usr/local/bin/whisper-cli", canInstallEngine: true, installingEngine: false, download: null };
+    if (command === "dictation_download_model") return "/models/ggml-large-v3.bin";
     if (command === "ai_list_models") return [{id:"fixture/text",name:"Fixture text",inputPrice:.1,outputPrice:.2}];
     if (command === "dictation_action") return state;
     if (command === "ai_usage_summary") { const totals = { requests: 0, inputTokens: 0, outputTokens: 0, knownCostUsd: 0, unknownCostRequests: 0, unknownTokenRequests: 0, estimatedRequests: 0 }; return { month: totals, allTime: totals, features: [], recent: [] }; }
@@ -164,7 +166,7 @@ it("does not replace a working remote provider while browsing an incomplete loca
   await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Change dictation model"]')!.click());
   await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('.ai-picker-providers button')].find(button=>button.textContent?.startsWith("Local"))!.click());
   expect(container.querySelector('[role="dialog"] input[aria-label="Local model file"]')).not.toBeNull();
-  expect(invoke).toHaveBeenLastCalledWith("dictation_save_settings",{settings:expect.objectContaining({provider:"openai",model:settings.model})});
+  expect(invoke.mock.calls.filter(([command]) => command === "dictation_save_settings").at(-1)).toEqual(["dictation_save_settings",{settings:expect.objectContaining({provider:"openai",model:settings.model})}]);
 });
 
 it("opens durable recovery without starting another transcription", async () => {
@@ -192,4 +194,16 @@ it("persists the dictation history switch independently and restores it on reope
   await act(async () => toggle().click());
   expect(settings.saveToClipboardHistory).toBe(true);
   expect(invoke.mock.calls.some(([command]) => command === "dictation_toggle")).toBe(false);
+});
+
+
+it("selects a managed local model and saves both detected paths before closing", async () => {
+  settings = { ...settings, model: "whisper-1", prompt: "Keep Korean names", vocabulary: ["Prism"] };
+  await mount();
+  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Change dictation model"]')!.click());
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.ai-picker-providers button')].find(button => button.textContent?.startsWith("Local"))!.click());
+  await act(async () => container.querySelector<HTMLButtonElement>('.dictation-local-catalog .dictation-model')!.click());
+  expect(invoke.mock.calls.filter(([command]) => command === "dictation_save_settings").at(-1)).toEqual(["dictation_save_settings", { settings: expect.objectContaining({ provider: "local", model: "Whisper Large v3", baseURL: "", modelPath: "/models/ggml-large-v3.bin", whisperPath: "/usr/local/bin/whisper-cli", prompt: "Keep Korean names", vocabulary: ["Prism"] }) }]);
+  expect(container.querySelector('[role="dialog"]:not([inert])')).toBeNull();
+  expect(container.querySelector('.ai-current-model-copy')?.textContent).toContain("Whisper Large v3");
 });
