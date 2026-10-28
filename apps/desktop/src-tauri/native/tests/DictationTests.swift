@@ -296,6 +296,32 @@ private final class MockProtocol: URLProtocol, @unchecked Sendable {
         precondition(local == "local fixture transcript")
         precondition(!FileManager.default.fileExists(atPath: wav.deletingPathExtension().appendingPathExtension("transcript.txt").path))
         print("PASS: local process result and temporary transcript cleanup (fixture executable)")
+        let promptedExecutable = temp.appendingPathComponent("whisper-prompt-fixture")
+        try #"""
+        #!/bin/sh
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --prompt) shift; prompt="$1" ;;
+            -of) shift; output="$1" ;;
+            -l) shift; [ "$1" = "ko" ] || exit 2 ;;
+            -m|-f) shift ;;
+            -np|-otxt) ;;
+            *) exit 3 ;;
+          esac
+          shift
+        done
+        [ -n "$prompt" ] || exit 4
+        printf '%s' "$prompt" > "$output.txt"
+        """#.write(to: promptedExecutable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: promptedExecutable.path)
+        var promptConfiguration = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+        promptConfiguration["prompt"] = "Prism에서 Whisper large v3 turbo를 사용해요.\nQ5 모델이에요."
+        promptConfiguration["vocabulary"] = ["Whisper", "Prism", "Q5"]
+        let promptConfig = try JSONDecoder().decode(DictationConfiguration.self, from: JSONSerialization.data(withJSONObject: promptConfiguration))
+        let prompted = try await LocalWhisperService().transcribe(audioURL: wav, executableURL: promptedExecutable, modelURL: temp.appendingPathComponent("model.bin"), language: "ko", prompt: promptConfig.effectivePrompt)
+        precondition(prompted == promptConfig.effectivePrompt && prompted.contains("Whisper, Prism, Q5"))
+        precondition(!FileManager.default.fileExists(atPath: wav.deletingPathExtension().appendingPathExtension("transcript.txt").path))
+        print("PASS: local --prompt contract preserves multilingual hints and vocabulary (fixture executable)")
         let failedExecutable = temp.appendingPathComponent("whisper-failure")
         try "#!/bin/sh\nexit 1\n".write(to: failedExecutable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: failedExecutable.path)

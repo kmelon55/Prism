@@ -32,7 +32,7 @@ struct LocalWhisperService {
         child.process.executableURL = executableURL
         child.process.standardOutput = FileHandle.nullDevice
         child.process.standardError = FileHandle.nullDevice
-        child.process.arguments = ["-m", modelURL.path, "-f", audioURL.path, "-l", language, "-otxt", "-of", output.path, "-np"] + (prompt.isEmpty ? [] : ["-p", prompt])
+        child.process.arguments = ["-m", modelURL.path, "-f", audioURL.path, "-l", language, "-otxt", "-of", output.path, "-np"] + (prompt.isEmpty ? [] : ["--prompt", prompt])
         let code: Int32 = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 child.process.terminationHandler = { process in continuation.resume(returning: process.terminationStatus) }
