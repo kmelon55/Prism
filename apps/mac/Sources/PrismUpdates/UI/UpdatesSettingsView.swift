@@ -34,7 +34,7 @@ struct UpdatesSettingsView: View {
             }
             PrismSettingsRow(Text("Install updates automatically", bundle: .module),
                              detail: Text("Download and install new versions in the background. Changes take effect when you restart Prism.", bundle: .module)) {
-                Toggle(isOn: Binding(get: { status.automaticInstall }, set: setAutomatic)) { EmptyView() }
+                Toggle(isOn: Binding(get: { status.automaticInstall }, set: { setAutomatic($0) })) { EmptyView() }
                     .toggleStyle(.prism)
                     .labelsHidden()
                     .disabled(isDisabled(status))
