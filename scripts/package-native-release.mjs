@@ -8,10 +8,11 @@
 // Output: dist/native-releases/v<version> with the DMG, ZIP, updater archive and signature, latest.json and checksums.
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inspectSignature, resolveLocalSigningIdentity, verifyCompatibleSignatures } from "./macos-signing.mjs";
+import { signUpdaterFile } from "./sign-updater.mjs";
 import { verifyUpdater } from "./verify-updater.mjs";
 
 const environment = { ...process.env };
@@ -19,7 +20,12 @@ const version = environment.VERSION ?? JSON.parse(readFileSync("package.json", "
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("VERSION must be a plain semantic version such as 0.2.0.");
 if (!environment.PRISM_INSTALLED_APP) throw new Error("Set PRISM_INSTALLED_APP to the installed app whose signing identity must be preserved.");
 if (!environment.TAURI_SIGNING_PRIVATE_KEY) throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to the existing updater key. Never create a new one.");
-const config = JSON.parse(readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8"));
+// The key the native app trusts for later updates, and, while it exists, the key the installed Tauri app trusts.
+const publicKeys = [/static let prismPublicKey = "([^"]+)"/.exec(readFileSync("apps/mac/Sources/PrismUpdates/Signature/Minisign.swift", "utf8"))?.[1]];
+if (!publicKeys[0]) throw new Error("Could not read the updater public key from the native app.");
+if (existsSync("apps/desktop/src-tauri/tauri.conf.json")) {
+  publicKeys.push(JSON.parse(readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8")).plugins.updater.pubkey);
+}
 const identity = resolveLocalSigningIdentity(environment);
 
 const output = resolve(environment.PRISM_OUTPUT ?? `dist/native-releases/v${version}`);
@@ -55,9 +61,10 @@ try {
     throw new Error("The updater archive has entries outside Prism.app or AppleDouble files.");
   }
   // The existing updater key signs the archive, so the installed Tauri app accepts it.
-  execFileSync(process.execPath, ["scripts/run-tauri.mjs", "signer", "sign", join(output, archive)], { stdio: "inherit", env: environment });
-  const signature = readFileSync(join(output, `${archive}.sig`), "utf8").trim();
-  verifyUpdater(readFileSync(join(output, archive)), signature, config.plugins.updater.pubkey);
+  const signature = signUpdaterFile(join(output, archive), environment.TAURI_SIGNING_PRIVATE_KEY,
+    environment.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "");
+  writeFileSync(join(output, `${archive}.sig`), signature);
+  for (const key of publicKeys) verifyUpdater(readFileSync(join(output, archive)), signature, key);
 
   execFileSync("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, join(output, `Prism_${version}_universal.zip`)]);
   const dmgFolder = join(staging, "dmg");
