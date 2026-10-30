@@ -1,4 +1,5 @@
 import { ModelPickerDialog } from "./model-picker/ModelPickerDialog";
+import { createModelSearch } from "./model-picker/modelSearch";
 import { ModelColumns, ModelPrice, ModelSpeed, ModelMetricLegend, type ModelSort } from "./model-picker/ModelMetrics";
 import { t, useLocale } from "./i18n";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
@@ -33,7 +34,7 @@ export function AiModelPicker({ selection, disabled, nativeRuntime, onSelect, on
     return()=>{alive=false;};
   },[open,provider,nativeRuntime,revision]);
   useEffect(() => { host.current?.querySelector(".model-catalog-list")?.scrollTo({top: 0}); }, [query, provider, sort]);
-  const filtered=models.filter(m=>`${m.name} ${m.id}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered=models.filter(createModelSearch(query))
     .sort((a,b)=>(sort === "input" ? (a.inputPrice ?? Infinity) - (b.inputPrice ?? Infinity) : sort === "output" ? (a.outputPrice ?? Infinity) - (b.outputPrice ?? Infinity) : 0) || a.name.localeCompare(b.name));
   async function select(model:AiModel){
     if(saving)return;setSaving(true);setError("");

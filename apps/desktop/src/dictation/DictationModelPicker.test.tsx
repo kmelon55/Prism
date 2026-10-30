@@ -55,6 +55,33 @@ it("disables realtime rows and preserves an unavailable saved/manual selection",
   expect(container.textContent).toContain("not confirmed for file transcription");
   expect(container.querySelector<HTMLInputElement>("details input")?.value).toBe("saved-model");
 });
+it("searches spaced model names and owners without reporting blank input as no results", async () => {
+  invoke.mockResolvedValue(catalog({ ...entry("whisper-large-v3"), ownedBy: "OpenAI" }, entry("other")));
+  await render();
+  const search = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+  async function searchFor(value: string) {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, value);
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  for (const query of ["  whisper   large  ", "large openai", "whisperlargev3"]) {
+    await searchFor(query);
+    expect(container.querySelectorAll(".dictation-model")).toHaveLength(1);
+    expect(container.querySelector(".dictation-model")?.textContent).toContain("whisper-large-v3");
+    expect(container.querySelector(".ai-settings-note")).toBeNull();
+  }
+  await searchFor("whisper unknown");
+  expect(container.querySelectorAll(".dictation-model")).toHaveLength(0);
+  expect(container.querySelector(".ai-settings-note")).not.toBeNull();
+  await searchFor("   ");
+  expect(container.querySelectorAll(".dictation-model")).toHaveLength(2);
+  expect(container.querySelector(".ai-settings-note")).toBeNull();
+  await searchFor("large openai");
+  await click("whisper-large-v3");
+  expect(select).toHaveBeenCalledWith("whisper-large-v3");
+});
+
 it("formats only API-reported pricing using Whisp's duration and token rules", () => {
   expect(modelPrice({ ...entry("x"), pricing: { transcription_duration_cost_per_second: "0.0001" } })).toBe("$0.36/hr");
   expect(modelPrice({ ...entry("x"), pricing: { audio_input_token_cost: "0.000001", output: "0.000002" } })).toContain("$1.00 / $2.00");

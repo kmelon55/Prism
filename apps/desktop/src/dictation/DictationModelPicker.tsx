@@ -1,4 +1,5 @@
 import { AnimatedDetails } from "../settings/InterfaceMotion";
+import { createModelSearch } from "../model-picker/modelSearch";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Check, Search } from "lucide-react";
@@ -49,6 +50,7 @@ export function DictationModelPicker(props: Props) {
   }, [identity, canLoad, provider, baseURL]);
   const current = state?.identity === identity ? state : undefined;
   const catalog = current?.catalog;
+  const filtered = catalog?.models.filter(createModelSearch(query)) ?? [];
   const loading = canLoad && (!current || current.loading);
   return <div className="dictation-model-picker">
     <div className="settings-row"><strong>{t("STT 모델")}</strong><button className="settings-toolbar-button" disabled={!canLoad || disabled} onClick={() => setRevision(value => value + 1)}><RefreshCw size={14} />{t("Refresh models")}</button></div>
@@ -61,9 +63,9 @@ export function DictationModelPicker(props: Props) {
         <p className="dictation-notice">{t("제공자 API에서 확인한 전사 모델")} · {catalog.models.length}</p>
         {catalog.models.length === 0 && <p role="status" className="dictation-notice">{t("API 응답에 확인 가능한 파일 전사 모델이 없습니다. 서버 문서를 확인하거나 모델 ID를 직접 입력하세요.")}</p>}
 
-        {query && !catalog.models.some(entry => `${entry.name} ${entry.id} ${entry.ownedBy}`.toLowerCase().includes(query.toLowerCase())) && <p role="status" className="ai-settings-note">{t("검색 결과가 없습니다.")}</p>}
+        {query.trim() && !filtered.length && <p role="status" className="ai-settings-note">{t("검색 결과가 없습니다.")}</p>}
         <div className="dictation-model-list" role="group" aria-label={t("STT 모델")}>
-          {catalog.models.filter(entry => `${entry.name} ${entry.id} ${entry.ownedBy}`.toLowerCase().includes(query.toLowerCase())).map(entry => <button key={entry.id} className="dictation-model" disabled={disabled || !entry.batchCompatible} aria-pressed={model === entry.id} onClick={() => onSelect(entry.id)}>
+          {filtered.map(entry => <button key={entry.id} className="dictation-model" disabled={disabled || !entry.batchCompatible} aria-pressed={model === entry.id} onClick={() => onSelect(entry.id)}>
             <span className="dictation-model-heading"><strong>{entry.name}</strong>{model === entry.id && <Check size={14} />}</span>
             <span className="dictation-model-id">{entry.id}{entry.ownedBy && ` · ${entry.ownedBy}`}</span>
             {entry.description && <span className="dictation-model-description">{entry.description}</span>}

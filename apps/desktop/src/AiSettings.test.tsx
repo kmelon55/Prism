@@ -203,6 +203,21 @@ it("keeps a canceled Keychain approval explicit instead of retrying on window fo
 });
 
 
+it("searches models with flexible spacing and word order, then saves the original ID", async () => {
+  await mount(); await click("기본 모델 변경");
+  for (const query of ["  FAST   CHAT  ", "fastchat", "chat creator", "fa st"] ) {
+    await type('[aria-label="모델 검색"]', query);
+    expect([...container.querySelectorAll(".ai-model-option strong")].map(row => row.textContent)).toEqual(["Fast Chat"]);
+  }
+  await type('[aria-label="모델 검색"]', "fast unknown");
+  expect(container.querySelectorAll(".ai-model-option")).toHaveLength(0);
+  await type('[aria-label="모델 검색"]', "   ");
+  expect(container.querySelectorAll(".ai-model-option")).toHaveLength(models.length);
+  await type('[aria-label="모델 검색"]', "chat creator");
+  await click("Fast Chat 선택");
+  expect(persisted).toMatchObject({ model: "creator/fast", modelName: "Fast Chat" });
+});
+
 it("opens the selector from the current model and closes only the popup on Escape",async()=>{
   await mount();
   expect(container.querySelector('[role="dialog"]:not([inert])')).toBeNull();

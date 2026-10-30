@@ -1,6 +1,7 @@
 import { CompatibleApiSettings } from "./ai/CompatibleApiSettings";
 import { AiUsage } from "./AiUsage";
 import { ModelPickerDialog } from "./model-picker/ModelPickerDialog";
+import { createModelSearch } from "./model-picker/modelSearch";
 import { ModelColumns, ModelPrice, ModelSpeed, ModelMetricLegend } from "./model-picker/ModelMetrics";
 import { t, useLocale } from "./i18n";
 import { AiToolSettings } from "./AiToolSettings";
@@ -146,7 +147,7 @@ export function AiSettings({ nativeRuntime }: { nativeRuntime: boolean }) {
     if (nativeRuntime) void invoke("open_web_url", { url }).catch(() => setError(t("페이지를 열지 못했습니다.")));
     else window.open(url, "_blank", "noopener,noreferrer");
   }
-  const filtered = models.filter((entry) => `${entry.name} ${entry.id}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+  const filtered = models.filter(createModelSearch(query))
     .sort((a, b) => (sort === "input" ? (a.inputPrice ?? Infinity) - (b.inputPrice ?? Infinity) : sort === "output" ? (a.outputPrice ?? Infinity) - (b.outputPrice ?? Infinity) : 0) || a.name.localeCompare(b.name));
   const activeModel = saved.provider === provider ? models.find((entry) => entry.id === saved.model) : undefined;
   const busy = savingKey || Boolean(savingModel);

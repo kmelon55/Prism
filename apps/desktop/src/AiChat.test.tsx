@@ -171,6 +171,23 @@ it("sorts model prices with free models first and unknown prices last without ma
   expect(list.scrollTop).toBe(0);
   expect(chatCalls()).toHaveLength(0);
 });
+it("keeps spaced model searches usable and selects the original model ID with Enter", async () => {
+  native.invoke.mockImplementation(async (command: string, args: any) => command === "ai_list_models"
+    ? [{ id: "openai/gpt-4o-mini", name: "GPT-4o Mini" }, { id: "other/model", name: "Other" }] : base(command, args));
+  await mount(); await click("대화 모델 변경");
+  const search = container.querySelector<HTMLInputElement>('[aria-label="대화 모델 검색"]')!;
+  for (const query of ["gpt 4o", "  MINI   openai  ", "gpt4omini"]) {
+    await type(search, query);
+    expect([...container.querySelectorAll(".model-catalog-row strong")].map(row => row.textContent)).toEqual(["GPT-4o Mini"]);
+  }
+  await type(search, "   ");
+  expect(container.querySelectorAll(".model-catalog-row")).toHaveLength(2);
+  await type(search, "gpt 4o");
+  await act(async () => search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+  expect([...history.values()][0]).toMatchObject({ provider: "openai", model: "openai/gpt-4o-mini" });
+  expect(chatCalls()).toHaveLength(0);
+});
+
 it("keeps provider clicks available when the WebView blurs the search without a focus target", async () => {
   native.invoke.mockImplementation(async (command: string, args: any) => command === "ai_list_models"
     ? [{ id: `${args.provider}/next`, name: `${args.provider} model` }] : base(command, args));
