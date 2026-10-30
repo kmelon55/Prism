@@ -1,0 +1,3 @@
+"NSMicrophoneUsageDescription" = "Prism은 받아쓰기에 마이크를 사용합니다.";
+"NSScreenCaptureUsageDescription" = "Prism은 선택한 화면 영역을 캡처해 AI에게 질문합니다.";
+"NSAppleEventsUsageDescription" = "Prism은 선택한 시스템 명령과 스크립트를 실행하기 위해 자동화를 사용합니다.";

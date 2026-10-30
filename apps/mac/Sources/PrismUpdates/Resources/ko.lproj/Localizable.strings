@@ -1,0 +1,46 @@
+/* Korean strings for PrismUpdates. Keys are the English source strings. */
+
+"Updates" = "업데이트";
+"Prism updates" = "Prism 업데이트";
+"Command" = "명령";
+
+/* Status (Updates.tsx) */
+"Updates are checked automatically every six hours." = "6시간마다 업데이트를 자동으로 확인합니다.";
+"Updates are disabled in development builds." = "개발 빌드에서는 업데이트가 비활성화됩니다.";
+"Checking for updates…" = "업데이트 확인 중…";
+"Prism is up to date." = "최신 버전의 Prism입니다.";
+"A new version of Prism is available." = "새로운 Prism 버전이 있습니다.";
+"Downloading and installing the update…" = "업데이트 다운로드 및 설치 중…";
+"Update installed. Restart Prism when you are ready." = "업데이트를 설치했습니다. 준비되면 Prism을 재시작하세요.";
+"Could not update Prism. Check your connection and try again." = "Prism을 업데이트하지 못했습니다. 연결을 확인하고 다시 시도하세요.";
+"Download and install" = "다운로드 및 설치";
+"Restart Prism" = "Prism 재시작";
+"Check for updates" = "업데이트 확인";
+"Error details" = "오류 상세 정보";
+"Install updates automatically" = "업데이트 자동 설치";
+"Download and install new versions in the background. Changes take effect when you restart Prism." = "새 버전을 백그라운드에서 다운로드하고 설치합니다. Prism을 재시작하면 적용됩니다.";
+"Could not save update settings." = "업데이트 설정을 저장하지 못했습니다.";
+
+/* Palette row (usePaletteUpdate.ts) */
+"Update Prism" = "Prism 업데이트";
+"Restart Prism to update" = "재시작하여 업데이트 적용";
+"Retry Prism update" = "Prism 업데이트 다시 시도";
+"Installing Prism update…" = "Prism 업데이트 설치 중…";
+"Installing…" = "설치 중…";
+
+/* Error details */
+"An update operation is already running." = "이미 업데이트 작업이 진행 중입니다.";
+"Check for an update first." = "먼저 업데이트를 확인하세요.";
+"Development builds cannot install updates." = "개발 빌드에서는 업데이트를 설치할 수 없습니다.";
+"Install Prism in Applications before updating." = "업데이트하기 전에 Prism을 응용 프로그램 폴더에 설치하세요.";
+"Could not reach the update server." = "업데이트 서버에 연결하지 못했습니다.";
+"The update information is invalid." = "업데이트 정보가 올바르지 않습니다.";
+"The update is not available for this Mac." = "이 Mac에서 사용할 수 있는 업데이트가 없습니다.";
+"The update signature is invalid. The installed app was not changed." = "업데이트 서명이 올바르지 않습니다. 설치된 앱은 변경하지 않았습니다.";
+"Invalid app update archive." = "앱 업데이트 압축 파일이 올바르지 않습니다.";
+"The update contains an unsupported app archive entry." = "업데이트에 지원하지 않는 압축 항목이 있습니다.";
+"The update is too large." = "업데이트가 너무 큽니다.";
+"This update changes Prism's signing identity and would reset macOS permissions. The installed app was not changed." = "이 업데이트는 Prism의 서명을 변경하여 macOS 권한을 초기화할 수 있습니다. 설치된 앱은 변경하지 않았습니다.";
+"The downloaded app is not the announced version. The installed app was not changed." = "다운로드한 앱이 안내된 버전과 다릅니다. 설치된 앱은 변경하지 않았습니다.";
+"Could not replace Prism. Check that Prism is in a folder you can write to." = "Prism을 교체하지 못했습니다. Prism이 쓰기 가능한 폴더에 있는지 확인하세요.";
+"No installed update is ready." = "설치된 업데이트가 없습니다.";

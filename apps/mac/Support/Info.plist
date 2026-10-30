@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Embedded in the bare executable so `swift run` and snapshots get a development identity and Korean.
+       scripts/build-app.sh writes the real bundle Info.plist. -->
+  <key>CFBundleIdentifier</key><string>dev.prism.native-dev</string>
+  <key>CFBundleName</key><string>Prism Dev</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
+  <key>CFBundleAllowMixedLocalizations</key><true/>
+</dict>
+</plist>

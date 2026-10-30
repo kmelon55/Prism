@@ -1,0 +1,17 @@
+/* Korean strings for PrismKit. Keys are the English source strings. */
+"Record Shortcut" = "단축키 기록";
+"Type Shortcut" = "단축키 입력";
+"Remove Shortcut" = "단축키 제거";
+"Record Hotkey" = "단축키 지정";
+"Add alias" = "별칭 추가";
+"Command" = "명령";
+"Alias" = "별칭";
+"Hotkey" = "단축키";
+
+/* Model picker header (settings-ai-dictation) */
+"Refresh" = "새로고침";
+"Loading" = "불러오는 중";
+"Close model picker" = "모델 선택 닫기";
+"Search actions…" = "동작 검색…";
+"No matching actions" = "일치하는 동작이 없습니다";
+"Close actions" = "동작 목록 닫기";

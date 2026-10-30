@@ -1,0 +1,196 @@
+/* Korean strings for PrismSystem. Keys are the English source strings. Wording follows apps/desktop/src/locales. */
+
+/* Window layouts */
+"Left Half" = "왼쪽 절반";
+"Right Half" = "오른쪽 절반";
+"Top Half" = "위쪽 절반";
+"Bottom Half" = "아래쪽 절반";
+"Top Left Quarter" = "왼쪽 위 1/4";
+"Top Right Quarter" = "오른쪽 위 1/4";
+"Bottom Left Quarter" = "왼쪽 아래 1/4";
+"Bottom Right Quarter" = "오른쪽 아래 1/4";
+"Top Left Sixth" = "왼쪽 위 1/6";
+"Top Center Sixth" = "가운데 위 1/6";
+"Top Right Sixth" = "오른쪽 위 1/6";
+"Bottom Left Sixth" = "왼쪽 아래 1/6";
+"Bottom Center Sixth" = "가운데 아래 1/6";
+"Bottom Right Sixth" = "오른쪽 아래 1/6";
+"First Third" = "왼쪽 1/3";
+"Center Third" = "가운데 1/3";
+"Last Third" = "오른쪽 1/3";
+"Left Two Thirds" = "왼쪽 2/3";
+"Center Two Thirds" = "가운데 2/3";
+"Right Two Thirds" = "오른쪽 2/3";
+"Maximize" = "최대화";
+"Almost Maximize" = "거의 최대화";
+"Center" = "가운데 정렬";
+"Maximize Width" = "가로 최대화";
+"Maximize Height" = "세로 최대화";
+"Reasonable Size" = "적당한 크기";
+"First Fourth" = "첫 번째 4분할";
+"Second Fourth" = "두 번째 4분할";
+"Third Fourth" = "세 번째 4분할";
+"Last Fourth" = "마지막 4분할";
+"Move Left" = "왼쪽 끝으로 이동";
+"Move Right" = "오른쪽 끝으로 이동";
+"Move Up" = "위쪽 끝으로 이동";
+"Move Down" = "아래쪽 끝으로 이동";
+"Next Display" = "다음 디스플레이";
+"Previous Display" = "이전 디스플레이";
+"Restore Previous Layout" = "이전 레이아웃 복원";
+"Window Management" = "창 관리";
+"Window" = "창";
+"Move the frontmost window to %@" = "현재 창을 %@(으)로 이동";
+"Restore the frontmost window to its previous Prism layout" = "현재 창을 이전 Prism 레이아웃으로 복원";
+"Apply %@" = "%@ 적용";
+
+/* Window errors */
+"Allow Prism in System Settings > Privacy & Security > Accessibility, then try again." = "시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용에서 Prism을 허용한 뒤 다시 시도하세요.";
+"Open another application, then show Prism and try the window action again." = "다른 앱을 연 뒤 Prism을 열어 창 명령을 다시 실행하세요.";
+"Prism could not read the focused window." = "현재 창 정보를 읽지 못했습니다.";
+"There is no previous Prism window layout to restore for the focused window." = "현재 창에 복원할 이전 Prism 레이아웃이 없습니다.";
+"Connect another display to move this window." = "창을 옮기려면 다른 디스플레이를 연결하세요.";
+"The target application refused the requested window geometry. Confirm that the window is resizable." = "대상 앱이 요청한 창 크기를 거부했습니다. 창 크기를 조절할 수 있는지 확인하세요.";
+"The application did not accept this window layout." = "앱이 이 창 배치를 허용하지 않았습니다.";
+"Accessibility access required" = "손쉬운 사용 권한 필요";
+
+/* Window settings */
+"Window behavior" = "창 배치 동작";
+"Cycle window sizes" = "반복 입력으로 크기 순환";
+"Repeat Left or Right Half to change size." = "왼쪽·오른쪽 절반 단축키를 다시 누르면 크기가 바뀝니다.";
+"Cycle order" = "순환 순서";
+"Window gap" = "창 사이 간격";
+"Screen edge gap" = "화면 가장자리 간격";
+"Almost Maximize size" = "거의 최대화 크기";
+"Try repeating a command" = "버튼을 반복해서 눌러보세요";
+"Review permission before using window layouts." = "창 레이아웃을 사용하기 전에 권한을 확인하세요.";
+"Open Permissions" = "권한 열기";
+"Reset to Defaults" = "기본값으로 재설정";
+"Invalid window management options." = "창 배치 설정 값이 올바르지 않습니다.";
+"Could not read window management options." = "창 배치 설정을 읽지 못했습니다.";
+"Invalid saved window management options." = "저장된 창 배치 설정이 올바르지 않습니다.";
+"Could not save window options." = "창 배치 설정을 저장하지 못했습니다.";
+
+/* System Settings */
+"System Settings" = "시스템 설정";
+"Appearance" = "화면";
+"Displays" = "디스플레이";
+"Sound" = "사운드";
+"Bluetooth" = "Bluetooth";
+"Network" = "네트워크";
+"Privacy & Security" = "개인정보 보호 및 보안";
+"Notifications" = "알림";
+"Keyboard" = "키보드";
+"Mouse" = "마우스";
+"Trackpad" = "트랙패드";
+"Battery" = "배터리";
+"Date & Time" = "날짜 및 시간";
+"Software Update" = "소프트웨어 업데이트";
+"Open macOS Appearance settings" = "macOS 화면 설정 열기";
+"Open macOS Displays settings" = "macOS 디스플레이 설정 열기";
+"Open macOS Sound settings" = "macOS 사운드 설정 열기";
+"Open macOS Bluetooth settings" = "macOS Bluetooth 설정 열기";
+"Open macOS Network settings" = "macOS 네트워크 설정 열기";
+"Open macOS Privacy & Security settings" = "macOS 개인정보 보호 및 보안 설정 열기";
+"Open macOS Notifications settings" = "macOS 알림 설정 열기";
+"Open macOS Keyboard settings" = "macOS 키보드 설정 열기";
+"Open macOS Mouse settings" = "macOS 마우스 설정 열기";
+"Open macOS Trackpad settings" = "macOS 트랙패드 설정 열기";
+"Open macOS Battery settings" = "macOS 배터리 설정 열기";
+"Open macOS Date & Time settings" = "macOS 날짜 및 시간 설정 열기";
+"Open macOS Software Update settings" = "macOS 소프트웨어 업데이트 설정 열기";
+"Open %@" = "%@ 열기";
+
+/* System actions */
+"System Actions" = "시스템 동작";
+"Command" = "명령";
+"Lock Screen" = "화면 잠금";
+"Sleep" = "잠자기";
+"Sleep Displays" = "디스플레이 잠자기";
+"Restart" = "재시동";
+"Shut Down" = "시스템 종료";
+"Log Out" = "로그아웃";
+"Empty Trash" = "휴지통 비우기";
+"Quit All Apps" = "모든 앱 종료";
+"Lock this Mac session" = "현재 macOS 세션 잠금";
+"Put this Mac to sleep" = "이 Mac을 잠자기 상태로 전환";
+"Turn off displays until the next input" = "다음 입력까지 디스플레이 끄기";
+"Restart this Mac after confirmation" = "확인 후 이 Mac 재시동";
+"Shut down this Mac after confirmation" = "확인 후 이 Mac 종료";
+"Log out of this Mac after confirmation" = "확인 후 이 Mac에서 로그아웃";
+"Permanently erase the items in the Trash after confirmation" = "확인 후 휴지통 항목을 영구적으로 삭제";
+"Quit every open app after confirmation" = "확인 후 열려 있는 모든 앱 종료";
+"Open apps will close. Continue?" = "열려 있는 앱이 닫힙니다. 계속하시겠습니까?";
+"Items in the Trash will be erased permanently. You can't undo this action." = "휴지통의 항목이 영구적으로 삭제됩니다. 이 동작은 되돌릴 수 없습니다.";
+"Every open app will quit. Apps with unsaved changes ask before closing." = "열려 있는 모든 앱이 종료됩니다. 저장하지 않은 변경 사항이 있는 앱은 닫기 전에 확인합니다.";
+"Cancel" = "취소";
+"A system action is already pending." = "시스템 명령을 처리하고 있습니다.";
+"No apps to quit" = "종료할 앱이 없습니다";
+"macOS declined the session request." = "macOS가 세션 요청을 거부했습니다.";
+"macOS declined Sleep Displays." = "macOS가 디스플레이 잠자기를 거부했습니다.";
+"Allow Prism Accessibility access before using Lock Screen." = "화면 잠금을 사용하려면 Prism에 손쉬운 사용 권한을 허용하세요.";
+"Allow Prism to control Finder in System Settings > Privacy & Security > Automation." = "시스템 설정 > 개인정보 보호 및 보안 > 자동화에서 Prism이 Finder를 제어하도록 허용하세요.";
+"Finder could not empty the Trash." = "Finder가 휴지통을 비우지 못했습니다.";
+
+/* Permissions */
+"Permissions" = "권한";
+"Accessibility" = "손쉬운 사용";
+"Screen Recording" = "화면 기록";
+"Microphone" = "마이크";
+"Automation" = "자동화";
+"Used to arrange other apps’ windows and insert dictated text." = "다른 앱의 창을 조절하거나 받아쓰기 결과를 입력할 때 사용합니다.";
+"Used to capture a screen region for Capture and Ask AI." = "화면 영역을 캡처해 AI에게 물어볼 때 사용합니다.";
+"Used only while dictation is recording." = "받아쓰기 녹음 중에만 사용합니다.";
+"Used to empty the Trash through Finder and run scripts you choose." = "Finder로 휴지통을 비우거나 직접 고른 스크립트를 실행할 때 사용합니다.";
+"Native access, only when needed" = "필요할 때만 시스템에 접근";
+"Prism asks for each permission only for the feature that uses it. Status updates when you return from System Settings." = "Prism은 각 권한을 그 권한이 필요한 기능에서만 요청합니다. 시스템 설정에서 돌아오면 상태가 자동으로 갱신됩니다.";
+"Allowed" = "허용됨";
+"Needs access" = "권한 필요";
+"Not requested" = "요청 전";
+"Unknown" = "알 수 없음";
+"Request Access" = "접근 요청";
+"Waiting for access…" = "허용 대기 중…";
+"Open Settings" = "설정 열기";
+"Check Again" = "다시 확인";
+"Current permission target" = "현재 실행 중인 권한 대상";
+"Reveal current executable" = "현재 실행 파일 보기";
+"Permissions are checked for this app." = "이 앱에 허용된 권한을 확인합니다.";
+"This is a development executable. Its permissions can differ from the installed Prism.app." = "개발 실행 파일입니다. 설치된 Prism.app의 권한과 다를 수 있습니다.";
+"An enabled Prism entry at another path does not grant this process access. Add and allow the target below. Prism checks again when you return." = "시스템 설정에 Prism이 켜져 있어도 아래 경로와 다르면 현재 앱의 권한이 아닙니다. 이 대상을 추가해 허용하세요. 돌아오면 자동으로 다시 확인합니다.";
+"This ad-hoc build may need authorization again after a native rebuild." = "임시 서명 빌드라 네이티브 재빌드 후 권한을 다시 허용해야 할 수 있습니다.";
+"If this exact path is already enabled but was rebuilt, remove that entry and add the current executable again." = "같은 경로가 이미 켜져 있어도 재빌드했다면 해당 항목을 제거하고 현재 실행 파일을 다시 추가해 허용하세요.";
+"Runtime details" = "실행 정보";
+
+/* Launch at login */
+"Launch at login" = "로그인 시 자동 실행";
+"Checking login item settings…" = "로그인 항목 설정을 확인하고 있어요…";
+"Available in the installed macOS app in Applications." = "응용 프로그램 폴더에 설치한 macOS 앱에서 설정할 수 있어요.";
+"Start Prism in the background when you sign in to your Mac." = "Mac에 로그인하면 Prism을 백그라운드에서 실행해요.";
+"Prism will start in the background when you sign in." = "로그인하면 Prism이 백그라운드에서 실행돼요.";
+"Allow Prism in System Settings → General → Login Items to finish enabling automatic startup." = "자동 실행을 켜려면 시스템 설정 → 일반 → 로그인 항목에서 Prism을 허용해 주세요.";
+"macOS could not find Prism's login item. Try enabling it again." = "macOS가 Prism 로그인 항목을 찾지 못했어요. 다시 켜 주세요.";
+"Could not change login item settings. Try again." = "로그인 항목 설정을 변경하지 못했어요. 다시 시도해 주세요.";
+"Open Login Items" = "로그인 항목 열기";
+"Refresh" = "새로고침";
+
+/* Window Management and Permissions settings (settings-system) */
+"Alias" = "별칭";
+"Hotkey" = "단축키";
+"Layout" = "레이아웃";
+"Layouts & shortcuts" = "배치와 단축키";
+"All layouts" = "전체 배치";
+"Split layouts" = "분할 배치";
+"Size & position" = "크기와 위치";
+"Filter window commands" = "창 배치 명령 필터";
+"Window layout preview" = "창 배치 미리보기";
+"Check permissions for the microphone, text insertion and modifier shortcuts." = "마이크, 다른 앱 입력, 보조 키 단축키에 필요한 권한을 확인합니다.";
+"Manage permission" = "권한 관리";
+"Window management and dictation insertion" = "창 관리와 받아쓰기 입력";
+"Screen capture for AI" = "AI용 화면 캡처";
+"Dictation recording" = "받아쓰기 녹음";
+"Finder and scripts" = "Finder와 스크립트";
+"Ordinary shortcut combinations do not require access; single and double modifier presses require Accessibility permission." = "일반 조합 단축키는 권한 없이 쓸 수 있지만, 보조 키 단독·두 번 누르기는 손쉬운 사용 권한이 필요합니다.";
+"Prism asks the first time you dictate. If you declined, allow it in System Settings." = "처음 받아쓰기할 때 요청합니다. 거부했다면 시스템 설정에서 허용하세요.";
+"macOS may ask you to reopen Prism after you allow it." = "허용한 뒤 macOS가 Prism을 다시 열도록 요청할 수 있습니다.";
+"Prism asks the first time it controls Finder." = "Finder를 처음 제어할 때 요청합니다.";
+
