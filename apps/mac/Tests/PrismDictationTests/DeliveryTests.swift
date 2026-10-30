@@ -67,13 +67,14 @@ struct DeliveryTests {
                                                    copyText: { _ in true }, environment: environment)
         #expect(lostFocus == .copied && posted.isEmpty, "Never paste into a different foreground app")
         foreground.value = pid
-        let change = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(30))
+        // Every read sees a newer clipboard, as if another app copied while Prism was about to paste.
+        var racing = environment
+        racing.revision = {
             revision.value += 1
+            return revision.value
         }
         let raced = await TextInjector.deliver("long transcript", paste: true, pressEnterAfterPaste: true, target: target,
-                                               copyText: { _ in true }, environment: environment)
-        await change.value
+                                               copyText: { _ in true }, environment: racing)
         #expect(raced == .copied && posted.isEmpty, "Never paste a clipboard replaced during delivery")
         #expect(TextInjector.pasteResult(observable: true, confirmed: false) == .unverified)
         #expect(TextInjector.pasteResult(observable: true, confirmed: true) == .pasted)
