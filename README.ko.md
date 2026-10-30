@@ -8,6 +8,10 @@ macOS 키보드 런처입니다. MIT 라이선스로 공개된 무료 오픈소�
 **[macOS용 Prism 다운로드](https://github.com/kmelon55/Prism/releases/latest)** ·
 [기여 안내](CONTRIBUTING.md) · [릴리스 안내](docs/releases.md)
 
+> **네이티브 전환 중입니다.** macOS 앱을 [`apps/mac`](apps/mac/README.md)에서 Swift로 다시 만들고 있습니다.
+> 같은 앱, 번들 ID, 설정, 업데이트 경로를 유지하므로 설치된 앱은 그 자리에서 업데이트됩니다.
+> 마지막 Tauri 릴리스는 `v0.1.19`이며, 소스는 [`legacy/tauri`](https://github.com/kmelon55/Prism/tree/legacy/tauri) 브랜치에 보관합니다.
+
 ## 설치
 
 **macOS 14 이상**에서 사용할 수 있습니다. Universal 빌드 하나로

@@ -8,6 +8,10 @@ run commands, and work with AI from one compact palette. Free and open source un
 **[Download Prism for macOS](https://github.com/kmelon55/Prism/releases/latest)** ·
 [Contributing](CONTRIBUTING.md) · [Release guide](docs/releases.md)
 
+> **Native rewrite in progress.** The macOS app is being rewritten in Swift in [`apps/mac`](apps/mac/README.md).
+> It keeps the same app, bundle identifier, settings and update channel, so installed copies update to it in place.
+> The last Tauri release is `v0.1.19`; its source is kept on the [`legacy/tauri`](https://github.com/kmelon55/Prism/tree/legacy/tauri) branch.
+
 ## Install
 
 Requires **macOS 14 or later**. The universal build supports **Apple Silicon and Intel**.
