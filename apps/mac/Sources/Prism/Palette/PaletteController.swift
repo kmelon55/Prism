@@ -158,6 +158,8 @@ final class PaletteController: NSObject, NSWindowDelegate {
         guard expanded != isExpanded else { return }
         isExpanded = expanded
         panel.level = expanded ? .normal : .floating
+        // A level change rebuilds the glass backdrop with the system blur radius.
+        glass?.scheduleBlurRefresh()
         guard panel.isVisible, let visible = (panel.screen ?? NSScreen.main)?.visibleFrame else {
             panel.setContentSize(expanded ? PaletteView.expandedSize : PaletteView.size)
             return

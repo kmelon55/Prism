@@ -204,26 +204,36 @@ public final class PrismGlassView: NSView {
     }
 
     private var blurRadius: Double?
-    private var refreshGeneration = 0
+    private var displayLink: CADisplayLink?
+    private var watchUntil = Date.distantPast
 
-    /// AppKit creates and sometimes rebuilds the backdrop filters after layout, so the radius is reapplied a few
-    /// times after each change, as the Tauri host does.
-    private func scheduleBlurRefresh() {
+    /// AppKit rebuilds the backdrop filters with its own radius when the window appears, resizes or changes level,
+    /// sometimes a few frames after the change. The radius is reapplied on every frame for a short while after each
+    /// such change, so the default never shows for more than a frame.
+    public func scheduleBlurRefresh() {
         guard blurRadius != nil else { return }
-        refreshGeneration += 1
-        let generation = refreshGeneration
-        for delay in [0, 16, 64, 160, 400] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, self.refreshGeneration == generation, let radius = self.blurRadius,
-                          let layer = self.glass.layer else { return }
-                    CATransaction.begin()
-                    CATransaction.setDisableActions(true)
-                    Self.apply(radius: radius, to: layer)
-                    CATransaction.commit()
-                }
-            }
+        watchUntil = Date().addingTimeInterval(0.8)
+        reapplyBlur()
+        guard displayLink == nil else { return }
+        let link = displayLink(target: self, selector: #selector(displayLinkFired))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    @objc private func displayLinkFired() {
+        reapplyBlur()
+        if Date() > watchUntil {
+            displayLink?.invalidate()
+            displayLink = nil
         }
+    }
+
+    private func reapplyBlur() {
+        guard let radius = blurRadius, let layer = glass.layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        Self.apply(radius: radius, to: layer)
+        CATransaction.commit()
     }
 
     @discardableResult
