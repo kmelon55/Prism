@@ -46,38 +46,12 @@ struct ScriptDirectoriesStore: Sendable {
 
 /// Reads `scriptDirectories` from the Tauri WebView's local storage, read-only.
 enum LegacyScriptDirectories {
-    static func read(webKitRoot: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appending(path: "Library/WebKit/\(AppPaths.releaseBundleIdentifier)/WebsiteData")) -> [String]? {
-        for url in localStorageFiles(webKitRoot) {
-            guard let database = try? SQLiteDatabase(url: url, readOnly: true),
-                  let rows = try? database.query("SELECT value FROM ItemTable WHERE key = ?", ["prism:preferences"], row: { $0.data("value") }),
-                  let blob = rows.first ?? nil,
-                  let directories = directories(fromLocalStorageValue: blob) else { continue }
-            return directories
-        }
-        return nil
+    static func read(webKitRoot: URL = LegacyWebStorage.defaultRoot) -> [String]? {
+        (LegacyWebStorage.preferences(webKitRoot: webKitRoot)?["scriptDirectories"] as? [Any])?.compactMap { $0 as? String }
     }
 
-    /// `WebsiteData/Default/<origin salt>/<origin salt>/LocalStorage/localstorage.sqlite3`.
-    static func localStorageFiles(_ root: URL) -> [URL] {
-        let manager = FileManager.default
-        let base = root.appending(path: "Default")
-        var files: [URL] = []
-        for outer in (try? manager.contentsOfDirectory(at: base, includingPropertiesForKeys: nil)) ?? [] {
-            for inner in (try? manager.contentsOfDirectory(at: outer, includingPropertiesForKeys: nil)) ?? [] {
-                let file = inner.appending(path: "LocalStorage/localstorage.sqlite3")
-                if manager.fileExists(atPath: file.path) { files.append(file) }
-            }
-        }
-        return files
-    }
-
-    /// WebKit stores local storage values as UTF-16LE.
     static func directories(fromLocalStorageValue blob: Data) -> [String]? {
-        guard let text = String(data: blob, encoding: .utf16LittleEndian),
-              let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-              let directories = object["scriptDirectories"] as? [Any] else { return nil }
-        return directories.compactMap { $0 as? String }
+        (LegacyWebStorage.object(fromLocalStorageValue: blob)?["scriptDirectories"] as? [Any])?.compactMap { $0 as? String }
     }
 }
 
