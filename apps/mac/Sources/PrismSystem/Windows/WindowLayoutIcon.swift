@@ -8,7 +8,7 @@ import AppKit
 enum WindowLayoutIcon {
     private static var cache: [String: NSImage] = [:]
     /// `#4ba7f4`, the layout fill of the Tauri app.
-    static let fill = NSColor(srgbRed: 0x4B / 255, green: 0xA7 / 255, blue: 0xF4 / 255, alpha: 1)
+    static let fill = NSColor(srgbRed: 0x4B / 255.0, green: 0xA7 / 255.0, blue: 0xF4 / 255.0, alpha: 1)
 
     static func image(for layout: WindowLayout, size: CGFloat = 28) -> NSImage {
         let key = "\(layout.rawValue)-\(size)"

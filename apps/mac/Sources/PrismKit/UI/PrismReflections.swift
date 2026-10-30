@@ -126,8 +126,8 @@ struct PrismReflections: View {
                 .map { hypot($0.x - center.x, $0.y - center.y) }.max() ?? 1
             ZStack {
                 shape.fill(RadialGradient(stops: [
-                    .init(color: .white.opacity(0x1B / 255), location: 0),
-                    .init(color: .white.opacity(0x06 / 255), location: 0.32),
+                    .init(color: .white.opacity(Double(0x1B) / 255), location: 0),
+                    .init(color: .white.opacity(Double(0x06) / 255), location: 0.32),
                     .init(color: .clear, location: 0.56),
                 ], center: UnitPoint(x: point.x, y: point.y), startRadius: 0, endRadius: reach))
                 .opacity(0.65)
@@ -138,7 +138,7 @@ struct PrismReflections: View {
                     .init(color: .black.opacity(0.012), location: 1),
                 ], startPoint: .top, endPoint: .bottom))
                 .opacity(0.65)
-                shape.strokeBorder(Color.white.opacity(0x12 / 255), lineWidth: 1.05)
+                shape.strokeBorder(Color.white.opacity(Double(0x12) / 255), lineWidth: 1.05)
                 shape.strokeBorder(AngularGradient(stops: Self.spectrum, center: .center,
                                                    angle: .degrees(light.angle - 45 - 90)), lineWidth: 1.05)
             }
@@ -203,8 +203,8 @@ public enum PrismHighlights {
     ], startPoint: .topLeading, endPoint: .bottomTrailing)
 
     static let gloss = LinearGradient(stops: [
-        .init(color: .white.opacity(0x16 / 255), location: 0), .init(color: .clear, location: 0.45),
-        .init(color: .black.opacity(0x08 / 255), location: 1),
+        .init(color: .white.opacity(Double(0x16) / 255), location: 0), .init(color: .clear, location: 0.45),
+        .init(color: .black.opacity(Double(0x08) / 255), location: 1),
     ], startPoint: UnitPoint(x: 0.37, y: 0), endPoint: UnitPoint(x: 0.63, y: 1))
 }
 
