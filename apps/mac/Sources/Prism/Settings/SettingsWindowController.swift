@@ -41,7 +41,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let window = window ?? makeWindow()
         self.window = window
         if !window.isVisible { window.center() }
-        NSApp.activate()
+        NSApp.bringForward()
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -65,7 +65,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         let glass = NSView.prismGlassBackground(opacity: PaletteController.backgroundOpacity)
         glass.setBlurRadius(Glass.blur)
-        let host = NSHostingView(rootView: SettingsRootView(model: model))
+        let host = FirstClickHostingView(rootView: SettingsRootView(model: model))
         host.translatesAutoresizingMaskIntoConstraints = false
         glass.contentView.addSubview(host)
         NSLayoutConstraint.activate([

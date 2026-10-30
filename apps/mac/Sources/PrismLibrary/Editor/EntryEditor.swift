@@ -89,19 +89,19 @@ final class EntryEditorController: NSObject, NSWindowDelegate {
     private func present(_ next: EntryEditorModel) {
         if let window, let editor, editor.isDirty, editor.draft.id != next.draft.id {
             // Keep unsaved work; the user decides there first.
-            NSApp.activate()
+            NSApp.bringForward()
             window.makeKeyAndOrderFront(nil)
             return
         }
         editor = next
         let window = window ?? makeWindow()
         window.title = next.windowTitle
-        window.contentView = NSHostingView(rootView: EntryEditorView(model: next, onCancel: { [weak self] in self?.close() },
+        window.contentView = FirstClickHostingView(rootView: EntryEditorView(model: next, onCancel: { [weak self] in self?.close() },
                                                                      onSave: { [weak self] in self?.save() }))
         window.setContentSize(window.contentView?.fittingSize ?? NSSize(width: 520, height: 420))
         if !window.isVisible { window.center() }
         self.window = window
-        NSApp.activate()
+        NSApp.bringForward()
         window.makeKeyAndOrderFront(nil)
     }
 

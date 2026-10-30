@@ -48,7 +48,7 @@ final class ChatWindowController: NSObject, NSWindowDelegate {
         if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || image != nil {
             Task { await model.accept(text: draft, image: image) }
         }
-        NSApp.activate()
+        NSApp.bringForward()
         if let origin, !window.isVisible, !Self.reduceMotion {
             grow(window, from: origin)
         } else {
