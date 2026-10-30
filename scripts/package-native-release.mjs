@@ -3,6 +3,8 @@
 //   TAURI_SIGNING_PRIVATE_KEY=… TAURI_SIGNING_PRIVATE_KEY_PASSWORD=… \
 //   PRISM_INSTALLED_APP=/Applications/Prism.app [VERSION=0.2.0] node scripts/package-native-release.mjs
 //
+// PRISM_APP_ONLY=1 stops after the signed and verified Prism.app, for a local install without the updater key.
+//
 // The bundle keeps the Tauri identity (Prism.app, dev.prism.desktop, executable prism-desktop) and is signed with the
 // existing "Prism Local Signing" identity, never ad-hoc. The installed app is only inspected, never replaced.
 // Output: dist/native-releases/v<version> with the DMG, ZIP, updater archive and signature, latest.json and checksums.
@@ -19,7 +21,8 @@ const environment = { ...process.env };
 const version = environment.VERSION ?? JSON.parse(readFileSync("package.json", "utf8")).version;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("VERSION must be a plain semantic version such as 0.2.0.");
 if (!environment.PRISM_INSTALLED_APP) throw new Error("Set PRISM_INSTALLED_APP to the installed app whose signing identity must be preserved.");
-if (!environment.TAURI_SIGNING_PRIVATE_KEY) throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to the existing updater key. Never create a new one.");
+const appOnly = environment.PRISM_APP_ONLY === "1";
+if (!appOnly && !environment.TAURI_SIGNING_PRIVATE_KEY) throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to the existing updater key. Never create a new one.");
 // The key the native app trusts for later updates, and, while it exists, the key the installed Tauri app trusts.
 const publicKeys = [/static let prismPublicKey = "([^"]+)"/.exec(readFileSync("apps/mac/Sources/PrismUpdates/Signature/Minisign.swift", "utf8"))?.[1]];
 if (!publicKeys[0]) throw new Error("Could not read the updater public key from the native app.");
@@ -31,7 +34,7 @@ const identity = resolveLocalSigningIdentity(environment);
 const output = resolve(environment.PRISM_OUTPUT ?? `dist/native-releases/v${version}`);
 const staging = mkdtempSync(join(tmpdir(), "prism-native-release-"));
 try {
-  execFileSync("/bin/zsh", ["apps/mac/scripts/build-app.sh"], {
+  execFileSync("/bin/zsh", ["scripts/build-app.sh"], {
     stdio: "inherit",
     env: { ...environment, CONFIG: "release", BUNDLE_ID: "dev.prism.desktop", APP_NAME: "Prism", EXECUTABLE: "prism-desktop",
            VERSION: version, SCRATCH: ".build-release", OUTPUT: staging },
@@ -53,6 +56,19 @@ try {
   }
 
   mkdirSync(output, { recursive: true });
+  if (appOnly) {
+    execFileSync("ditto", [app, join(output, "Prism.app")]);
+    console.log(join(output, "Prism.app"));
+  } else {
+    packageUpdates(app);
+    console.log(output);
+  }
+} finally {
+  rmSync(staging, { recursive: true, force: true });
+}
+
+// The updater archive and its signature, the DMG and ZIP installers, the feed and checksums.
+function packageUpdates(app) {
   const archive = `Prism_${version}_universal.app.tar.gz`;
   // COPYFILE_DISABLE keeps AppleDouble `._` files out of the archive.
   execFileSync("tar", ["-czf", join(output, archive), "-C", staging, "Prism.app"], { env: { ...environment, COPYFILE_DISABLE: "1" } });
@@ -83,7 +99,4 @@ try {
   const sums = readdirSync(output).filter(name => name !== "SHA256SUMS.txt").sort().map(name =>
     `${createHash("sha256").update(readFileSync(join(output, name))).digest("hex")}  ${name}`);
   writeFileSync(join(output, "SHA256SUMS.txt"), sums.join("\n") + "\n");
-  console.log(output);
-} finally {
-  rmSync(staging, { recursive: true, force: true });
 }
