@@ -1,4 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export const applicationIdentifier = "dev.prism.desktop";
 
@@ -8,6 +11,24 @@ export function requireSigningIdentity(environment) {
     throw new Error("A persistent APPLE_SIGNING_IDENTITY is required for a macOS app build. Ad-hoc updates invalidate macOS permissions. See docs/releases.md.");
   }
   return identity;
+}
+
+/**
+ * Selects the existing "Prism Local Signing" identity from its dedicated keychain, as configured by
+ * setup-local-macos-signing.mjs, unless APPLE_SIGNING_IDENTITY already names one. Never creates certificates.
+ */
+export function resolveLocalSigningIdentity(environment) {
+  const localIdentity = join(homedir(), "Library/Application Support/Prism Signing/identity.json");
+  if (!environment.CI && !environment.APPLE_SIGNING_IDENTITY && existsSync(localIdentity)) {
+    const identity = JSON.parse(readFileSync(localIdentity, "utf8"));
+    const password = readFileSync(identity.passwordFile, "utf8").trim();
+    const unlocked = spawnSync("/usr/bin/security", ["unlock-keychain", "-p", password, identity.keychain], { stdio: "ignore" });
+    if (unlocked.status !== 0) throw new Error("Could not unlock Prism's signing keychain. The app was not built.");
+    const available = spawnSync("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning", identity.keychain], { encoding: "utf8" });
+    if (!available.stdout?.includes(identity.identity)) throw new Error("The configured Prism signing identity is unavailable in its keychain.");
+    environment.APPLE_SIGNING_IDENTITY = identity.identity;
+  }
+  return requireSigningIdentity(environment);
 }
 
 export function requireReleaseCredentials(environment) {
