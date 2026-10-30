@@ -198,4 +198,16 @@ struct ShortcutTests {
         controls.remove()
         #expect(controls.failedActions.isEmpty)
     }
+
+    /// The modifier monitors also watch mouse downs. Reading `keyCode` from those raised an exception that dropped
+    /// every click in Prism's own windows.
+    @Test func mouseEventsHaveNoKeyCodeInsteadOfRaising() throws {
+        let click = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                    windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        #expect(click.keyCodeIfKey == 0)
+        let key = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                context: nil, characters: "a", charactersIgnoringModifiers: "a",
+                                                isARepeat: false, keyCode: 0x26))
+        #expect(key.keyCodeIfKey == 0x26)
+    }
 }

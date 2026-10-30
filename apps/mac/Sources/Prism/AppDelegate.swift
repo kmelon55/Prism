@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
     var previousApplication: NSRunningApplication? { palette.previousApplication }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ClickTrace.startIfRequested()
         Appearance.applyStoredTheme()
         NSApp.mainMenu = MainMenu.make(target: self)
         palette.onOpenSettings = { [weak self] in self?.openSettings(nil) }

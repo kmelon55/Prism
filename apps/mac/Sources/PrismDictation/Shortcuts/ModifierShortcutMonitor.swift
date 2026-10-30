@@ -80,7 +80,7 @@ final class ModifierShortcutMonitor {
     }
 
     func handle(_ event: NSEvent) {
-        handle(type: event.type, keyCode: event.keyCode, flags: event.modifierFlags, timestamp: event.timestamp)
+        handle(type: event.type, keyCode: event.keyCodeIfKey, flags: event.modifierFlags, timestamp: event.timestamp)
     }
 
     func handle(type: NSEvent.EventType, keyCode: UInt16, flags rawFlags: NSEvent.ModifierFlags, timestamp: TimeInterval) {
@@ -101,5 +101,13 @@ final class ModifierShortcutMonitor {
 
     private func reset() {
         for index in detectors.indices { detectors[index].reset() }
+    }
+}
+
+extension NSEvent {
+    /// The key code, or 0 for mouse events. Reading `keyCode` from a mouse event raises an Objective-C exception,
+    /// and inside a local monitor that silently drops the click.
+    var keyCodeIfKey: UInt16 {
+        [.keyDown, .keyUp, .flagsChanged].contains(type) ? keyCode : 0
     }
 }

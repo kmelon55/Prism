@@ -151,10 +151,10 @@ final class RecordingControls {
         guard !modifierActions.isEmpty else { return }
         let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
         modifierGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated { self?.handleModifier(type: event.type, keyCode: event.keyCode, flags: event.modifierFlags) }
+            MainActor.assumeIsolated { self?.handleModifier(type: event.type, keyCode: event.keyCodeIfKey, flags: event.modifierFlags) }
         }
         modifierLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            self?.handleModifier(type: event.type, keyCode: event.keyCode, flags: event.modifierFlags)
+            self?.handleModifier(type: event.type, keyCode: event.keyCodeIfKey, flags: event.modifierFlags)
             return event
         }
     }
