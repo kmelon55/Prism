@@ -19,17 +19,17 @@ Prefer a short imperative commit subject such as `Improve keyboard result naviga
 Run the checks that apply to your change:
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm build
+cd apps/mac
+swift build
+swift test
 ```
 
-Native changes also require `cargo check` or a Tauri build on a machine with the Rust toolchain installed.
+Release script changes also need `node --test scripts/*.test.mjs` from the repository root. Android changes follow
+[`apps/android/README.md`](apps/android/README.md).
 
 
 ## Installed app and releases
 
 Use the installed Prism app for daily work and receive changes through GitHub Releases.
-See [the release guide](docs/releases.md). Preserve existing development servers;
-do not start, restart, or stop them without an explicit request. Do not create
-separate Prism Test bundles or change the stable application identifier.
+See [the release guide](docs/releases.md). Development builds run as "Prism Dev" with their own bundle identifier
+and data, beside the installed app; do not create other test bundles or change the stable application identifier.

@@ -3,10 +3,8 @@ dist/
 target/
 .DS_Store
 *.log
-*.tsbuildinfo
 .idea/
 .vscode/
-apps/desktop/src-tauri/gen/
 
 .env
 .env.*

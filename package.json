@@ -1,21 +1,18 @@
 {
   "name": "prism",
-  "version": "0.1.19",
+  "version": "0.2.0",
   "private": true,
-  "description": "An open-source, keyboard-first command palette for desktop.",
+  "description": "An open-source, keyboard-first launcher for macOS.",
   "license": "MIT",
-  "packageManager": "pnpm@10.27.0",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm --filter @prism/desktop build",
-    "desktop:bundle": "pnpm tauri build",
+    "build": "cd apps/mac && swift build",
+    "test": "cd apps/mac && swift test && cd ../.. && node --test scripts/*.test.mjs",
     "macos:signing:setup": "node scripts/setup-local-macos-signing.mjs",
     "macos:signing:verify": "node scripts/verify-macos-signing.mjs",
-    "macos:install": "node scripts/install-macos-app.mjs",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r --if-present test",
-    "tauri": "pnpm --filter @prism/desktop tauri"
+    "macos:package": "node scripts/package-native-release.mjs",
+    "macos:install": "node scripts/install-macos-app.mjs"
   }
 }

@@ -1,0 +1,51 @@
+name: Sign native release
+# Signs the updater archive of a draft macOS release with the existing updater key and uploads the signature,
+# latest.json and refreshed checksums. The app itself is code signed on the signing Mac by
+# scripts/package-native-release.mjs, which uploads the draft; publish the release after this succeeds.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Draft release tag, such as v0.2.0
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: native-release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test scripts/sign-updater.test.mjs scripts/verify-updater.test.mjs scripts/native-release-feed.test.mjs
+      - name: Require a draft release
+        run: test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true
+      - name: Download the draft's assets
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$TAG" --dir "$RUNNER_TEMP/release"
+      - name: Sign the updater archive
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: node scripts/native-release-feed.mjs "$RUNNER_TEMP/release" "${TAG#v}"
+      - name: Upload the signature, feed and checksums
+        run: |
+          version="${TAG#v}"
+          gh release upload "$TAG" --clobber \
+            "$RUNNER_TEMP/release/Prism_${version}_universal.app.tar.gz.sig" \
+            "$RUNNER_TEMP/release/latest.json" \
+            "$RUNNER_TEMP/release/SHA256SUMS.txt"

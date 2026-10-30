@@ -5,7 +5,7 @@
 - Write all Git-facing project artifacts in English. This includes branch names, commit subjects and bodies, pull request titles and descriptions, review summaries, release notes, and changelog entries.
 - Use concise imperative English for commit subjects, for example: `Add native application provider`.
 - Do not commit, push, create a pull request, deploy, or publish unless the user explicitly requests it.
-- Preserve the installed macOS signing identity. Use `pnpm macos:install` for an authorized local app replacement; never overwrite `/Applications/Prism.app` with an ad-hoc build or a different signer.
+- Preserve the installed macOS signing identity. Use `node scripts/install-macos-app.mjs` (after `PRISM_APP_ONLY=1 node scripts/package-native-release.mjs`) for an authorized local app replacement; never overwrite `/Applications/Prism.app` with an ad-hoc build or a different signer.
 - Keep signing certificates and their private keys persistent and outside the repository. Never regenerate a certificate as part of a build, reset TCC, or weaken Keychain access controls to avoid permission prompts.
 
 ## Persistent browser and Computer Use policy

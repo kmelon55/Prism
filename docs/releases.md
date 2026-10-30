@@ -1,154 +1,72 @@
 # Release Prism
 
-Keep `/Applications/Prism.app`, the product name `Prism`, and bundle identifier
-`dev.prism.desktop` stable. Do not replace or restart the installed app during a
-release build. Preserve running development servers and unrelated worktree changes.
+Keep `/Applications/Prism.app`, the product name `Prism`, the bundle identifier `dev.prism.desktop` and the
+executable name `prism-desktop` stable: installed copies update in place only while all four match. Do not replace
+or restart the installed app during a release build. Preserve running development servers and unrelated worktree
+changes.
 
 ## Prepare a version
 
-1. Update the version in root `package.json`, `apps/desktop/package.json`,
-   `apps/desktop/src-tauri/tauri.conf.json`, and `apps/desktop/src-tauri/Cargo.toml`.
-   Refresh the Prism package entry in `Cargo.lock`.
-2. Update `docs/release-notes.md` in English. Run `pnpm typecheck`, `pnpm test`,
-   `pnpm build`, `bash scripts/test-dictation-native.sh`, `bash scripts/test-login-item-native.sh`, `node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs`,
-   and `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`.
-3. Build and verify the complete release before publishing. Commit in English,
-   push `main`, then push an annotated version tag such as `v0.1.2`.
-4. Create a draft GitHub release with `docs/release-notes.md`, upload every file in
-   `dist/releases/v0.1.2`, verify the assets, then publish it as latest.
-   Published releases are immutable; use a new version to correct mistakes.
-5. Verify the public `releases/latest/download/latest.json`, archive signature,
-   checksums, and both macOS architecture entries. Artifact checks do not prove an
-   actual installation, restart, or permission behavior on a user's Mac.
+1. Update `version` in the root `package.json`; packaging reads it.
+2. Write `docs/release-notes.md` in English.
+3. Run `npm test` (Swift tests in `apps/mac` and the release script tests, including the signing integration test
+   that needs the local signing identity).
+4. Commit in English and push `main`.
 
-## Signing and notarization
+## Build and publish
 
-Automatic updates do not require Apple notarization. They require the existing
-Tauri updater private key and its matching public key in `tauri.conf.json`.
-The DMG is a manual installer; automatic updates use the `.app.tar.gz`, `.sig`,
-and `latest.json` assets. Never replace the updater key or publish it in Git.
-
-Prism also requires a persistent macOS code-signing certificate so updates keep
-the app's identity. The updater archive signature and macOS code signature are
-separate checks. Packaged builds reject missing identities and ad-hoc signing.
-Never regenerate a certificate during a build, reset TCC, or weaken Keychain ACLs.
-Keep certificate backups and private keys outside the repository.
-
-### Non-notarized release from the signing Mac
-
-Use the existing `Prism Local Signing` identity. The Tauri wrapper reads the
-existing `~/Library/Application Support/Prism Signing/identity.json` configuration
-and unlocks only that identity's dedicated keychain. An explicit
-`APPLE_SIGNING_IDENTITY` can select an already-provisioned certificate instead.
-The packaging step compares both designated requirements against the installed
-app across all architectures and rejects an incompatible signer.
-
-Set `TAURI_SIGNING_PRIVATE_KEY` to the existing updater private key path and
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to its passphrase (empty for the current key).
-Install Rust targets `aarch64-apple-darwin` and `x86_64-apple-darwin`, then run:
+Packaging runs on the signing Mac, which holds the `Prism Local Signing` identity:
 
 ```sh
-pnpm tauri build --target universal-apple-darwin --bundles app
-node scripts/create-release-dmg.mjs
-PRISM_RELEASE_MODE=local-signed PRISM_INSTALLED_APP=/Applications/Prism.app node scripts/package-release.mjs
+PRISM_INSTALLED_APP=/Applications/Prism.app node scripts/package-native-release.mjs
 ```
 
-This builds without controlling Finder or replacing the installed app. Packaging
-verifies the updater signature against the configured public key, produces the
-DMG, ZIP, updater archive and signature, feed, and SHA-256 checksums.
+It builds a universal (Apple Silicon and Intel) release bundle, signs it with hardened runtime and
+`apps/mac/Resources/Prism.entitlements`, checks its designated requirement against the installed app, and writes
+the DMG, ZIP, updater archive (`Prism_<version>_universal.app.tar.gz`) and `SHA256SUMS.txt` to
+`dist/native-releases/v<version>`. It never creates a certificate and never touches the installed app.
 
-Clearly label the release as not notarized. New downloads may require
-System Settings → Privacy & Security → Open Anyway. Moving from an older ad-hoc
-build to a persistent certificate may require a one-time permission approval.
-Switching from the local certificate to Developer ID is a separate identity
-migration, not an interchangeable build setting.
+The updater archive is signed with the existing updater key. When that key is not on the signing Mac:
 
-### Notarized releases in GitHub Actions
+1. Push an annotated tag such as `v0.2.0` and create a **draft** release with `docs/release-notes.md`, uploading
+   every file in `dist/native-releases/v<version>`.
+2. Run the **Sign native release** workflow with that tag. It signs the archive with the
+   `TAURI_SIGNING_PRIVATE_KEY` repository secret, verifies it against the public key in
+   `apps/mac/Sources/PrismUpdates/Signature/Minisign.swift`, and uploads the `.sig`, `latest.json` and refreshed
+   checksums to the draft.
+3. Check the draft's assets, then publish it as the latest release.
 
-The **Release macOS** job is opt-in through the repository variable
-`MACOS_RELEASE_CI_ENABLED=true`. Leave it disabled while the persistent certificate
-is held only on the signing Mac; pushing tags still permits local publication.
-Do not enable it until the certificate is provisioned and the installed-app
-identity migration has been addressed.
+With the key available locally (`TAURI_SIGNING_PRIVATE_KEY` set to the key or its path, and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, empty for the current key), packaging signs the archive and writes
+`latest.json` itself. Published releases are immutable; use a new version to correct mistakes.
 
-The job requires `APPLE_SIGNING_IDENTITY` (Developer ID Application name),
-`APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`,
-`APPLE_PASSWORD`, `APPLE_TEAM_ID`, and `TAURI_SIGNING_PRIVATE_KEY` secrets.
-It never falls back to ad-hoc signing. `PRISM_RELEASE_MODE=notarized` additionally
-requires a Developer ID signature and a valid stapled notarization ticket.
-CI selects Xcode 26.3 to compile macOS 26 glass APIs while retaining macOS 14 support.
-The workflow can be dispatched for an existing tag to retry an unpublished release.
+After publishing, verify the public `releases/latest/download/latest.json`, the archive signature and checksums.
+Artifact checks do not prove an installation, restart or permission behavior on a user's Mac.
 
-### Local builds without a Developer ID certificate
-
-Run `pnpm macos:signing:setup` once. It creates a persistent signing identity in
-`~/Library/Application Support/Prism Signing`, with an encrypted signing keychain
-and PKCS#12 backup. The directory is owner-only and never belongs in Git.
-macOS asks the user to approve certificate trust for code signing in their user
-account. It does not change system trust, HTTPS trust, Gatekeeper, or app permissions.
-Repeated setup reuses the certificate; builds must never generate a replacement.
-Keep a secure backup of the entire directory and do not copy its secrets into chat.
-
-The Tauri wrapper automatically uses this local identity when no explicit identity
-is set, and unlocks only its dedicated signing keychain. This identity supports non-notarized GitHub releases. Use `PRISM_RELEASE_MODE=local-signed` and `PRISM_INSTALLED_APP=/Applications/Prism.app` when packaging; the installed signer must match. A transition to Developer ID is a separate one-time
-migration; local installs reject incompatible public updates instead of losing grants.
-
-Before replacing an existing app with the same signer, run:
+## Install on the signing Mac
 
 ```sh
-pnpm macos:signing:verify path/to/Prism.app /Applications/Prism.app
-pnpm macos:install path/to/Prism.app
+PRISM_APP_ONLY=1 PRISM_INSTALLED_APP=/Applications/Prism.app node scripts/package-native-release.mjs
+node scripts/install-macos-app.mjs    # after quitting Prism
 ```
 
-The verifier checks both apps against each other's designated requirements on every
-architecture. For the initial ad-hoc-to-certificate migration, verify the candidate
-alone and use `pnpm macos:install path/to/Prism.app --migrate-from-adhoc` after quitting
-Prism. The installer backs up the previous app, checks signatures, and preserves app
-data; it refuses to stop an app or replace a certificate signer. Obtain the initial macOS grants
-in the newly installed app. Test two different builds signed with the same identity
-before claiming that future updates preserve permissions.
+The installer checks the signature, refuses an incompatible signer, keeps a backup ZIP of the previous app and
+replaces `/Applications/Prism.app` atomically.
 
-## Update behavior
+## Signing
 
-The native process checks GitHub 20 seconds after startup and every six hours.
-Settings → General provides a manual check. Checks and installs are serialized
-across windows. Tauri verifies the download signature, then Prism verifies the
-extracted app's code signature and mutual compatibility with the installed app.
-An ad-hoc or different signer is rejected before replacement. Available updates
-appear as the first command-palette result when the search is empty, above favorites, without opening Settings or manually checking. Enter or clicking that row installs the update. The same row shows installation progress and then Restart Prism; restarting remains explicit. Failed installations keep a retry row. Unrelated searches and clipboard history retain their normal results.
-Installation is manual by default. Settings → General → Install updates
-automatically opts into background download and verified installation, including
-an already-discovered update. This preference persists across restarts. Restarting
-remains a separate action, so automatic installation does not interrupt active work.
-Errors remain retryable and do not restart the app.
-Development builds cannot install updates.
+Updates require two independent signatures:
 
-Chat and dictation reuse already-authorized keys and request required macOS
-authorization when the user starts the feature. Settings also provide an explicit
-**Allow key use** action. Status reads remain silent and fall back to metadata when
-access is denied. Successfully opened
-keys stay in zeroizing process memory, and no credentials move to plaintext settings.
+- **Updater signature.** The Minisign key whose public half is in `Minisign.swift`. Never replace the updater key or
+  publish it in Git; installed apps reject archives signed by any other key.
+- **Code signature.** A persistent certificate, so updates keep the app's identity and its macOS permissions.
+  Packaged builds reject missing identities and ad-hoc signing. Never regenerate the certificate during a build,
+  reset TCC, or weaken Keychain access. Keep certificate backups and private keys outside the repository.
 
-## Launch at login
+`scripts/package-native-release.mjs` reads `~/Library/Application Support/Prism Signing/identity.json` and unlocks
+only that identity's dedicated keychain; `APPLE_SIGNING_IDENTITY` can select another provisioned certificate.
+`node scripts/setup-local-macos-signing.mjs` creates the identity once on a new signing Mac.
 
-The implementation uses Apple's [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice) API.
-
-Settings → General reads and changes `SMAppService.mainApp` registration. No separate
-local preference or startup registration is used. Approval remains a user action in
-macOS Login Items. Only release builds installed at `/Applications/Prism.app` may
-register; the stable bundle identifier, install path, and signing identity are kept
-across updates. Native service tests use a fake service and never change host login
-items. Actual registration and login after an update require separate runtime proof.
-
-## Cleanup
-
-Build artifacts are disposable; application data and signing keys are not.
-Remove release staging folders only when no build is using them. Never remove
-Application Support, WebKit storage, Keychain items, or user scripts as build cleanup.
-
-
-### Palette update row verification (2026-09-12)
-
-117 focused App, update controls, navigation and localization tests passed, including first-row selection, Enter installation, duplicate-install suppression, explicit restart, retry/search/clipboard behavior and preserving an existing user selection during background arrival. TypeScript and signed macOS app packaging passed. An Orca embedded-browser static preview used real App components with mocked updater IPC to verify first-row display, click-to-install, the restart row and Enter-to-restart. This is renderer verification, not an actual update download or installation.
-
-Release 0.1.7 checks: 616 frontend/core tests, 235 Rust tests (5 opt-in tests ignored), the native dictation mock suite, 5 signing/updater tests, TypeScript, and the production frontend build passed. Universal packaging verifies both macOS architectures, the existing installed signing identity, the updater archive signature, and artifact checksums.
+Releases are not Apple notarized. Label them so; new downloads may require System Settings → Privacy & Security →
+Open Anyway. Switching to a Developer ID certificate is a separate identity migration (installed copies would need
+permissions granted again), not an interchangeable build setting.

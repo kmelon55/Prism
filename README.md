@@ -2,15 +2,11 @@
 
 [English](README.md) · [한국어](README.ko.md)
 
-A keyboard-first launcher for macOS. Find apps and files, manage your clipboard,
-run commands, and work with AI from one compact palette. Free and open source under MIT.
+A keyboard-first launcher for macOS. Find apps and files, manage your clipboard, run commands, and work with AI
+from one compact palette. A native Swift app, free and open source under MIT.
 
 **[Download Prism for macOS](https://github.com/kmelon55/Prism/releases/latest)** ·
 [Contributing](CONTRIBUTING.md) · [Release guide](docs/releases.md)
-
-> **Native rewrite in progress.** The macOS app is being rewritten in Swift in [`apps/mac`](apps/mac/README.md).
-> It keeps the same app, bundle identifier, settings and update channel, so installed copies update to it in place.
-> The last Tauri release is `v0.1.19`; its source is kept on the [`legacy/tauri`](https://github.com/kmelon55/Prism/tree/legacy/tauri) branch.
 
 ## Install
 
@@ -19,83 +15,69 @@ Requires **macOS 14 or later**. The universal build supports **Apple Silicon and
 1. Download the `.dmg` or `.zip` from [GitHub Releases](https://github.com/kmelon55/Prism/releases/latest).
 2. Open the DMG and drag **Prism.app** into **Applications**, or extract the ZIP and move the app there.
 3. Open `/Applications/Prism.app`. Keep this as your one installed copy.
-4. Press **⌘⇧Space** to show or hide Prism. Use **⌘,** for Settings.
+4. Press **⌘⇧Space** to show or hide Prism (change it in **Settings → Launcher**). Use **⌘,** for Settings.
 
 ### First launch: Open Anyway
 
-Prism 0.1.1 uses a **persistent local signing certificate, without Apple notarization**.
-macOS may block the first launch because it cannot verify the developer.
-After trying to open Prism, go to **System Settings → Privacy & Security → Open Anyway**,
-then confirm **Open**. Only do this for a download you trust from this repository.
+Prism is signed with a **persistent local certificate, without Apple notarization**. macOS may block the first
+launch because it cannot verify the developer. After trying to open Prism, go to **System Settings → Privacy &
+Security → Open Anyway**, then confirm **Open**. Only do this for a download you trust from this repository.
 See [Apple's instructions](https://support.apple.com/en-us/102445).
 
-Prism asks for permissions when a feature needs them. Accessibility enables window
-management and inserting text into other apps; dictation needs microphone access.
-New packaged builds require a persistent signing certificate. Existing ad-hoc installs
-may need authorization once when moving to that identity. Updates with incompatible
-signatures are rejected before replacing the app. Update archive signatures and Apple
-notarization are separate checks. See [signing setup](docs/releases.md#signing-and-notarization).
+Prism asks for permissions when a feature needs them. Accessibility enables window management, snippet expansion
+and inserting text into other apps; dictation needs microphone access. Updates keep the same signing identity, so
+permissions stay granted.
 
-## Updates and everyday use
+## Everyday use and updates
 
-Prism runs in the background when its palette is hidden. Opening it again brings
-back the existing instance. To start it when you sign in, enable **Settings → General → Launch at login**.
-Prism reads the actual macOS registration and shows when approval is needed in
-**System Settings → General → Login Items**.
+Prism runs in the background when its palette is hidden. To start it when you sign in, enable
+**Settings → General → Launch at login**.
 
-The installed app checks GitHub for updates at startup and every six hours. A new
-version appears in an in-app notice and **Settings → General**. Choose **Download
-and install**, then **Restart Prism** when you have finished your current work.
-Checks are automatic; installation and restart are explicit. You can also use
-**Check for updates** at any time. Network failures leave the current app usable.
+The app checks GitHub for updates at startup and every six hours. A new version appears in **Settings → General**.
+Choose **Download and install**, then restart Prism when you have finished your current work. Every update is
+verified against Prism's updater key before it replaces the app.
 
-Settings and local history live in `~/Library/Application Support/dev.prism.desktop`
-and the app's WebKit storage. Provider keys stay in macOS Keychain. Updating the app
-keeps these separate from the installed executable.
+Settings and local history live in `~/Library/Application Support/dev.prism.desktop`; provider keys stay in the
+macOS Keychain. Updating the app keeps both.
 
 ## Features
 
-- Fast app and file search, aliases, keyboard navigation, and global shortcuts.
-- Clipboard history, snippets, script commands, local notes, and library search.
-- Window positioning, calculator, unit conversion, and dated currency reference rates.
-- Bring-your-own-key AI chat and voice dictation, with provider settings in the app.
-- English and Korean UI, including Korean search support.
+- App and file search with aliases, favorites, frecency, keyboard navigation and global shortcuts.
+- Clipboard history, snippets with expansion, quicklinks, notes and script commands.
+- Window management, calculator with units, currencies and dates, emoji picker, system commands.
+- Bring-your-own-key AI chat and voice dictation, with local or provider models.
+- Backups and an import from Raycast.
+- English and Korean UI, including Korean search.
 
-macOS is the current packaged release. Windows/Linux desktop code and the native
-[Android launcher](apps/android/README.md) are in development; this release does not
-include installers for those platforms. Individual features may require OS
-permissions, local model setup, or your own provider account.
+Prism 0.2 and later are native Swift. Prism 0.1.x was a Tauri app; its source is kept on the
+[`legacy/tauri`](https://github.com/kmelon55/Prism/tree/legacy/tauri) branch, and installed 0.1.x copies update to
+the native app in place. A separate native [Android launcher](apps/android/README.md) is in development.
 
 ## Develop
 
-Use **Node.js 22+**, **pnpm 10.27.0**, Rust, and Apple Command Line Tools.
+Use Apple Command Line Tools (Swift 6) and Node.js 22+ for the release scripts.
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm test
-pnpm build
-cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+cd apps/mac
+swift build
+swift test
+scripts/build-app.sh      # a runnable "Prism Dev.app" with its own data, beside the installed Prism
 ```
 
-For a browser preview, explicitly run `pnpm --filter @prism/desktop dev`.
-For a native development session, explicitly run `pnpm tauri dev` after quitting
-the installed app. Do not start another server if one is already running.
-Debug builds do not install updates. Do not keep separate “Prism Test” copies.
-
-For daily use, open `/Applications/Prism.app`. Source edits do not modify it live.
-Use the [local signing and installation workflow](docs/releases.md#signing-and-notarization) for an
-authorized local update, or publish a signed GitHub release; notarization is optional.
+Development builds use the bundle identifier `dev.prism.native-dev` and their own data folder, so they never touch
+the installed app. See [`apps/mac/README.md`](apps/mac/README.md) for the module layout and conventions, and the
+[release guide](docs/releases.md) to package, sign and publish.
 
 ```text
-apps/desktop/          React + Tauri desktop app
-apps/android/          Native Android launcher in development
-packages/command-core/ Shared command and search logic
-docs/                  Architecture, feature notes, and release instructions
+apps/mac/        Native macOS app (Swift package)
+apps/android/    Native Android launcher in development
+scripts/         Packaging, signing and updater scripts
+docs/            Architecture, feature notes and release instructions
 ```
 
 ## License
 
 [MIT](LICENSE). Third-party notices are kept with their source, including
-[Whisp-derived dictation](apps/desktop/src-tauri/native/dictation/LICENSE-Whisp).
+[Whisp-derived dictation](apps/mac/Sources/PrismDictation/Resources/LICENSE-Whisp.txt) and
+[Unicode emoji data](apps/mac/Sources/PrismEmoji/Resources/UNICODE-LICENSE.txt).
 This project is not affiliated with the Minecraft project Prism Launcher.

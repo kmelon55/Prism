@@ -1,37 +1,32 @@
-// Builds, signs and packages the Swift app (apps/mac) as a Prism release that the installed Tauri app can update to.
+// Builds, signs and packages the Swift app (apps/mac) as a Prism release.
 //
-//   TAURI_SIGNING_PRIVATE_KEY=… TAURI_SIGNING_PRIVATE_KEY_PASSWORD=… \
 //   PRISM_INSTALLED_APP=/Applications/Prism.app [VERSION=0.2.0] node scripts/package-native-release.mjs
 //
-// PRISM_APP_ONLY=1 stops after the signed and verified Prism.app, for a local install without the updater key.
+// The bundle keeps the identity installed copies update in place (Prism.app, dev.prism.desktop, executable
+// prism-desktop) and is signed with the existing "Prism Local Signing" identity, never ad-hoc. The installed app is
+// only inspected, never replaced.
 //
-// The bundle keeps the Tauri identity (Prism.app, dev.prism.desktop, executable prism-desktop) and is signed with the
-// existing "Prism Local Signing" identity, never ad-hoc. The installed app is only inspected, never replaced.
-// Output: dist/native-releases/v<version> with the DMG, ZIP, updater archive and signature, latest.json and checksums.
-import { createHash } from "node:crypto";
+// Output: dist/native-releases/v<version> with the DMG, ZIP, updater archive and checksums. With the updater key in
+// TAURI_SIGNING_PRIVATE_KEY the archive is signed here and latest.json written too; without it, the "Sign native
+// release" GitHub workflow signs the uploaded draft release with the repository secret.
+//
+// PRISM_APP_ONLY=1 stops after the signed and verified app, written to dist/native-app/Prism.app, for a local install
+// with scripts/install-macos-app.mjs.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inspectSignature, resolveLocalSigningIdentity, verifyCompatibleSignatures } from "./macos-signing.mjs";
-import { signUpdaterFile } from "./sign-updater.mjs";
-import { verifyUpdater } from "./verify-updater.mjs";
+import { archiveName, signRelease, writeChecksums } from "./native-release-feed.mjs";
 
 const environment = { ...process.env };
 const version = environment.VERSION ?? JSON.parse(readFileSync("package.json", "utf8")).version;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("VERSION must be a plain semantic version such as 0.2.0.");
 if (!environment.PRISM_INSTALLED_APP) throw new Error("Set PRISM_INSTALLED_APP to the installed app whose signing identity must be preserved.");
 const appOnly = environment.PRISM_APP_ONLY === "1";
-if (!appOnly && !environment.TAURI_SIGNING_PRIVATE_KEY) throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to the existing updater key. Never create a new one.");
-// The key the native app trusts for later updates, and, while it exists, the key the installed Tauri app trusts.
-const publicKeys = [/static let prismPublicKey = "([^"]+)"/.exec(readFileSync("apps/mac/Sources/PrismUpdates/Signature/Minisign.swift", "utf8"))?.[1]];
-if (!publicKeys[0]) throw new Error("Could not read the updater public key from the native app.");
-if (existsSync("apps/desktop/src-tauri/tauri.conf.json")) {
-  publicKeys.push(JSON.parse(readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8")).plugins.updater.pubkey);
-}
 const identity = resolveLocalSigningIdentity(environment);
 
-const output = resolve(environment.PRISM_OUTPUT ?? `dist/native-releases/v${version}`);
+const output = resolve(environment.PRISM_OUTPUT ?? (appOnly ? "dist/native-app" : `dist/native-releases/v${version}`));
 const staging = mkdtempSync(join(tmpdir(), "prism-native-release-"));
 try {
   execFileSync("/bin/zsh", ["scripts/build-app.sh"], {
@@ -55,32 +50,28 @@ try {
     if (!entitlements.includes(key)) throw new Error(`The signed app is missing the ${key} entitlement.`);
   }
 
+  rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
   if (appOnly) {
     execFileSync("ditto", [app, join(output, "Prism.app")]);
     console.log(join(output, "Prism.app"));
   } else {
-    packageUpdates(app);
+    packageRelease(app);
     console.log(output);
   }
 } finally {
   rmSync(staging, { recursive: true, force: true });
 }
 
-// The updater archive and its signature, the DMG and ZIP installers, the feed and checksums.
-function packageUpdates(app) {
-  const archive = `Prism_${version}_universal.app.tar.gz`;
+// The updater archive, the DMG and ZIP installers and checksums, plus the signature and feed when the key is here.
+function packageRelease(app) {
+  const archive = archiveName(version);
   // COPYFILE_DISABLE keeps AppleDouble `._` files out of the archive.
   execFileSync("tar", ["-czf", join(output, archive), "-C", staging, "Prism.app"], { env: { ...environment, COPYFILE_DISABLE: "1" } });
   const listing = execFileSync("tar", ["-tzf", join(output, archive)], { encoding: "utf8" }).split("\n").filter(Boolean);
   if (listing.some(name => !name.startsWith("Prism.app/") || name.split("/").some(part => part.startsWith("._")))) {
     throw new Error("The updater archive has entries outside Prism.app or AppleDouble files.");
   }
-  // The existing updater key signs the archive, so the installed Tauri app accepts it.
-  const signature = signUpdaterFile(join(output, archive), environment.TAURI_SIGNING_PRIVATE_KEY,
-    environment.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "");
-  writeFileSync(join(output, `${archive}.sig`), signature);
-  for (const key of publicKeys) verifyUpdater(readFileSync(join(output, archive)), signature, key);
 
   execFileSync("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, join(output, `Prism_${version}_universal.zip`)]);
   const dmgFolder = join(staging, "dmg");
@@ -91,12 +82,10 @@ function packageUpdates(app) {
   execFileSync("hdiutil", ["create", "-volname", "Prism", "-srcfolder", dmgFolder, "-format", "UDZO", "-fs", "HFS+",
     "-ov", join(output, `Prism_${version}_universal.dmg`)], { stdio: "inherit" });
 
-  const platform = { signature, url: `https://github.com/kmelon55/Prism/releases/download/v${version}/${archive}` };
-  writeFileSync(join(output, "latest.json"), JSON.stringify({
-    version, notes: `Prism ${version}. See the GitHub release notes for changes.`, pub_date: new Date().toISOString(),
-    platforms: { "darwin-aarch64": platform, "darwin-x86_64": platform },
-  }, null, 2) + "\n");
-  const sums = readdirSync(output).filter(name => name !== "SHA256SUMS.txt").sort().map(name =>
-    `${createHash("sha256").update(readFileSync(join(output, name))).digest("hex")}  ${name}`);
-  writeFileSync(join(output, "SHA256SUMS.txt"), sums.join("\n") + "\n");
+  if (environment.TAURI_SIGNING_PRIVATE_KEY) {
+    signRelease(output, version, environment);
+  } else {
+    writeChecksums(output);
+    console.log("No updater key here: upload these files to a draft release, then run the \"Sign native release\" workflow.");
+  }
 }

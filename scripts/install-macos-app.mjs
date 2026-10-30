@@ -8,7 +8,7 @@ if (process.platform !== "darwin") throw new Error("This installer requires macO
 const args = process.argv.slice(2);
 const flags = args.filter((arg) => arg.startsWith("--"));
 if (flags.some((flag) => flag !== "--migrate-from-adhoc")) throw new Error("Unknown installer option.");
-const source = resolve(args.find((arg) => !arg.startsWith("--")) ?? "apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/Prism.app");
+const source = resolve(args.find((arg) => !arg.startsWith("--")) ?? "dist/native-app/Prism.app");
 const installed = "/Applications/Prism.app";
 const executable = join(installed, "Contents/MacOS/prism-desktop");
 if (source === installed) throw new Error("Choose a newly built app as the installation source.");

@@ -1,13 +1,14 @@
-Prism 0.1.19 makes model selection easier to read and scroll in chat, AI settings, and dictation.
+Prism 0.2.0 is a native macOS app. It replaces the Tauri, React and Rust app of 0.1.x with Swift, AppKit and SwiftUI, and keeps your data, settings, shortcuts and permissions.
 
-- Replace cramped model popovers with a larger centered dialog. Keep search and column headings visible while browsing the model list.
-- Prevent scrolling at list boundaries from moving the settings page behind the dialog. Use a single scrolling area for speech models.
-- Separate model names, IDs, input prices, and output prices. Sort text models by name or price, with unavailable prices listed last.
-- Add five-segment price indicators and dated reference throughput for three Vercel models. Reference speed is provider-specific public data from October 28, 2026, not measured Prism latency. Unknown values remain unavailable rather than receiving an estimated score.
-- Preserve model selection, failed-save recovery, keyboard navigation, focus restoration, and light/dark themes.
+- Lighter and faster: the app is about 17 MB instead of 56 MB and uses well under 100 MB of memory instead of about 450 MB. Windows open instantly and use the system's glass.
+- Everything from 0.1.19 carries over: app and file search, clipboard history, snippets and expansion, notes and quicklinks, emoji, calculator with units, currency and dates, window management, script commands, AI chat, dictation, backups and the Raycast import.
+- Your existing data stays where it was and loads unchanged, including clipboard history, library, AI conversations, provider keys, dictation models, global shortcuts and aliases. Appearance settings and aliases from the old app are imported on first launch.
+- The empty palette now leads with favorites and your most-used apps and commands. Launch history from 0.1.x counts.
+- Type a URL to open it, `web <query>` to search, or fall back to a web search when nothing matches.
+- The AI chat model picker and the dictation text model share one searchable catalog.
 
-Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Existing installations can use Settings → General → Check for updates, then restart Prism to use the new version.
+Download the universal DMG or ZIP for Apple Silicon and Intel Macs running macOS 14 or later. Installed 0.1.x copies update in place through Settings → General → Check for updates.
 
-The app uses the existing Prism Local Signing certificate and updater key. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway. Local-signed updates can still require renewed macOS Keychain approval.
+The app uses the existing Prism Local Signing certificate and updater key, so macOS permissions stay granted. It is not Apple notarized; a first installation may require System Settings → Privacy & Security → Open Anyway.
 
-Validation covers TypeScript, frontend/core and Rust tests, native dictation and login-item mocks, the production build, universal macOS packaging, installed-signer compatibility, updater signatures, and artifact checksums. Browser previews exercise the actual UI components with test IPC and public catalog data, including scroll containment in a 760 × 500 viewport. These checks do not establish native WebView behavior, live inference performance, update installation, or macOS permission behavior. No Windows, Linux or Android public release is included.
+Validation covers about 580 Swift tests, the release script tests, universal packaging, installed-signer compatibility, updater signatures and checksums, and daily use on the signing Mac. The update from 0.1.x through the old app's updater was not exercised end to end.

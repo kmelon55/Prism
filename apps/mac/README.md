@@ -1,10 +1,9 @@
 # Prism for macOS (native)
 
-A pure Swift rewrite of the Tauri app in `apps/desktop`. When it reaches feature parity it replaces the
-Tauri app, and the Tauri, React and Rust code is removed. Until then the Tauri app keeps shipping bug fixes.
-
-Goals: smaller and lighter than the WebView app (target 10–20 MB bundle, 50–150 MB memory instead of
-~456 MB), instant windows, and real macOS look and feel. macOS 14+, Apple Silicon and Intel.
+Prism's macOS app since 0.2.0: a pure Swift rewrite of the Tauri app of 0.1.x, whose source is kept on the
+[`legacy/tauri`](https://github.com/kmelon55/Prism/tree/legacy/tauri) branch. It is small (a 17 MB bundle instead of
+56 MB, well under 100 MB of memory instead of about 456 MB), opens windows instantly and looks native.
+macOS 14+, Apple Silicon and Intel.
 
 ## Layout
 
@@ -47,8 +46,8 @@ feature appears in the app as soon as its `make` returns providers or panes.
   Dictation 700, Backup 800, Advanced 900.
 - **Background work:** put monitors and event taps in `FeatureContribution.start`, which runs after launch.
 - **Own windows:** a feature may manage its own `NSWindow`/`NSPanel` (AI chat, dictation overlay, notes).
-- **Command IDs and hotkeys:** give every command row the same ID the Tauri app uses (`clipboard:open-history`,
-  `window:left-half`, …; see `apps/desktop/src/providers`). The shell owns `command-shortcuts-v1.json`,
+- **Command IDs and hotkeys:** give every command row the same ID the Tauri app used (`clipboard:open-history`,
+  `window:left-half`, …; see `apps/desktop/src/providers` on `legacy/tauri`). The shell owns `command-shortcuts-v1.json`,
   registers those hotkeys and runs the row's first action, so features do not register command hotkeys or
   build their own shortcut recorders. `Shortcut(accelerator:)` reads the Tauri format (`shift+super+KeyV`).
   Features that need a non-command global key (dictation's double-tap) handle it themselves.
@@ -60,7 +59,7 @@ feature appears in the app as soon as its `make` returns providers or panes.
 - **Data compatibility.** The release app keeps bundle ID `dev.prism.desktop` and the Tauri data folder
   `~/Library/Application Support/dev.prism.desktop`, so existing data must load unchanged: same SQLite file
   names, tables and columns, same JSON files and keys, same keychain services (`dev.prism.desktop.ai`,
-  `dev.prism.desktop.ai.compatible`). The Rust code in `apps/desktop/src-tauri/src` is the specification.
+  `dev.prism.desktop.ai.compatible`). The Rust code in `apps/desktop/src-tauri/src` on the `legacy/tauri` branch is the specification.
   Never run a destructive migration on those files; add columns or tables only when needed.
 - **Never write to the installed app's data.** Development builds use `dev.prism.native-dev` automatically and
   tests use `PRISM_DATA_DIR` or temporary directories. Reading a live file read-only to learn its schema
@@ -71,9 +70,8 @@ feature appears in the app as soon as its `make` returns providers or panes.
   `Resources/ko.lproj/Localizable.strings` (the shell's are in `Sources/Prism/Resources`). Give command rows
   `searchAliases` with both the English and Korean title so either language finds them. In feature modules use `String(localized: "…", bundle: .module)` and
   `Text("…", bundle: .module)`; plain `Text("…")` looks in the main bundle and will not be translated.
-  Match the Korean wording of `apps/desktop/src/locales`.
-- **Tests.** Use Swift Testing (`import Testing`). Port the matching Rust and TypeScript tests so behavior stays
-  the same during the migration.
+  Match the Korean wording of `apps/desktop/src/locales` on `legacy/tauri`.
+- **Tests.** Use Swift Testing (`import Testing`).
 - **Style.** Match the existing code: small types, doc comments only where intent is not obvious.
 
 ## Build, test and look at it
@@ -95,30 +93,15 @@ scripts/build-app.sh                       # a runnable "Prism Dev.app" (bundle 
 When several people or agents build at once, give each a separate `--scratch-path` (for example
 `.build-clipboard`) so they do not wait on the same build lock.
 
-## Migration status (2026-10-30)
+## Status (2026-10-30)
 
-Every feature module is ported and passes its tests (about 570 Swift tests). A stripped universal release bundle is
-15 MB (the Tauri app is 56 MB); `footprint` measured 23 MB idle, 35 MB with the palette open and 42 MB with
-Settings open (the Tauri app measured about 456 MB).
+Every feature of the Tauri app is ported, with about 580 Swift tests, and 0.2.0 ships this app. The UI follows the
+Tauri app's design (monochrome glass, flat settings rows); shared building blocks live in `Sources/PrismKit/UI`
+(`PrismTheme`, `PrismControls`, `SettingsLayout` and the `*Components.swift` files), and feature screens should use
+them rather than stock `Form`, bordered or accent-colored controls.
 
-The UI follows the Tauri app's design (monochrome glass, flat settings rows). Shared building blocks live in
-`Sources/PrismKit/UI` (`PrismTheme`, `PrismControls`, `SettingsLayout` and the `*Components.swift` files); feature
-screens should use them rather than stock `Form`, bordered or accent-colored controls. To compare with the
-original, run the Tauri frontend in a browser (`npx vite` in `apps/desktop`, `?window=settings` for settings) and
-render the native screens with `--render-snapshots` (`--actions`, `--open-id` and `--settings-height` help here).
+Release packaging, signing and publishing are in [the release guide](../../docs/releases.md).
 
-Remaining before the native app replaces the Tauri app:
-
-- Hands-on checks in the running app: hotkeys, paste, window moves, snippet expansion, dictation recording,
-  live AI requests, the chat window as a whole, keyboard routing on feature screens, backup restore and Raycast
-  import against real files.
-- Release: `node scripts/package-native-release.mjs` (from the repository root) builds the universal bundle with the
-  Tauri identity (`Prism.app`, `dev.prism.desktop`, executable `prism-desktop` so the Tauri updater's restart finds
-  it), signs it with the existing "Prism Local Signing" identity, hardened runtime and `Resources/Prism.entitlements`,
-  checks it against the installed app's designated requirement, and writes the DMG, ZIP, updater archive, Tauri
-  updater signature, `latest.json` and checksums to `dist/native-releases/v<version>`. It needs
-  `PRISM_INSTALLED_APP` and the existing `TAURI_SIGNING_PRIVATE_KEY`. Still to do before publishing: prove the
-  Tauri → native update once with locally signed builds and a local feed.
-- Known differences from Tauri, listed in each module's final report: no persisted file index or FSEvents watch
-  for indexed folders; emoji recents, script folders and old aliases that lived in WebView storage are not
-  migrated; the updater has no admin-password fallback or download progress.
+Known gaps compared with the Tauri app: no persisted file index or FSEvents watch for indexed folders, emoji recents
+from WebView storage are not imported, and the updater has no admin-password fallback or download progress. The
+update from an installed 0.1.x through its Tauri updater has not been exercised end to end.
