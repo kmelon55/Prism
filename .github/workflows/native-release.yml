@@ -43,9 +43,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: node scripts/native-release-feed.mjs "$RUNNER_TEMP/release" "${TAG#v}"
       - name: Upload the signature, feed and checksums
+        # The release asset API fails intermittently with HTTP 500; retry each file.
         run: |
           version="${TAG#v}"
-          gh release upload "$TAG" --clobber \
-            "$RUNNER_TEMP/release/Prism_${version}_universal.app.tar.gz.sig" \
-            "$RUNNER_TEMP/release/latest.json" \
-            "$RUNNER_TEMP/release/SHA256SUMS.txt"
+          for file in "Prism_${version}_universal.app.tar.gz.sig" latest.json SHA256SUMS.txt; do
+            for attempt in 1 2 3 4 5; do
+              gh release upload "$TAG" --clobber "$RUNNER_TEMP/release/$file" && break
+              [ "$attempt" = 5 ] && exit 1
+              sleep $((attempt * 5))
+            done
+          done
