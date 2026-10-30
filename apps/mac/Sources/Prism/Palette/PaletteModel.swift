@@ -257,7 +257,9 @@ final class PaletteModel {
     }
 
     /// Runs the selected item's action bound to this shortcut. Returns false when nothing matched.
+    /// Outside the action panel ⌘, stays with Settings, as in the Tauri app, even when an item binds it.
     func performShortcut(key: KeyEquivalent, modifiers: EventModifiers) -> Bool {
+        if actionPanelItem == nil, key == ",", modifiers == .command { return false }
         guard let item = actionPanelItem ?? selectedItem else { return false }
         guard let action = item.actions.first(where: { $0.shortcut?.key == key && $0.shortcut?.modifiers == modifiers }) else { return false }
         closeActionPanel()
