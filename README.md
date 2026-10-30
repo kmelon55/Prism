@@ -55,7 +55,7 @@ the native app in place. A separate native [Android launcher](apps/android/READM
 
 ## Develop
 
-Use Apple Command Line Tools (Swift 6) and Node.js 22+ for the release scripts.
+Use Xcode 27 or its Command Line Tools (Swift 6.4; Xcode 26 cannot build the package) and Node.js 22+ for the release scripts.
 
 ```sh
 cd apps/mac

@@ -7,13 +7,11 @@ permissions:
   contents: read
 jobs:
   check:
-    runs-on: macos-26
+    # Releases are built with Xcode 27 (Swift 6.4); Xcode 26 rejects or crashes on parts of this package.
+    runs-on: xcode-27
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "26.6"
       - uses: actions/setup-node@v4
         with:
           node-version: 22

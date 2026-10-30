@@ -30,10 +30,10 @@ final class ChatWindowController: NSObject, NSWindowDelegate {
             Task { await model.accept(text: draft, image: image) }
         }
         model.refreshConfiguration()
-        let model = model
+        let chat = model
         return PaletteScreen(id: "ai-chat", title: L("AI Chat"), expanded: true) { [weak self] in
-            ChatRootView(model: model, onClose: { [weak self] in
-                model.saveOnClose()
+            ChatRootView(model: chat, onClose: { [weak self] in
+                chat.saveOnClose()
                 self?.context?.popScreen()
             }, onExport: { [weak self] session in self?.export(session) }, chooseFolder: { Self.chooseFolder() })
         }

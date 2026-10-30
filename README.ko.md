@@ -54,7 +54,7 @@ Prism 0.2부터는 네이티브 Swift 앱입니다. 0.1.x는 Tauri 앱이었으�
 
 ## 개발
 
-Apple Command Line Tools(Swift 6)가 필요하고, 릴리스 스크립트에는 Node.js 22+가 필요합니다.
+Xcode 27 또는 그 Command Line Tools(Swift 6.4, Xcode 26으로는 빌드되지 않음)가 필요하고, 릴리스 스크립트에는 Node.js 22+가 필요합니다.
 
 ```sh
 cd apps/mac
