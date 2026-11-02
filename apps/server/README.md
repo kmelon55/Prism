@@ -10,7 +10,7 @@ Set `POSTGRES_PASSWORD` (a URL-safe random password), `PRISM_PAIRING_SECRET` (at
 
 The database uses a named persistent volume. The SQL files in `migrations/` initialize an **empty** database only, in filename order. For existing databases, review and run pending SQL migrations explicitly; the web process does not automatically modify production schemas. `npm run migrate` applies the idempotent `0001.sql` and `0002.sql` schemas using `DATABASE_URL` from the caller's environment. Existing installations need `0002.sql` before using selective transfers. Changing database credentials in Compose does not change an existing database user's password.
 
-If the host DNS is unreachable from Docker's default build bridge, set `PRISM_BUILD_NETWORK=host` for that deployment. This changes only the build network; runtime services retain their isolated Compose network. Leave it unset on hosts with working bridge DNS.
+If the host LAN DNS is unreachable from Docker's build bridge, set `PRISM_BUILD_DNS=public`. This selects a dependency-install stage with a read-only resolver mount using `build-resolv.conf` (Cloudflare's 1.1.1.1/1.0.0.1). It does not change host DNS, runtime DNS or network isolation. Leave it unset on hosts with working bridge DNS.
 
 The container runs as the Node user. The production image includes the built application, not the source tree or environment files. Docker Compose and deployment have not been executed in the author's local validation environment because Docker is unavailable there.
 
