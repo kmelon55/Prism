@@ -1,6 +1,8 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      network: ${PRISM_BUILD_NETWORK:-default}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/prism
