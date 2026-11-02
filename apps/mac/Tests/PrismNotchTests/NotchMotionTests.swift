@@ -18,15 +18,17 @@ struct NotchMotionTests {
         window.contentView = canvas
         window.orderFrontRegardless()
         defer { canvas.clear(); window.orderOut(nil) }
+        CATransaction.begin()
         canvas.present(AnyView(Text("Timer").frame(maxWidth: .infinity, maxHeight: .infinity)),
                        size: CGSize(width: 480, height: 330), mode: .expanded, animated: true)
-        CATransaction.flush()
+        let installedReveal = canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation
+        CATransaction.commit()
         let motion = try #require(canvas.motion)
         #expect(motion.from == CGSize(width: 480, height: 1))
         let finalFrame = canvas.contentFrame
         // CI may not composite an invisible off-screen panel before the animation ends.
-        // Verify the installed Core Animation frames instead of scheduler/display timing.
-        let reveal = try #require(canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation)
+        // Copy the installed frames before flushing: a slow flush may outlive the animation.
+        let reveal = try #require(installedReveal)
         let revealPaths = try #require(reveal.values as? [CGPath])
         #expect(revealPaths.contains { $0.boundingBoxOfPath.height > 1 && $0.boundingBoxOfPath.height < 330 })
         #expect(revealPaths.allSatisfy { abs($0.boundingBoxOfPath.width - 480) < 0.01 })
@@ -61,18 +63,22 @@ struct NotchMotionTests {
         window.contentView = canvas
         window.orderFrontRegardless()
         defer { canvas.clear(); window.orderOut(nil) }
-        func present(_ mode: NotchPresentation.Mode, animated: Bool) {
+        @discardableResult
+        func present(_ mode: NotchPresentation.Mode, animated: Bool) -> CAKeyframeAnimation? {
+            // Capture the animation before committing it to the asynchronous compositor.
+            CATransaction.begin()
+            defer { CATransaction.commit() }
             canvas.present(AnyView(NotchView(model: model, geometry: geometry, mode: mode)),
                            size: geometry.frame(mode: mode).size, mode: mode, animated: animated)
-            CATransaction.flush()
+            return canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation
         }
         present(.compact, animated: false)
         try await Task.sleep(for: .milliseconds(80))
         let windowFrame = window.frame
-        present(.expanded, animated: true)
+        let installedMorph = present(.expanded, animated: true)
         let contentFrame = try #require(canvas.contentFrame)
         #expect(contentFrame.size == geometry.frame(mode: .expanded).size)
-        let morph = try #require(canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation)
+        let morph = try #require(installedMorph)
         let paths = try #require(morph.values as? [CGPath])
         #expect(paths.contains { $0.boundingBoxOfPath.height > 34 && $0.boundingBoxOfPath.height < 330 })
         #expect(paths.first?.boundingBoxOfPath.size == geometry.frame(mode: .compact).size)
