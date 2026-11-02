@@ -228,3 +228,13 @@
 "Needs access" = "권한 필요";
 "Preview waveform" = "파형 미리보기";
 "Recording needs microphone access; insertion needs Accessibility access." = "녹음에는 마이크 권한, 자동 입력에는 손쉬운 사용 권한이 필요합니다.";
+
+// Notch tools
+"Speak into the app you were using." = "사용하던 앱에 음성으로 입력해요.";
+"Dictation needs attention" = "받아쓰기를 확인해 주세요";
+"Ready to listen" = "받아쓰기 준비됐어요";
+"Preparing…" = "준비 중…";
+"Processing…" = "처리 중…";
+"Inserting…" = "입력 중…";
+
+"Speak naturally." = "편하게 말해보세요";

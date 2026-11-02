@@ -17,10 +17,11 @@ public struct PaletteItem: Identifiable {
     /// Puts the row above everything else, favorites included, while the query is empty. For rare, timely rows
     /// such as a ready update.
     public var leadsEmptyQuery: Bool
+    public var style: PaletteRowStyle
 
     public init(
         candidate: SearchCandidate, icon: PaletteIcon, accessory: String = "", actions: [PaletteAction],
-        hiddenWhenQueryIsEmpty: Bool = false, leadsEmptyQuery: Bool = false
+        hiddenWhenQueryIsEmpty: Bool = false, leadsEmptyQuery: Bool = false, style: PaletteRowStyle = .row
     ) {
         self.candidate = candidate
         self.icon = icon
@@ -28,11 +29,35 @@ public struct PaletteItem: Identifiable {
         self.actions = actions
         self.hiddenWhenQueryIsEmpty = hiddenWhenQueryIsEmpty
         self.leadsEmptyQuery = leadsEmptyQuery
+        self.style = style
     }
 
     public var title: String { candidate.title }
     public var subtitle: String { candidate.subtitle }
     public var section: String { candidate.section }
+}
+
+/// How the palette draws a row. Instant answers use a large card, and related answers that follow it share
+/// a grid of small cells; each card or cell is still one selectable item with its own actions.
+public enum PaletteRowStyle: Equatable {
+    case row
+    case answer(PaletteAnswer)
+    case answerCell(PaletteAnswer)
+}
+
+/// `input → output`, each with a short muted detail such as a unit name or a Korean reading.
+public struct PaletteAnswer: Equatable {
+    public var input: String
+    public var inputDetail: String
+    public var output: String
+    public var outputDetail: String
+
+    public init(input: String, inputDetail: String = "", output: String, outputDetail: String = "") {
+        self.input = input
+        self.inputDetail = inputDetail
+        self.output = output
+        self.outputDetail = outputDetail
+    }
 }
 
 public enum PaletteIcon {

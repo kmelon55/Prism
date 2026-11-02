@@ -18,6 +18,8 @@ import Testing
     ("1 GB to MiB", "953.674316406", "MiB"), ("8 Mb to MB", "1", "MB"),
     ("1 B to b", "8", "b"), ("1,234.56789 m to m", "1234.56789", "m"),
     ("3 Feet IN Meters", "0.9144", "m"), ("1 km → mi", "0.621371192237", "mi"),
+    ("10 m/s to km/h", "36", "km/h"), ("1 gallon to L", "3.785411784", "L"), ("1 cup to ml", "236.5882365", "mL"),
+    ("33평 m2", "109.090909091", "m²"), ("1근 g", "600", "g"), ("100 km/h to mph", "62.1371192237", "mph"),
 ])
 func convertsUnits(query: String, expected: String, label: String) throws {
     let conversion = try #require(try UnitConversion.convert(query))
@@ -27,7 +29,7 @@ func convertsUnits(query: String, expected: String, label: String) throws {
 
 @Test(arguments: [
     "paper", "100", "100달러", "100 USD to KRW", "1,00 m to km", "1e3 m to km", "1 mb to MB",
-    "1 m/s to km/h", "1 gallon to L", "10 m to cm\n", "m to cm", "10 m",
+    "10 m to cm\n", "m to cm", "10 m",
 ])
 func doesNotGuessUnsupportedSyntax(query: String) throws {
     #expect(try UnitConversion.convert(query) == nil)
@@ -45,7 +47,7 @@ func doesNotGuessUnsupportedSyntax(query: String) throws {
 }
 
 @Test func returnsAQueryCorrelatedAnswerWithAPlainCopyValue() throws {
-    let answer = try #require(InstantAnswers.unit("1 GB to B"))
+    let answer = try #require(InstantAnswers.unit("1 GB to B").first)
     #expect(answer.title == "1,000,000,000 B")
     #expect(answer.subtitle == "1 GB")
     #expect(answer.copyValue == "1000000000")
@@ -54,7 +56,33 @@ func doesNotGuessUnsupportedSyntax(query: String) throws {
     #expect(answer.matchedQuery == "1 GB to B")
     #expect(answer.id == "units:result")
 
-    let failure = try #require(InstantAnswers.unit("1 kg to cm"))
+    let failure = try #require(InstantAnswers.unit("1 kg to cm").first)
     #expect(failure.kind == .failure)
     #expect(failure.matchedQuery == "1 kg to cm")
+}
+
+@Test func bareAmountsLeadWithTheUsualUnitAndOfferRelatedOnes() throws {
+    let height = try #require(try UnitConversion.conversions("180cm"))
+    #expect(height.map(\.to.label) == ["ft", "in", "m", "mm"])
+    #expect(height[0].result == "5.90551181102")
+    let answers = InstantAnswers.unit("180cm")
+    #expect(answers.first?.presentation == .card)
+    #expect(answers.first?.output == "5.90551 ft")
+    #expect(answers.dropFirst().allSatisfy { $0.presentation == .cell })
+    #expect(answers[1].id == "units:ft-in" && answers[1].output == "5 ft 10.9 in")
+    #expect(try UnitConversion.conversions("30평")?.first?.to.label == "m²")
+    #expect(try UnitConversion.conversions("70 kg")?.first?.to.label == "lb")
+    #expect(try UnitConversion.conversions("2 L")?.first?.to.label == "gal")
+    #expect(try UnitConversion.conversions("30 C")?.first?.to.label == "°F")
+}
+
+@Test func explicitConversionsListRelatedUnitsAfterTheRequestedOne() throws {
+    let results = try #require(try UnitConversion.conversions("1 km to mi"))
+    #expect(results.first?.to.label == "mi")
+    #expect(!results.dropFirst().contains { $0.to.label == "mi" || $0.to.label == "km" })
+}
+
+@Test(arguments: ["3d", "5 b", "1 GB", "10 min", "paper", "100", "100 USD", "2 + 3", "1 ft 2 in"])
+func bareAmountsIgnoreSearchesAndDurations(query: String) throws {
+    #expect(try UnitConversion.conversions(query) == nil)
 }

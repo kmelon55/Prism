@@ -3,16 +3,20 @@ import SwiftUI
 
 /// Whisp's 21-bar waveform: live level while recording, a sweeping pulse while transcribing.
 struct WaveformView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("reduceMotion") private var appReduceMotion = false
     let amplitude: Double
     let phase: DictationPhase
+    var barCount = 21
+    private var motionDisabled: Bool { reduceMotion || appReduceMotion }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 45)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: motionDisabled)) { context in
             Canvas { canvas, size in
-                let bars = 21
-                let spacing: CGFloat = 3.25
+                let bars = max(2, barCount)
+                let spacing: CGFloat = size.width < 60 ? 2 : 3.25
                 let width = (size.width - CGFloat(bars - 1) * spacing) / CGFloat(bars)
-                let time = context.date.timeIntervalSinceReferenceDate
+                let time = motionDisabled ? 0 : context.date.timeIntervalSinceReferenceDate
                 // Real microphone levels sit low for long stretches; a gentle curve lifts the middle range so
                 // speech visibly moves the bars.
                 let responsiveAmplitude = pow(max(0, amplitude), 0.72)
@@ -38,8 +42,8 @@ struct WaveformView: View {
                 }
             }
         }
-        .animation(.smooth(duration: 0.16), value: amplitude)
-        .animation(.easeOut(duration: 0.22), value: phase)
+        .animation(motionDisabled ? nil : .smooth(duration: 0.10), value: amplitude)
+        .animation(motionDisabled ? nil : .easeOut(duration: 0.18), value: phase)
         .accessibilityLabel(phase == .recording ? Text("Recording", bundle: .module) : Text("Transcribing…", bundle: .module))
     }
 }

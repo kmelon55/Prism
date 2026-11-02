@@ -23,6 +23,7 @@ final class PaletteModel {
 
     var query = ""
     var selection = 0
+    private(set) var selectionFollowsPointer = false
     private(set) var results: [PaletteItem] = []
     private(set) var sections: [Section] = []
     private(set) var screens: [PaletteScreen] = []
@@ -96,6 +97,7 @@ final class PaletteModel {
     /// Asks every provider for the current query. Each publishes as soon as it finishes; answers for an older
     /// query are dropped, and rows from the previous query stay visible until their provider replaces them.
     func refresh() {
+        selectionFollowsPointer = false
         userMovedSelection = false
         generation += 1
         let generation = generation
@@ -229,6 +231,7 @@ final class PaletteModel {
     }
 
     func moveSelection(by delta: Int) {
+        selectionFollowsPointer = false
         if actionPanelItem != nil {
             actionSelection = min(max(actionSelection + delta, 0), max(actionPanelActions.count - 1, 0))
             return
@@ -239,6 +242,20 @@ final class PaletteModel {
     }
 
     var selectedItem: PaletteItem? { results.indices.contains(selection) ? results[selection] : nil }
+
+    /// Rows may outlive a provider re-ranking. Resolve their stable identity at click time.
+    func activate(id: String) {
+        guard let index = results.firstIndex(where: { $0.id == id }) else { return }
+        activate(index: index)
+    }
+
+    func selectFromPointer(id: String) {
+        guard actionPanelItem == nil, let index = results.firstIndex(where: { $0.id == id }) else { return }
+        guard index != selection || !selectionFollowsPointer else { return }
+        userMovedSelection = true
+        selectionFollowsPointer = true
+        selection = index
+    }
 
     func activate(index: Int? = nil) {
         if actionPanelItem != nil {

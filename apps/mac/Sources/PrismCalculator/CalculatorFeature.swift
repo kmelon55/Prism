@@ -10,8 +10,8 @@ public enum CalculatorFeature {
         let rates = CurrencyRates(file: context.paths.file(CurrencyRates.fileName))
         let items = AnswerItems(context: context)
         return FeatureContribution(providers: [
-            AnswerProvider(id: "calculator", items: items) { query in InstantAnswers.calculation(query).map { [$0] } ?? [] },
-            AnswerProvider(id: "units", items: items) { query in InstantAnswers.unit(query).map { [$0] } ?? [] },
+            AnswerProvider(id: "calculator", items: items) { query in InstantAnswers.calculation(query) },
+            AnswerProvider(id: "units", items: items) { query in InstantAnswers.unit(query) },
             AnswerProvider(id: "datetime", items: items) { query in InstantAnswers.dateTime(query).map { [$0] } ?? [] },
             AnswerProvider(id: "currency", items: items) { query in await currencyAnswers(query, rates: rates) },
         ])
@@ -30,7 +30,12 @@ public enum CalculatorFeature {
             }
         }
         if Task.isCancelled { return [] }
-        return intents.map { InstantAnswers.currency($0, snapshot: snapshot, query: query) }
+        // The first conversion is the card; any others (환율) follow as cells.
+        return intents.enumerated().map { index, intent in
+            var answer = InstantAnswers.currency(intent, snapshot: snapshot, query: query)
+            if index > 0, answer.presentation == .card { answer.presentation = .cell }
+            return answer
+        }
     }
 }
 
@@ -68,8 +73,19 @@ struct AnswerItems {
                 rankingBoost: 72, matchedQuery: answer.matchedQuery),
             icon: icon(answer.kind),
             accessory: answer.accessory,
-            actions: answer.kind == .failure ? [] : actions(answer)
+            actions: answer.kind == .failure ? [] : actions(answer),
+            style: style(answer)
         )
+    }
+
+    private func style(_ answer: InstantAnswer) -> PaletteRowStyle {
+        let card = PaletteAnswer(input: answer.input, inputDetail: answer.inputDetail,
+                                 output: answer.output, outputDetail: answer.outputDetail)
+        switch answer.presentation {
+        case .row: return .row
+        case .card: return .answer(card)
+        case .cell: return .answerCell(card)
+        }
     }
 
     private func icon(_ kind: InstantAnswer.Kind) -> PaletteIcon {

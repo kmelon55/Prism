@@ -62,6 +62,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticTermination</key><false/>
   <key>NSMicrophoneUsageDescription</key><string>Prism uses the microphone for dictation.</string>
+  <key>NSAudioCaptureUsageDescription</key><string>Prism processes audio from apps you choose to adjust their volume and output device. Audio is not saved or sent anywhere.</string>
   <key>NSScreenCaptureUsageDescription</key><string>Prism captures a screen region you select to ask AI about it.</string>
   <key>NSAppleEventsUsageDescription</key><string>Prism uses automation to run system commands and scripts you choose.</string>
 </dict>

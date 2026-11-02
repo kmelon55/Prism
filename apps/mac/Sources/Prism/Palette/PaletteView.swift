@@ -132,12 +132,32 @@ struct PaletteView: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(model.sections.enumerated()), id: \.element.id) { offset, section in
                             PrismSectionLabel(section.title, isFirst: offset == 0)
-                            ForEach(section.rows) { row in
-                                PaletteRow(item: row.item, isSelected: row.index == model.selection)
-                                    .id(row.id)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { model.activate(index: row.index) }
+                            ForEach(PaletteRowBlock.blocks(section.rows)) { block in
+                                switch block {
+                                case .single(let row):
+                                    selectable(row) {
+                                        if case .answer(let answer) = row.item.style {
+                                            PaletteAnswerCard(answer: answer, isSelected: row.id == model.selectedItem?.id)
+                                        } else {
+                                            PaletteRow(item: row.item, isSelected: row.id == model.selectedItem?.id)
+                                        }
+                                    }
+                                case .cells(let rows):
+                                    PaletteAnswerGrid(rows: rows) { row in
+                                        selectable(row) {
+                                            if case .answerCell(let answer) = row.item.style {
+                                                PaletteAnswerCell(answer: answer, isSelected: row.id == model.selectedItem?.id)
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                        }
+                    }
+                    .backgroundPreferenceValue(PaletteRowBounds.self) { anchors in
+                        GeometryReader { geometry in
+                            ListSelectionSurface(rows: anchors.mapValues { geometry[$0] }, selectedID: model.selectedItem?.id,
+                                                 enabled: model.actionPanelItem == nil) { model.selectFromPointer(id: $0) }
                         }
                     }
                     .padding(.horizontal, 12)
@@ -146,11 +166,19 @@ struct PaletteView: View {
                 }
                 .scrollIndicators(.never)
                 .onChange(of: model.selection) { _, selection in
-                    guard model.results.indices.contains(selection) else { return }
+                    guard !model.selectionFollowsPointer, model.results.indices.contains(selection) else { return }
                     proxy.scrollTo(model.results[selection].id)
                 }
             }
         }
+    }
+
+    private func selectable<Content: View>(_ row: PaletteModel.Section.Row, @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .id(row.id)
+            .contentShape(Rectangle())
+            .onTapGesture { model.activate(id: row.id) }
+            .anchorPreference(key: PaletteRowBounds.self, value: .bounds) { [row.id: $0] }
     }
 
     private var footer: some View {
@@ -212,7 +240,142 @@ struct PaletteRow: View {
         }
         .padding(.horizontal, 11)
         .frame(minHeight: PrismPaletteMetrics.rowHeight)
-        .prismRowBackground(isSelected: isSelected)
+    }
+}
+
+/// Consecutive answer cells share one grid; every other row stands alone.
+enum PaletteRowBlock: Identifiable {
+    case single(PaletteModel.Section.Row)
+    case cells([PaletteModel.Section.Row])
+
+    var id: String {
+        switch self {
+        case .single(let row): row.id
+        case .cells(let rows): "cells:" + (rows.first?.id ?? "")
+        }
+    }
+
+    static func blocks(_ rows: [PaletteModel.Section.Row]) -> [PaletteRowBlock] {
+        var blocks: [PaletteRowBlock] = []
+        for row in rows {
+            guard case .answerCell = row.item.style else { blocks.append(.single(row)); continue }
+            if case .cells(let previous) = blocks.last {
+                blocks[blocks.count - 1] = .cells(previous + [row])
+            } else {
+                blocks.append(.cells([row]))
+            }
+        }
+        return blocks
+    }
+}
+
+/// An instant answer as a large `input → output` card, like Raycast's calculator.
+struct PaletteAnswerCard: View {
+    let answer: PaletteAnswer
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            side(answer.input, answer.inputDetail, emphasized: false, reservesDetail: !answer.outputDetail.isEmpty)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(PrismTheme.textMuted)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(PrismTheme.surfaceStrong))
+                .overlay(Circle().strokeBorder(PrismTheme.line))
+            side(answer.output, answer.outputDetail, emphasized: true, reservesDetail: !answer.inputDetail.isEmpty)
+        }
+        .frame(height: 108)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(isSelected ? PrismTheme.surfaceStrong : PrismTheme.surface))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(isSelected ? PrismTheme.lineStrong : PrismTheme.line))
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// `reservesDetail` keeps both values on one line when only the other side has a detail.
+    private func side(_ value: String, _ detail: String, emphasized: Bool, reservesDetail: Bool) -> some View {
+        VStack(spacing: 9) {
+            Text(verbatim: value)
+                .font(.system(size: 25, weight: emphasized ? .semibold : .medium))
+                .tracking(-0.5)
+                .monospacedDigit()
+                .foregroundStyle(emphasized ? PrismTheme.text : PrismTheme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .textSelection(.disabled)
+            if !detail.isEmpty || reservesDetail {
+                Text(verbatim: detail.isEmpty ? " " : detail)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PrismTheme.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(PrismTheme.surfaceStrong))
+                    .opacity(detail.isEmpty ? 0 : 1)
+            }
+        }
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Related answers below a card, three to a line.
+struct PaletteAnswerGrid<Cell: View>: View {
+    let rows: [PaletteModel.Section.Row]
+    @ViewBuilder let cell: (PaletteModel.Section.Row) -> Cell
+    private static var columns: Int { 3 }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(Array(stride(from: 0, to: rows.count, by: Self.columns)), id: \.self) { start in
+                HStack(spacing: 8) {
+                    ForEach(rows[start..<min(start + Self.columns, rows.count)]) { row in
+                        cell(row).frame(maxWidth: .infinity)
+                    }
+                    ForEach(0..<(Self.columns - min(Self.columns, rows.count - start)), id: \.self) { _ in
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+        .padding(.bottom, 4)
+    }
+}
+
+struct PaletteAnswerCell: View {
+    let answer: PaletteAnswer
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(verbatim: answer.output)
+                .font(.system(size: 15, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(PrismTheme.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+            if !answer.outputDetail.isEmpty {
+                Text(verbatim: answer.outputDetail)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(PrismTheme.textMuted)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 13)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(isSelected ? PrismTheme.surfaceStrong : PrismTheme.surface))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(isSelected ? PrismTheme.lineStrong : PrismTheme.line))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One highlight belongs to the list, rather than a retained background on every recycled row.
+private struct PaletteRowBounds: SwiftUI.PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] { [:] }
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
     }
 }
 
@@ -226,13 +389,16 @@ struct PaletteIconView: View {
         case .symbol(let name, _):
             // Monochrome line glyphs like the Tauri lucide icons; module tints are intentionally ignored here.
             Image(systemName: PrismGlyph.outline(name))
-                .font(.system(size: 15, weight: .light))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(isSelected ? PrismTheme.accentStrong : PrismTheme.textSecondary)
         case .file(let path):
             if showFileIcons {
-                Image(nsImage: AppIconCache.shared.icon(forPath: path)).resizable()
+                PrismFileIcon(path: path)
+                    // Keep the icon compact within the 26pt row slot.
+                    .frame(width: 24, height: 24)
+                    .allowsHitTesting(false)
             } else {
-                Image(systemName: "app").font(.system(size: 15, weight: .light)).foregroundStyle(PrismTheme.textSecondary)
+                Image(systemName: "app").font(.system(size: 15, weight: .regular)).foregroundStyle(PrismTheme.textSecondary)
             }
         case .image(let image):
             Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)

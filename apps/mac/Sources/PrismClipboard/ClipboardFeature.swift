@@ -19,6 +19,7 @@ public enum ClipboardFeature {
     public static func make(context: any PrismContext) -> FeatureContribution {
         let history = history(context: context)
         let settings = ClipboardSettingsModel(history: history)
+        let notchModel = ClipboardHistoryModel(history: history)
         return FeatureContribution(
             providers: [ClipboardCommandsProvider(history: history)],
             settingsPanes: [
@@ -28,6 +29,9 @@ public enum ClipboardFeature {
                     ClipboardSettingsView(model: settings)
                 },
             ],
+            notchWidgets: [NotchWidget(id: "clipboard", title: ClipboardText.localize("Clipboard"), systemImage: "doc.on.clipboard") { dismiss in
+                ClipboardNotchView(model: notchModel, dismiss: dismiss)
+            }],
             start: { history.start() }
         )
     }

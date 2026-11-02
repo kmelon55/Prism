@@ -35,8 +35,9 @@ let package = Package(
         .testTarget(name: "PrismFilesTests", dependencies: ["PrismFiles"]),
         .target(name: "PrismEmoji", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismEmojiTests", dependencies: ["PrismEmoji"]),
-        .target(name: "PrismSystem", dependencies: ["PrismKit"], resources: [.process("Resources")]),
-        .testTarget(name: "PrismSystemTests", dependencies: ["PrismSystem"]),
+        .target(name: "PrismAudioDSP", linkerSettings: [.linkedFramework("CoreAudio")]),
+        .target(name: "PrismSystem", dependencies: ["PrismKit", "PrismAudioDSP"], resources: [.process("Resources")]),
+        .testTarget(name: "PrismSystemTests", dependencies: ["PrismSystem", "PrismAudioDSP"]),
         .target(name: "PrismScripts", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismScriptsTests", dependencies: ["PrismScripts"]),
         .target(name: "PrismAI", dependencies: ["PrismKit"], resources: [.process("Resources")]),
@@ -47,10 +48,14 @@ let package = Package(
         .testTarget(name: "PrismBackupTests", dependencies: ["PrismBackup"]),
         .target(name: "PrismUpdates", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismUpdatesTests", dependencies: ["PrismUpdates"]),
+        .target(name: "PrismNotch", dependencies: ["PrismKit"], resources: [.process("Resources")]),
+        .testTarget(name: "PrismNotchTests", dependencies: ["PrismNotch"]),
+        .target(name: "PrismKeyboard", dependencies: ["PrismKit"], resources: [.process("Resources")]),
+        .testTarget(name: "PrismKeyboardTests", dependencies: ["PrismKeyboard"]),
 
         .executableTarget(
             name: "Prism",
-            dependencies: ["PrismCore", "PrismKit", "PrismCalculator", "PrismClipboard", "PrismLibrary", "PrismFiles", "PrismEmoji", "PrismSystem", "PrismScripts", "PrismAI", "PrismDictation", "PrismBackup", "PrismUpdates"],
+            dependencies: ["PrismCore", "PrismKit", "PrismCalculator", "PrismClipboard", "PrismLibrary", "PrismFiles", "PrismEmoji", "PrismSystem", "PrismScripts", "PrismAI", "PrismDictation", "PrismBackup", "PrismUpdates", "PrismNotch", "PrismKeyboard"],
             resources: [.process("Resources")],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", embeddedInfoPlist])]
         ),

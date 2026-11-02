@@ -159,3 +159,9 @@
 "Search" = "검색";
 "Add" = "추가";
 "Press ⌘N to write a note." = "⌘N을 눌러 노트를 작성하세요.";
+
+// Notch tools
+"Quick Note" = "빠른 메모";
+"Write something to remember…" = "기억해둘 내용을 적어보세요…";
+"Saves to Notes" = "노트에 저장돼요";
+"Retry" = "다시 시도";

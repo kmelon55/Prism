@@ -1,0 +1,82 @@
+
+// Notch tools
+"%lld min" = "%lld분";
+"A little time to focus" = "잠깐, 집중할 시간";
+"A running timer continues when the notch is hidden. Cancel it in Timer to stop it." = "노치를 숨겨도 실행 중인 타이머는 계속돼요. 타이머에서 취소할 수 있어요.";
+"Cancel timer" = "타이머 취소";
+"Choose the tools you want here." = "여기에 둘 도구를 골라보세요.";
+"Click to open" = "클릭해서 열어요";
+"Collapse notch" = "노치 접기";
+"Could not load notch settings. Your saved file has not been changed." = "노치 설정을 불러오지 못했어요. 저장된 파일은 변경하지 않았어요.";
+"Could not save notch settings. Try again." = "노치 설정을 저장하지 못했어요. 다시 시도해 주세요.";
+"Customize notch" = "노치 설정";
+"Disconnected display · using main display" = "연결이 끊긴 디스플레이 · 주 디스플레이 사용 중";
+"Dismiss timer" = "타이머 완료 확인";
+"Display" = "디스플레이";
+"Displays" = "디스플레이";
+"All displays" = "모든 디스플레이";
+"Disconnected display" = "연결이 끊긴 디스플레이";
+"Disconnected · selection remembered" = "연결이 끊겼어요 · 선택은 유지돼요";
+"Choose one or more displays. All displays also includes displays connected later." = "노치를 표시할 화면을 선택해 주세요. ‘모든 디스플레이’를 선택하면 나중에 연결한 화면에도 표시돼요.";
+"No selected display is connected. Select a display to show the notch." = "선택한 화면이 연결되어 있지 않아요. 노치를 표시할 화면을 선택해 주세요.";
+"Connect or select a display in Notch settings." = "노치 설정에서 표시할 디스플레이를 선택하거나 연결해 주세요.";
+"Duration in minutes" = "타이머 시간(분)";
+"Hover for a preview. Click to open, then pin to keep it open." = "마우스를 올려 미리 보고, 클릭해서 열어요. 고정하면 계속 열어둘 수 있어요.";
+"Keep open" = "열어두기";
+"Keep your favorite tools at the top of the screen." = "자주 쓰는 도구를 화면 상단에 모아둬요.";
+"Keeps time while the notch is closed or your Mac sleeps." = "노치를 닫거나 Mac이 잠들어도 시간이 이어져요.";
+"Main display" = "주 디스플레이";
+"Move earlier" = "앞으로 이동";
+"Move later" = "뒤로 이동";
+"Notch" = "노치";
+"Open Notch" = "노치 열기";
+"Open notch" = "노치 열기";
+"Pause timer" = "타이머 일시정지";
+"Paused" = "일시정지";
+"Pinned tools" = "고정한 도구";
+"Preview on hover" = "마우스를 올리면 미리보기";
+"Productivity" = "생산성";
+"Resume timer" = "타이머 계속";
+"Show notch" = "노치 표시";
+"Start timer" = "타이머 시작";
+"These tools use your existing Prism data. Clipboard capture stays under Clipboard settings." = "기존 Prism 데이터를 그대로 사용해요. 클립보드 수집은 클립보드 설정에서 관리해요.";
+"Time is up" = "시간이 다 됐어요";
+"Timer" = "타이머";
+"Timer finished" = "타이머 완료";
+"Timer, clipboard, notes and dictation at the top of your screen" = "화면 상단에서 타이머, 클립보드, 메모와 받아쓰기를 사용해요";
+"Your tools, within reach" = "자주 쓰는 도구를 한곳에";
+"Pomodoro" = "뽀모도로";
+"Timer mode" = "타이머 종류";
+"Start Pomodoro" = "뽀모도로 시작";
+"Focus session complete" = "이번 집중을 마쳤어요";
+"Time to focus" = "집중할 시간이에요";
+"Break is over" = "휴식을 마쳤어요";
+"Time for a break" = "잠깐 쉬어가요";
+"%lld / 4 sessions" = "%lld / 4회 완료";
+"Focus for 25 minutes, rest for 5. Take a 15-minute break after four sessions." = "25분 집중하고 5분 쉬어요. 네 번 집중하면 15분 쉬어가요.";
+"Start each break and focus session when you are ready." = "준비되면 다음 휴식이나 집중을 시작해 주세요.";
+"Start next focus session" = "다음 집중 시작";
+"Start 15-minute break" = "15분 휴식 시작";
+"Start 5-minute break" = "5분 휴식 시작";
+"A timer is already active. Finish or cancel it first." = "진행 중인 타이머가 있어요. 먼저 완료하거나 취소해 주세요.";
+"25-minute focus sessions with short and long breaks" = "25분 집중과 짧은 휴식, 긴 휴식을 이어가요";
+"Timers and your favorite tools at the top of your screen" = "화면 상단에서 타이머와 자주 쓰는 도구를 사용해요";
+
+// Notch settings preview
+"%lld pinned" = "%lld개 고정";
+"Also shows the notch on displays connected later." = "나중에 연결한 화면에도 노치를 표시해요.";
+"The notch is off" = "노치가 꺼져 있어요";
+"Turn On" = "켜기";
+"Collapsed" = "접힘";
+"Hover" = "미리보기";
+"Expanded" = "펼침";
+"Turn on Preview on hover to use this state." = "‘마우스를 올리면 미리보기’를 켜면 볼 수 있어요.";
+"Shown as on %@" = "%@ 기준 미리보기";
+"Click the notch to try it. Changes on the left appear here right away." = "노치를 클릭해 직접 써 볼 수 있어요. 왼쪽에서 바꾼 설정이 바로 반영돼요.";
+"Drag to reorder" = "드래그해서 순서 바꾸기";
+
+"25 min focus" = "25분 집중";
+
+"5 min break" = "5분 휴식";
+
+"4 rounds" = "4회 반복";

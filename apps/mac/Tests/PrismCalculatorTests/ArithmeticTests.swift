@@ -103,7 +103,7 @@ private func rejects(_ expression: String, _ expected: Arithmetic.Failure) {
 }
 
 @Test func commandMapsEveryRejectionToNoPaletteResult() {
-    #expect(InstantAnswers.calculation("3 * 7")?.copyValue == "21")
-    #expect(InstantAnswers.calculation("21") == nil)
-    #expect(InstantAnswers.calculation("1 / 0") == nil)
+    #expect(InstantAnswers.calculation("3 * 7").first?.copyValue == "21")
+    #expect(InstantAnswers.calculation("21").isEmpty)
+    #expect(InstantAnswers.calculation("1 / 0").isEmpty)
 }

@@ -30,7 +30,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     let model = SettingsModel()
     private var window: NSWindow?
     private var glass: PrismGlassView?
-    static let size = NSSize(width: 880, height: 620)
+    static let size = NSSize(width: 1100, height: 740)
+    static let minimumSize = NSSize(width: 940, height: 600)
 
     func install(_ panes: [SettingsPane]) {
         model.panes = panes.sorted { ($0.group.rawValue, $0.order) < ($1.group.rawValue, $1.order) }
@@ -60,7 +61,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window.isMovableByWindowBackground = false
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        window.minSize = NSSize(width: 760, height: 520)
+        window.minSize = Self.minimumSize
         window.delegate = self
 
         let glass = NSView.prismGlassBackground(opacity: PaletteController.backgroundOpacity)
@@ -93,7 +94,7 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             SettingsSidebar(model: model)
-                .frame(width: 200)
+                .frame(width: 220)
                 .background(alignment: .top) { WindowDragArea().frame(height: 44) }
             ZStack {
                 if let pane = model.panes.first(where: { $0.id == model.selection }) {
@@ -108,7 +109,7 @@ struct SettingsRootView: View {
         }
         .background(PrismShellOverlay())
         .tint(PrismTheme.accent)
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: SettingsWindowController.minimumSize.width, minHeight: SettingsWindowController.minimumSize.height)
         .ignoresSafeArea()
     }
 }

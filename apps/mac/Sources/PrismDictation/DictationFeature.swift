@@ -19,6 +19,14 @@ public enum DictationFeature {
                     DictationSettingsView(service: service)
                 },
             ],
+            notchWidgets: [NotchWidget(id: "dictation", title: String(localized: "Dictation", bundle: .module), systemImage: "mic",
+                                       activity: { service.controller.busy ? DictationNotchView.title(service.controller.phase) : nil },
+                                       compactContent: { AnyView(DictationCompactView(controller: service.controller)) }) { [weak context] dismiss in
+                DictationNotchView(service: service, dismiss: dismiss, settings: { [weak context] in
+                    dismiss()
+                    context?.openSettings(paneID: settingsPaneID)
+                })
+            }],
             start: { service.start() }
         )
     }

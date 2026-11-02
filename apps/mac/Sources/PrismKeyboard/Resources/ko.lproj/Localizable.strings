@@ -1,0 +1,47 @@
+/* Korean strings for PrismKeyboard. Keys are the English source strings. */
+
+/* Page */
+"Keyboard" = "키보드";
+"Keyboard remapping" = "키보드 리매핑";
+"Change what keys do in every app. Turning this off restores every key at once." = "모든 앱에서 키 동작을 바꿉니다. 끄면 모든 키가 즉시 원래대로 돌아옵니다.";
+"Could not read keyboard settings. Remapping is off." = "키보드 설정을 읽지 못했습니다. 리매핑이 꺼져 있습니다.";
+"Keyboard remapping could not start. Review permissions and retry." = "키보드 리매핑을 시작하지 못했습니다. 권한을 확인한 뒤 다시 시도하세요.";
+"Settings could not be saved." = "설정을 저장하지 못했습니다.";
+"Accessibility access required" = "손쉬운 사용 권한 필요";
+"Allow Prism in Accessibility to change what keys do." = "키 동작을 바꾸려면 손쉬운 사용에서 Prism을 허용하세요.";
+"Open Permissions" = "권한 열기";
+"Hyper key" = "하이퍼 키";
+"Caps Lock" = "Caps Lock";
+
+/* Tap and hold */
+"Tap and hold" = "탭/홀드 키";
+"Add Key" = "키 추가";
+"Space: tap for Space, hold for ⌘" = "스페이스: 탭하면 스페이스, 누르고 있으면 ⌘";
+"Caps Lock: tap for Escape, hold for Hyper (⌃⌥⇧⌘)" = "Caps Lock: 탭하면 Esc, 누르고 있으면 하이퍼 (⌃⌥⇧⌘)";
+"Custom Key" = "직접 설정";
+"No keys yet" = "추가한 키 없음";
+"A tap-and-hold key types normally when tapped and acts as modifier keys while held, such as Space as ⌘." = "탭하면 원래대로 입력되고, 누르고 있으면 보조 키처럼 동작합니다. 예: 스페이스를 ⌘로 사용.";
+"Tap" = "탭";
+"Hold" = "홀드";
+"Space" = "스페이스";
+"Nothing" = "입력 안 함";
+"Hold delay" = "홀드 판정 시간";
+"A key pressed this long after a tap-and-hold key always counts as a shortcut. Shorter feels faster; longer forgives fast typing." = "탭/홀드 키를 누른 뒤 이 시간이 지나 누른 키는 항상 단축키로 처리합니다. 짧을수록 반응이 빠르고, 길수록 빠른 타이핑에서 실수가 줄어듭니다.";
+
+/* Remapped shortcuts */
+"Remapped shortcuts" = "단축키 바꾸기";
+"Add Shortcut" = "단축키 추가";
+"No shortcuts yet" = "추가한 단축키 없음";
+"Replace one shortcut with another, everywhere or only in one app." = "단축키를 다른 단축키로 바꿉니다. 모든 앱 또는 특정 앱에만 적용할 수 있습니다.";
+"All Apps" = "모든 앱";
+"Choose App…" = "앱 선택…";
+"Choose" = "선택";
+"Record" = "키 입력";
+"Type Keys" = "키를 누르세요";
+"Remove" = "제거";
+
+/* Excluded apps */
+"Apps without tap and hold" = "탭/홀드 키를 끌 앱";
+"Add App" = "앱 추가";
+"No apps" = "추가한 앱 없음";
+"Tap-and-hold keys type normally in these apps, such as games. Remapped shortcuts still apply." = "게임처럼 이 앱들에서는 탭/홀드 키가 원래대로 입력됩니다. 단축키 바꾸기는 계속 적용됩니다.";

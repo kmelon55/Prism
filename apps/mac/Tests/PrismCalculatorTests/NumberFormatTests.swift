@@ -20,25 +20,25 @@ func groupingPreservesAllDigits(value: String, expected: String) {
 }
 
 @Test func groupsDisplayValuesWhileCopyingUntouchedResults() throws {
-    let answer = try #require(InstantAnswers.calculation("1,000 + 2,000"))
+    let answer = try #require(InstantAnswers.calculation("1,000 + 2,000").first)
     #expect(answer.title == "3,000")
     #expect(answer.subtitle == "1,000 + 2,000")
     #expect(answer.copyValue == "3000")
     #expect(answer.formattedValue == "3,000")
     #expect(answer.equation == "1,000 + 2,000 = 3,000")
     #expect(answer.matchedQuery == "1,000 + 2,000")
-    #expect(InstantAnswers.calculation("1,00+2") == nil)
+    #expect(InstantAnswers.calculation("1,00+2").isEmpty)
 
-    let long = try #require(InstantAnswers.calculation("1234567.890123 * 1"))
+    let long = try #require(InstantAnswers.calculation("1234567.890123 * 1").first)
     #expect(long.title == "1,234,567.890123")
     #expect(long.copyValue == "1234567.890123")
 }
 
 @Test func calculatorIgnoresPlainWordsAndNumbers() {
     for query in ["", "   ", "paper", "42", "1,000", "safari", "2 + x", "(1)", "100 USD to KRW"] {
-        #expect(InstantAnswers.calculation(query) == nil, "\(query)")
+        #expect(InstantAnswers.calculation(query).isEmpty, "\(query)")
     }
-    #expect(InstantAnswers.calculation(" 2 + 2 ")?.matchedQuery == "2 + 2")
+    #expect(InstantAnswers.calculation(" 2 + 2 ").first?.matchedQuery == "2 + 2")
 }
 
 @Test func runtimeNumberTextMatchesJavaScriptAndRust() {

@@ -1,16 +1,21 @@
 import SwiftUI
 
-// The settings page layout of the Tauri app (`.settings-content`, `.settings-group`, `.settings-row`):
-// flat rows on the glass, small group titles, generous spacing, no boxed forms.
+// The settings page layout: rows grouped into quiet cards on the glass, small group titles above them,
+// and an optional fixed aside for pages that preview what they configure.
 
 /// A settings page: a 96 pt header with the pane title, then a scrolling column of groups.
-public struct PrismSettingsPage<Content: View>: View {
+/// An `aside` (such as a live preview) stays fixed on the right while the settings column scrolls.
+public struct PrismSettingsPage<Content: View, Aside: View>: View {
     let title: String
     let content: Content
+    let aside: Aside
+    let hasAside: Bool
 
-    public init(_ title: String, @ViewBuilder content: () -> Content) {
+    public init(_ title: String, @ViewBuilder content: () -> Content, @ViewBuilder aside: () -> Aside) {
         self.title = title
         self.content = content()
+        self.aside = aside()
+        hasAside = true
     }
 
     public var body: some View {
@@ -19,18 +24,49 @@ public struct PrismSettingsPage<Content: View>: View {
                 .font(.system(size: 21, weight: .semibold))
                 .tracking(-0.63)
                 .foregroundStyle(PrismTheme.text)
-                .padding(.horizontal, 30)
+                .padding(.horizontal, 32)
                 .frame(height: 96, alignment: .bottomLeading)
                 .padding(.bottom, -4)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) { content }
-                    .padding(EdgeInsets(top: 24, leading: 30, bottom: 32, trailing: 30))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if hasAside {
+                HStack(alignment: .top, spacing: 0) {
+                    column(trailing: 14).frame(width: PrismSettingsMetrics.splitColumnWidth)
+                    aside
+                        .padding(EdgeInsets(top: 24, leading: 14, bottom: 28, trailing: 32))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+            } else {
+                column(trailing: 32)
             }
-            .scrollIndicators(.automatic)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+
+    private func column(trailing: CGFloat) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) { content }
+                .frame(maxWidth: hasAside ? .infinity : PrismSettingsMetrics.readableWidth, alignment: .leading)
+                .padding(EdgeInsets(top: 24, leading: 32, bottom: 32, trailing: trailing))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.automatic)
+    }
+}
+
+public extension PrismSettingsPage where Aside == EmptyView {
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+        aside = EmptyView()
+        hasAside = false
+    }
+}
+
+public enum PrismSettingsMetrics {
+    /// Wide windows keep rows readable instead of stretching labels and controls apart.
+    public static let readableWidth: CGFloat = 760
+    /// The settings column of a page with an aside, including its padding.
+    public static let splitColumnWidth: CGFloat = 400
+    public static let cardRadius: CGFloat = 13
 }
 
 /// A titled run of rows. The title is optional, as in the Tauri General page's first group.
@@ -56,12 +92,33 @@ public struct PrismSettingsGroup<Content: View, Accessory: View>: View {
                     Spacer(minLength: 12)
                     accessory
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 2)
+                .padding(.bottom, 9)
             }
-            content
+            _VariadicView.Tree(PrismSettingsCard()) { content }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Groups read as one card: each child gets the card's inset and a hairline between it and the next.
+/// An empty group draws no card.
+private struct PrismSettingsCard: _VariadicView_UnaryViewRoot {
+    @ViewBuilder
+    func body(children: _VariadicView.Children) -> some View {
+        if let last = children.last?.id {
+            VStack(spacing: 0) {
+                ForEach(children) { child in
+                    child.padding(.horizontal, 16)
+                    if child.id != last {
+                        Rectangle().fill(PrismTheme.separator).frame(height: 1).padding(.horizontal, 16)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: PrismSettingsMetrics.cardRadius, style: .continuous).fill(PrismTheme.surface))
+            .overlay(RoundedRectangle(cornerRadius: PrismSettingsMetrics.cardRadius, style: .continuous).strokeBorder(PrismTheme.line))
+        }
     }
 }
 
@@ -95,8 +152,8 @@ public struct PrismSettingsRow<Control: View>: View {
                 }
             }
         }
-        .padding(.vertical, 12)
-        .frame(minHeight: 57)
+        .padding(.vertical, 11)
+        .frame(minHeight: 54)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -133,6 +190,7 @@ public struct PrismSettingsNote: View {
     public var body: some View {
         text.font(.system(size: 11)).foregroundStyle(PrismTheme.textMuted).lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 10)
     }
 }
 

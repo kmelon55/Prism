@@ -6,19 +6,31 @@ arithmetic, and Enter copies the displayed numeric value without grouping or a u
 
 | Family | Examples | Supported units |
 | --- | --- | --- |
-| Length | `10 cm to inch`, `1마일 킬로미터` | mm, cm, m, km, in, ft, yd, mi |
-| Mass | `2.5 kg to g`, `1 lb to kg` | mg, g, kg, metric t, oz, lb |
+| Length | `10 cm to inch`, `1마일 킬로미터`, `180cm` | mm, cm, m, km, in, ft, yd, mi, nmi |
+| Mass | `2.5 kg to g`, `1 lb to kg`, `1근 g` | mg, g, kg, metric t, oz, lb, st, 근 (600 g), 돈 (3.75 g) |
 | Temperature | `100 섭씨 화씨`, `32 F to C` | °C/C, °F/F, K |
-| Volume | `2 L to mL` | mL, L, m³ |
+| Volume | `2 L to mL`, `1 cup to ml` | mL/cc, L, m³, tsp, tbsp, fl oz, cup, pt, qt, gal (US customary) |
 | Duration | `2시간 분`, `1 d to h` | ms, s, min, h, d, wk |
-| Area | `1 m2 to cm2` | cm², m², km², ft², ha |
+| Area | `1 m2 to cm2`, `30평` | cm², m², km², ft², ha, acre, 평 |
+| Speed | `100 km/h to mph`, `10 m/s` | m/s, km/h, mph, knots |
 | Data size | `1 GB to B`, `1 GiB to MiB`, `8 Mb to MB` | B/b; decimal k, M, G, T; binary Ki, Mi, Gi, Ti |
 
 English full names and common Korean names are recognized for physical units. Separators include
 `to`, `in`, `->`, `→`, `=`, or a space between source and target; Korean targets may end in `로` or `으로`.
 Use unambiguous units: ounces are mass, tonnes are metric, and data symbols preserve case so `MB`
-(megabytes) and `Mb` (megabits) never collapse into the same unit. Unqualified gallons, months,
-compound units, and Korean number multipliers are not supported.
+(megabytes) and `Mb` (megabits) never collapse into the same unit. Cups, pints, quarts and gallons
+are US customary measures. Months, compound units, and Korean number multipliers are not supported.
+
+A bare amount such as `180cm`, `70kg`, `2 L` or `30평` needs no target. Durations and data sizes still
+need one, because `3d` or `5b` are more often searches. The palette shows the main conversion as a
+large `input → output` card, followed by related units as cells (180 cm also gets `5 ft 10.9 in`).
+Each card and cell is its own row, so Return, ⌘K and copy actions work on whichever is selected.
+Displayed values use six significant digits; copied values keep the full twelve.
+
+In Korean, a typed number from 10,000 up (`123456789`), a large arithmetic result, and a currency
+amount also show the Korean reading, such as `1억 2,345만 6,789` or `13만 8천원`. Round thousands and
+hundreds within a four-digit group read with 천 and 백 (`1억 2천만`). Numbers with a leading zero,
+such as phone numbers, are not read.
 
 Inputs are limited to 160 characters, twelve decimal places, and an absolute amount of 10^12.
 The parser validates comma grouping before removing separators. Different dimensions and temperatures

@@ -17,12 +17,15 @@ macOS 14+, Apple Silicon and Intel.
 | `PrismLibrary` | Quicklinks, snippets, notes, favorites, snippet expansion. |
 | `PrismFiles` | Filename search through Spotlight and indexed folders, file previews. |
 | `PrismEmoji` | Emoji picker. |
-| `PrismSystem` | System and power commands, window management, permissions, launch at login. |
+| `PrismSystem` | System and power commands, window management, permissions, launch at login, timed Keep Awake, per-app audio and system-output switching shared by the palette and notch. |
+| `PrismAudioDSP` | Lock-free Float32 gain and channel mapping for per-app audio callbacks; no Swift or allocation on the real-time thread. |
 | `PrismScripts` | Script commands (Raycast script command format), arguments, runs. |
 | `PrismAI` | AI chat window, providers, streaming, history, usage, tools. |
 | `PrismDictation` | Dictation recording, transcription, overlay, text insertion, models. |
 | `PrismBackup` | Backup, restore, Raycast import. |
 | `PrismUpdates` | Checking for, verifying and installing updates. |
+| `PrismNotch` | Optional top-of-screen tools, panel presentation, display placement and a persistent countdown timer. |
+| `PrismKeyboard` | Keyboard remapping: tap-and-hold keys (Space as ⌘, Caps Lock as Escape and Hyper), shortcut remaps per app. Off by default; no event tap while off. |
 
 Feature modules depend only on `PrismKit` (and through it `PrismCore`), never on each other or on the app.
 Each one exposes `XFeature.make(context:) -> FeatureContribution`, which `FeatureRegistry` already calls, so a
@@ -46,6 +49,8 @@ feature appears in the app as soon as its `make` returns providers or panes.
   Dictation 700, Backup 800, Advanced 900.
 - **Background work:** put monitors and event taps in `FeatureContribution.start`, which runs after launch.
 - **Own windows:** a feature may manage its own `NSWindow`/`NSPanel` (AI chat, dictation overlay, notes).
+- **Notch tools:** return `NotchWidget`s in `FeatureContribution.notchWidgets`. The shell supplies these to
+  `PrismNotch`; each widget keeps its existing feature-owned service. See [Notch](../../docs/notch.md).
 - **Command IDs and hotkeys:** give every command row the same ID the Tauri app used (`clipboard:open-history`,
   `window:left-half`, …; see `apps/desktop/src/providers` on `legacy/tauri`). The shell owns `command-shortcuts-v1.json`,
   registers those hotkeys and runs the row's first action, so features do not register command hotkeys or

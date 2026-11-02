@@ -33,12 +33,14 @@ public protocol PrismContext: AnyObject, Sendable {
 public struct FeatureContribution {
     public var providers: [any PaletteProvider]
     public var settingsPanes: [SettingsPane]
+    public var notchWidgets: [NotchWidget]
     /// Starts background work such as clipboard monitoring. Called once after every feature is built.
     public var start: @MainActor () -> Void
 
-    public init(providers: [any PaletteProvider] = [], settingsPanes: [SettingsPane] = [], start: @escaping @MainActor () -> Void = {}) {
+    public init(providers: [any PaletteProvider] = [], settingsPanes: [SettingsPane] = [], notchWidgets: [NotchWidget] = [], start: @escaping @MainActor () -> Void = {}) {
         self.providers = providers
         self.settingsPanes = settingsPanes
+        self.notchWidgets = notchWidgets
         self.start = start
     }
 }

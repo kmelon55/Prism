@@ -9,5 +9,6 @@
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
   <key>CFBundleAllowMixedLocalizations</key><true/>
+  <key>NSAudioCaptureUsageDescription</key><string>Prism processes audio from apps you choose to adjust their volume and output device. Audio is not saved or sent anywhere.</string>
 </dict>
 </plist>

@@ -25,6 +25,9 @@ public enum LibraryFeature {
                     LibrarySettingsView(services: services, expander: expander, state: settingsState)
                 },
             ],
+            notchWidgets: [NotchWidget(id: "notes", title: L10n.tr("Quick Note"), systemImage: "note.text") { dismiss in
+                NotesNotchView(model: services.notes.model, services: services, dismiss: dismiss)
+            }],
             start: { expander.start() }
         )
     }

@@ -36,6 +36,8 @@ try {
     cwd: "apps/mac",
   });
   const app = join(staging, "Prism.app");
+  const captureDescription = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print :NSAudioCaptureUsageDescription", join(app, "Contents/Info.plist")], { encoding: "utf8" }).trim();
+  if (!captureDescription) throw new Error("The app is missing its System Audio Recording permission description.");
 
   // The updater archive must hold only regular files and directories.
   const links = execFileSync("find", [app, "-type", "l"], { encoding: "utf8" }).trim();

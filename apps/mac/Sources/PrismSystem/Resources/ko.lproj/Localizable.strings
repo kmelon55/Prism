@@ -194,3 +194,68 @@
 "macOS may ask you to reopen Prism after you allow it." = "허용한 뒤 macOS가 Prism을 다시 열도록 요청할 수 있습니다.";
 "Prism asks the first time it controls Finder." = "Finder를 처음 제어할 때 요청합니다.";
 
+// Optional notch and palette utilities
+"Audio" = "오디오";
+"Audio controls" = "오디오 설정";
+"Apps" = "앱별";
+"System output" = "기본 출력";
+"App Audio" = "앱별 오디오";
+"Enable app audio" = "앱별 오디오 켜기";
+"Refresh audio apps" = "오디오 앱 새로고침";
+"App audio requires macOS 14.2 or later." = "앱별 오디오는 macOS 14.2 이상에서 사용할 수 있어요.";
+"Control each app's volume and output. macOS asks for System Audio Recording access when you first adjust an app. Audio stays on your Mac and is never saved." = "앱마다 음량과 출력을 조절해요. 처음 조절하면 시스템 오디오 녹음 권한을 요청해요. 소리는 Mac 안에서만 처리하고 저장하지 않아요.";
+"Play audio in an app to see it here." = "앱에서 소리를 재생하면 여기에 나타나요.";
+"Turn off to restore normal app audio." = "끄면 각 앱의 원래 오디오로 돌아가요.";
+"Applied" = "적용됨";
+"Restore normal audio" = "원래 오디오로 되돌리기";
+"Retry app audio" = "다시 연결";
+"App audio actions" = "앱별 오디오 동작";
+"Unmute app" = "앱 음소거 해제";
+"Mute app" = "앱 음소거";
+"Volume" = "음량";
+"Follow system output" = "기본 출력 따르기";
+"System" = "기본 출력";
+"Disconnected" = "연결 끊김";
+"Output for this app" = "이 앱의 출력 기기";
+"Waiting for audio and permission. Original playback is unchanged." = "소리와 권한을 확인하고 있어요. 아직은 원래대로 재생돼요.";
+"Could not configure app audio. Check System Audio Recording permission in System Settings." = "앱별 오디오를 연결하지 못했어요. 시스템 설정에서 시스템 오디오 녹음 권한을 확인해 주세요.";
+"Unsupported audio format." = "지원하지 않는 오디오 형식이에요.";
+"Audio device is unavailable." = "오디오 기기를 사용할 수 없어요.";
+"Could not allocate the audio mixer." = "오디오 믹서를 준비하지 못했어요.";
+"The audio format changed. Normal app audio has been restored." = "오디오 형식이 바뀌어 원래 앱 오디오로 돌아갔어요.";
+"App audio currently supports matching-rate mono or stereo devices." = "현재는 샘플레이트가 같은 모노·스테레오 기기를 지원해요.";
+"Could not load app audio settings. Your saved file has not been changed." = "앱별 오디오 설정을 불러오지 못했어요. 저장된 파일은 변경하지 않았어요.";
+"Could not save app audio settings. The change was not applied." = "앱별 오디오 설정을 저장하지 못해 변경을 적용하지 않았어요.";
+"The selected output disconnected. Normal app audio has been restored." = "선택한 출력 연결이 끊겨 원래 앱 오디오로 돌아갔어요.";
+"Keep Awake" = "잠자기 방지";
+"Keeping your Mac awake" = "Mac 잠자기를 막고 있어요";
+"Start keeping awake" = "잠자기 방지 시작";
+"Stop keeping awake" = "잠자기 방지 끄기";
+"Prevents automatic sleep. Your display can turn off, and closing the lid or choosing Sleep still works." = "자동 잠자기를 막아요. 화면은 꺼질 수 있어요. 덮개를 닫거나 직접 선택한 잠자기는 막지 않아요.";
+"Could not keep your Mac awake." = "잠자기 방지를 켜지 못했어요.";
+"Could not stop Keep Awake. Try again." = "잠자기 방지를 끄지 못했어요. 다시 시도해 주세요.";
+"%lld min" = "%lld분";
+"Audio Output" = "오디오 출력";
+"Refresh audio outputs" = "오디오 출력 새로고침";
+"No audio outputs available." = "사용할 수 있는 오디오 출력이 없어요.";
+"That audio device is no longer connected." = "오디오 기기 연결이 끊겼어요.";
+"The audio output did not change. Try again." = "오디오 출력이 바뀌지 않았어요. 다시 시도해 주세요.";
+"Could not change the audio output." = "오디오 출력을 바꾸지 못했어요.";
+"Could not read audio outputs." = "오디오 출력 목록을 불러오지 못했어요.";
+"Changes the default playback output. Apps with their own output setting may keep using it." = "기본 재생 출력을 바꿔요. 출력을 따로 설정한 앱은 기존 기기를 사용할 수 있어요.";
+"Utilities" = "유틸리티";
+
+
+"About app audio" = "앱별 오디오 안내";
+
+"No audio playing" = "재생 중인 소리가 없어요";
+
+"Turn on to adjust app audio." = "오른쪽 위 스위치를 켜서 조절해요.";
+
+"Until normal sleep resumes" = "후에 평소 절전 설정으로 돌아가요";
+
+"No automatic sleep" = "자동으로 잠들지 않아요";
+
+"Closing the lid still puts your Mac to sleep." = "덮개를 닫으면 평소처럼 잠자기에 들어가요.";
+
+"Default output for your Mac" = "Mac의 기본 출력 장치";

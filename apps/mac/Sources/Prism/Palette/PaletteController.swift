@@ -188,6 +188,7 @@ final class PaletteController: NSObject, NSWindowDelegate {
 
     private func makePanel() -> PalettePanel {
         let panel = PalettePanel()
+        panel.acceptsMouseMovedEvents = true
         panel.delegate = self
         panel.onKeyEquivalent = { [weak self] event in self?.model.handleKeyEquivalent(event) ?? false }
         panel.onCancel = { [weak self] in
