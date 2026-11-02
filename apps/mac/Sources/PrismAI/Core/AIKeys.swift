@@ -166,12 +166,20 @@ final class AIKeyStore: @unchecked Sendable {
     let compatibleKeychain: AIKeychain
     private let lock = NSLock()
     private var sessions: [AIProvider: KeySession] = [:]
+    private var syncObserver: NSObjectProtocol?
     private var compatibleSession: (base: String, session: KeySession)?
 
     init(service: String = AIKeychain.providerService, compatibleService: String = AIKeychain.compatibleService) {
         keychain = AIKeychain(service: service)
         compatibleKeychain = AIKeychain(service: compatibleService)
+        syncObserver = NotificationCenter.default.addObserver(forName: .init("dev.prism.sync.providerKeysChanged"), object: nil, queue: nil) { [weak self] _ in
+            guard let self else { return }
+            self.lock.lock(); defer { self.lock.unlock() }
+            self.sessions = [:]
+        }
     }
+
+    deinit { if let syncObserver { NotificationCenter.default.removeObserver(syncObserver) } }
 
     func info(_ provider: AIProvider) throws -> AIKeyInfo {
         lock.lock(); defer { lock.unlock() }

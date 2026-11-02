@@ -23,6 +23,7 @@ macOS 14+, Apple Silicon and Intel.
 | `PrismAI` | AI chat window, providers, streaming, history, usage, tools. |
 | `PrismDictation` | Dictation recording, transcription, overlay, text insertion, models. |
 | `PrismBackup` | Backup, restore, Raycast import. |
+| `PrismSync` | Opt-in encrypted device backups, selective imports, feature synchronization and explicit text sharing through a self-hosted server. |
 | `PrismUpdates` | Checking for, verifying and installing updates. |
 | `PrismNotch` | Optional top-of-screen tools, panel presentation, display placement and a persistent countdown timer. |
 | `PrismKeyboard` | Keyboard remapping: tap-and-hold keys (Space as ⌘, Caps Lock as Escape and Hyper), shortcut remaps per app. Off by default; no event tap while off. |

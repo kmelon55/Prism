@@ -42,13 +42,21 @@ final class DictationKeys: @unchecked Sendable {
     private let lock = NSLock()
     /// Keys read during this process, so one approval covers the session.
     private var cache: [String: String] = [:]
+    private var syncObserver: NSObjectProtocol?
 
     init(service: String = DictationKeys.service, compatibleService: String = DictationKeys.compatibleService,
          storage: any DictationKeyStorage = SystemKeyStorage()) {
         self.service = service
         self.compatibleService = compatibleService
         self.storage = storage
+        syncObserver = NotificationCenter.default.addObserver(forName: .init("dev.prism.sync.providerKeysChanged"), object: nil, queue: nil) { [weak self] _ in
+            guard let self else { return }
+            self.lock.lock(); defer { self.lock.unlock() }
+            self.cache = [:]
+        }
     }
+
+    deinit { if let syncObserver { NotificationCenter.default.removeObserver(syncObserver) } }
 
     static func account(for provider: SpeechProvider) -> String? {
         switch provider {

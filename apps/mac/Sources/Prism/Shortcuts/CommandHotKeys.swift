@@ -41,6 +41,47 @@ final class CommandHotKeys {
         commands = commandsStore.load()?.shortcuts ?? [:]
     }
 
+    func registerTransfers() {
+        SyncTransfers.register(SyncTransfer(id: "shortcut.launcher", title: "Prism 실행 단축키", read: {
+            try TransferCodec.encode(self.launcher.accelerator)
+        }, validate: { data in
+            let value = try JSONDecoder().decode(String.self, from: data)
+            guard Shortcut(accelerator: value) != nil else { throw TransferError("단축키 형식이 올바르지 않아요.") }
+        }, apply: { data, _ in
+            guard !self.isPaused else { throw TransferError("단축키 입력을 마친 뒤 다시 가져오세요.") }
+            let value = try JSONDecoder().decode(String.self, from: data)
+            guard let shortcut = Shortcut(accelerator: value), !self.commands.values.contains(shortcut.accelerator) else { throw TransferError("다른 명령의 단축키와 겹쳐요.") }
+            let previous = self.launcher
+            self.launcher = shortcut; self.registerLauncher()
+            do {
+                guard self.launcherError == nil else { throw TransferError("macOS 또는 다른 앱에서 사용하는 단축키예요.") }
+                try self.launcherStore.save(LauncherFile(accelerator: value))
+            } catch { self.launcher = previous; self.registerLauncher(); throw error }
+        }))
+        SyncTransfers.register(SyncTransfer(id: "shortcut.commands", title: "명령별 단축키", read: {
+            try TransferCodec.encode(self.commands)
+        }, validate: { data in _ = try Self.decodeTransfer(data) }, apply: { data, replace in
+            guard !self.isPaused else { throw TransferError("단축키 입력을 마친 뒤 다시 가져오세요.") }
+            let incoming = try Self.decodeTransfer(data)
+            let previous = self.commands
+            let next = replace ? incoming : previous.merging(incoming) { _, new in new }
+            guard Set(next.values).count == next.count, !next.values.contains(self.launcher.accelerator) else { throw TransferError("단축키가 중복돼요. 기존 단축키를 확인하세요.") }
+            self.commands = next; self.registerCommands()
+            do {
+                guard self.failures.isEmpty else { throw TransferError("등록할 수 없는 단축키가 있어 기존 설정을 유지했어요.") }
+                try self.commandsStore.save(CommandsFile(shortcuts: next))
+            } catch { self.commands = previous; self.registerCommands(); throw error }
+            NotificationCenter.default.post(name: CommandShortcuts.didChangeNotification, object: nil)
+        }))
+    }
+
+    private static func decodeTransfer(_ data: Data) throws -> [String: String] {
+        let values = try JSONDecoder().decode([String: String].self, from: data)
+        guard values.count <= 1000, Set(values.values).count == values.count,
+              values.allSatisfy({ !$0.key.isEmpty && $0.key.utf8.count <= 256 && (Shortcut(accelerator: $0.value) != nil || doubleTapValues.contains($0.value)) }) else { throw TransferError("단축키 설정 형식이 올바르지 않아요.") }
+        return values
+    }
+
     func start() {
         registerLauncher()
         registerCommands()

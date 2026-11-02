@@ -12,6 +12,7 @@ import PrismDictation
 import PrismBackup
 import PrismNotch
 import PrismKeyboard
+import PrismSync
 
 /// Every feature module, in the order their providers are asked for results.
 @MainActor
@@ -30,6 +31,7 @@ enum FeatureRegistry {
             BackupFeature.make(context: context),
             UpdatesFeature.make(context: context),
             KeyboardFeature.make(context: context),
+            SyncFeature.make(context: context),
         ]
         return features + [NotchFeature.make(context: context, widgets: features.flatMap(\.notchWidgets))]
     }

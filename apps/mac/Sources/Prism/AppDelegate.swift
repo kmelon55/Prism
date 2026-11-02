@@ -112,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
             isEnabled: { toggles.isEnabled($0) },
             setEnabled: { toggles.setEnabled($1, for: $0) }
         )
+        hotKeys.registerTransfers()
         BackupFeature.shortcutAccess = BackupShortcutAccess(
             read: { (hotKeys.launcher.accelerator, hotKeys.commands) },
             setLauncher: { shortcut in

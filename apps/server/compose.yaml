@@ -1,0 +1,45 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/prism
+      PRISM_PAIRING_SECRET: ${PRISM_PAIRING_SECRET:?Set PRISM_PAIRING_SECRET}
+      PRISM_OWNER_ID: ${PRISM_OWNER_ID:-personal}
+    expose: ["3000"]
+    mem_limit: 512m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17-bookworm
+    mem_limit: 512m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prism
+      POSTGRES_DB: prism
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - prism-db:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prism"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  prism-db:

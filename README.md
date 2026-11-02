@@ -71,9 +71,16 @@ the installed app. See [`apps/mac/README.md`](apps/mac/README.md) for the module
 ```text
 apps/mac/        Native macOS app (Swift package)
 apps/android/    Native Android launcher in development
+apps/server/     Optional self-hosted sync server (preview)
 scripts/         Packaging, signing and updater scripts
 docs/            Architecture, feature notes and release instructions
 ```
+
+## Optional self-hosted sync (preview)
+
+The macOS app supports selective encrypted device backups, one-time imports, and opt-in automatic sync for notes, snippets, links, shortcuts, appearance, and supported provider API keys. Clipboard text sharing is separately opt-in.
+Run the TanStack Start/PostgreSQL server on your own host; see the [setup and limitations](apps/server/README.md).
+Android sync, public accounts, and an official hosted service are not available yet. Prism works without a server.
 
 ## License
 

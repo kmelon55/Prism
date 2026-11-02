@@ -91,6 +91,19 @@ final class NotesModel {
         focusToken += 1
     }
 
+    func ensureTransferReady() throws {
+        guard !isBusy, !(autosave?.hasUnsavedChanges ?? false), status != .saving else {
+            throw TransferError("메모를 저장 중이에요. 저장이 끝나면 다시 동기화해요.")
+        }
+    }
+
+    func refreshAfterTransfer(_ entries: [LibraryEntry]) {
+        guard let document, !(autosave?.hasUnsavedChanges ?? false) else { return }
+        if let updated = entries.first(where: { $0.id == document.id }) {
+            if NoteMarkdown.forEditing(updated) != document { start(updated) }
+        } else if !document.value.isEmpty { self.document = nil; autosave = nil; status = .idle }
+    }
+
     func settle() async -> Bool {
         await autosave?.settle() ?? true
     }

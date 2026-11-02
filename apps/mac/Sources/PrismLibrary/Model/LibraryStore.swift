@@ -50,6 +50,31 @@ final class LibraryStore: Sendable {
         try database.execute("CREATE UNIQUE INDEX IF NOT EXISTS entries_keyword_unique ON entries(keyword) WHERE keyword IS NOT NULL AND keyword != ''")
     }
 
+    func applyTransfer(_ data: Data, kind: LibraryEntry.Kind, replace: Bool) throws {
+        let incoming = try Self.decodeTransfer(data, kind: kind)
+        try database.transaction {
+            let before = try load()
+            let incomingIDs = Set(incoming.map(\.id))
+            guard !before.entries.contains(where: { incomingIDs.contains($0.id) && $0.kind != kind }) else {
+                throw TransferError("다른 종류의 항목과 ID가 충돌해요.")
+            }
+            let retained = before.entries.filter { $0.kind != kind || (!replace && !incomingIDs.contains($0.id)) }
+            let combined = retained + incoming
+            guard combined.count <= LibraryLimits.maxEntries,
+                  combined.reduce(0, { $0 + $1.value.utf8.count }) <= LibraryLimits.maxTotalBytes else { throw LibraryError.full }
+            let keywords = combined.compactMap(\.normalizedKeyword)
+            guard Set(keywords).count == keywords.count else { throw LibraryError.duplicateKeyword }
+            // Remove the selected category first so keyword swaps remain atomic and valid.
+            try database.run("DELETE FROM entries WHERE kind=?", [kind.rawValue])
+            for entry in combined where entry.kind == kind {
+                try database.run("INSERT INTO entries(id,kind,title,value,keyword) VALUES(?,?,?,?,?)", [entry.id, kind.rawValue, entry.title, entry.value, entry.normalizedKeyword])
+            }
+            for entry in before.entries where entry.kind == kind && !combined.contains(where: { $0.id == entry.id }) {
+                try database.run("DELETE FROM favorites WHERE id=?", [entry.paletteID])
+            }
+        }
+    }
+
     func load() throws -> LibrarySnapshot {
         let entries = try database.query("SELECT id,kind,title,value,keyword FROM entries ORDER BY title COLLATE NOCASE") { row -> LibraryEntry? in
             // Rows of kinds this version does not know are kept on disk but not shown.

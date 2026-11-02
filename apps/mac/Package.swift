@@ -50,12 +50,14 @@ let package = Package(
         .testTarget(name: "PrismUpdatesTests", dependencies: ["PrismUpdates"]),
         .target(name: "PrismNotch", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismNotchTests", dependencies: ["PrismNotch"]),
+        .target(name: "PrismSync", dependencies: ["PrismKit"]),
+        .testTarget(name: "PrismSyncTests", dependencies: ["PrismSync"]),
         .target(name: "PrismKeyboard", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismKeyboardTests", dependencies: ["PrismKeyboard"]),
 
         .executableTarget(
             name: "Prism",
-            dependencies: ["PrismCore", "PrismKit", "PrismCalculator", "PrismClipboard", "PrismLibrary", "PrismFiles", "PrismEmoji", "PrismSystem", "PrismScripts", "PrismAI", "PrismDictation", "PrismBackup", "PrismUpdates", "PrismNotch", "PrismKeyboard"],
+            dependencies: ["PrismCore", "PrismKit", "PrismCalculator", "PrismClipboard", "PrismLibrary", "PrismFiles", "PrismEmoji", "PrismSystem", "PrismScripts", "PrismAI", "PrismDictation", "PrismBackup", "PrismUpdates", "PrismNotch", "PrismKeyboard", "PrismSync"],
             resources: [.process("Resources")],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", embeddedInfoPlist])]
         ),

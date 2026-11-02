@@ -13,6 +13,7 @@ final class LibraryModel {
     private(set) var favorites: [LibraryFavorite] = []
     private(set) var loadError: String?
     private(set) var hasLoaded = false
+    private(set) var pendingWrites = 0
 
     /// Normalized note bodies for full-text search, built off the main actor after each load.
     @ObservationIgnored private(set) var noteSearchIndex: [String: String] = [:]
@@ -92,6 +93,8 @@ final class LibraryModel {
 
     private func write(_ body: @escaping @Sendable (LibraryStore) throws -> Void) async throws {
         guard let store else { throw LibraryError.storage }
+        pendingWrites += 1
+        defer { pendingWrites -= 1 }
         let result = await Task.detached(priority: .userInitiated) { Result { try body(store) } }.value
         await reload()
         NotificationCenter.default.post(name: Self.didChange, object: self)

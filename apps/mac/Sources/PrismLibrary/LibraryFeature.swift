@@ -11,6 +11,16 @@ public enum LibraryFeature {
         let model = LibraryModel(store: store)
         let services = LibraryServices(context: context, model: model)
         Self.services = services
+        store?.registerTransfers(ensureReady: {
+            guard model.pendingWrites == 0 else { throw TransferError("라이브러리 저장이 끝나면 다시 동기화해요.") }
+            try services.notes.model.ensureTransferReady()
+        }, didApply: { entries in
+            services.notes.model.refreshAfterTransfer(entries)
+            Task {
+                await model.reload()
+                NotificationCenter.default.post(name: LibraryModel.didChange, object: model)
+            }
+        })
         LibraryFavorites.install(services.favorites)
         services.editor.onSaved = { [weak context] _ in context?.showHUD(L10n.tr("Saved")) }
         let expander = SnippetExpander(configURL: context.paths.file(SnippetExpansionConfig.fileName), library: model)

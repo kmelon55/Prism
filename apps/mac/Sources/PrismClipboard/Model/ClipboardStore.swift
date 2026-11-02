@@ -213,7 +213,14 @@ public final class ClipboardStore: @unchecked Sendable {
         guard enabled, preferences.isCapturing(at: ClipboardClock.nowMs()), _generation == expected else { return }
         switch result {
         case .success(let payload?):
-            do { try record(payload) } catch { captureNotice = error.message }
+            do {
+                try record(payload)
+                if case .text(let text) = payload, captureNotice == nil {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .init("dev.prism.clipboard.capturedText"), object: nil, userInfo: ["text": text])
+                    }
+                }
+            } catch { captureNotice = error.message }
         case .success(nil): captureNotice = nil
         case .failure(let error): captureNotice = error.message
         }
