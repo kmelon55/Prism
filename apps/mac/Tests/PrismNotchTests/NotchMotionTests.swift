@@ -24,9 +24,12 @@ struct NotchMotionTests {
         let motion = try #require(canvas.motion)
         #expect(motion.from == CGSize(width: 480, height: 1))
         let finalFrame = canvas.contentFrame
-        try await Task.sleep(for: .milliseconds(60))
-        #expect(canvas.visibleSize.height > 1 && canvas.visibleSize.height < 330)
-        #expect(abs(canvas.visibleSize.width - 480) < 0.01)
+        // CI may not composite an invisible off-screen panel before the animation ends.
+        // Verify the installed Core Animation frames instead of scheduler/display timing.
+        let reveal = try #require(canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation)
+        let revealPaths = try #require(reveal.values as? [CGPath])
+        #expect(revealPaths.contains { $0.boundingBoxOfPath.height > 1 && $0.boundingBoxOfPath.height < 330 })
+        #expect(revealPaths.allSatisfy { abs($0.boundingBoxOfPath.width - 480) < 0.01 })
         #expect(canvas.visiblePath?.boundingBoxOfPath.minY == 0)
         #expect(canvas.contentFrame == finalFrame)
         // Reduced motion must skip both the reveal and the content translation.
@@ -69,17 +72,19 @@ struct NotchMotionTests {
         present(.expanded, animated: true)
         let contentFrame = try #require(canvas.contentFrame)
         #expect(contentFrame.size == geometry.frame(mode: .expanded).size)
-        var intermediate = false
+        let morph = try #require(canvas.layer?.mask?.animation(forKey: "morph") as? CAKeyframeAnimation)
+        let paths = try #require(morph.values as? [CGPath])
+        #expect(paths.contains { $0.boundingBoxOfPath.height > 34 && $0.boundingBoxOfPath.height < 330 })
+        #expect(paths.first?.boundingBoxOfPath.size == geometry.frame(mode: .compact).size)
+        let finalSize = try #require(paths.last?.boundingBoxOfPath.size)
+        #expect(abs(finalSize.width - 480) < 0.01 && abs(finalSize.height - 330) < 0.01)
         for _ in 0..<5 {
             try await Task.sleep(for: .milliseconds(20))
             #expect(window.frame == windowFrame)
             #expect(canvas.contentFrame == contentFrame)
-            let size = canvas.visibleSize
-            intermediate = intermediate || (size.height > 34 && size.height < 330)
             #expect(abs((canvas.visiblePath?.boundingBoxOfPath.midX ?? 0) - canvas.bounds.midX) < 1)
             #expect(canvas.visiblePath?.boundingBoxOfPath.minY == 0)
         }
-        #expect(intermediate)
         present(.compact, animated: true)
         try await Task.sleep(for: .milliseconds(650))
         #expect(abs(canvas.visibleSize.width - 200) < 0.01)
