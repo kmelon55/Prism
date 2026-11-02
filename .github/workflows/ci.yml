@@ -35,3 +35,4 @@ jobs:
         working-directory: apps/server
       - run: npm run check && npm test && npm run build
         working-directory: apps/server
+      - run: docker build --tag prism-sync:ci apps/server
