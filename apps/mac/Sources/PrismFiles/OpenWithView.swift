@@ -65,12 +65,12 @@ struct OpenWithView: View {
     var body: some View {
         VStack(spacing: 0) {
             PrismScreenHeader {
-                PrismBackButton(help: Text("Back", bundle: .module), action: onCancel)
+                PrismBackButton(help: Text("Back", bundle: .module.prismLocalized), action: onCancel)
                 HStack(spacing: 9) {
                     PrismSearchGlyph()
                     ScreenSearchField(
                         text: Binding(get: { model.query }, set: { model.query = $0 }),
-                        placeholder: String(localized: "Open “\(model.hit.name)” with…", bundle: .module),
+                        placeholder: String(localized: "Open “\(model.hit.name)” with…", bundle: .module.prismLocalized),
                         onCommand: handle
                     )
                 }
@@ -86,7 +86,7 @@ struct OpenWithView: View {
                                     .foregroundStyle(PrismTheme.text)
                                 Spacer()
                                 if app.isDefault {
-                                    Text("Default", bundle: .module).font(.prism(11)).foregroundStyle(PrismTheme.textMuted)
+                                    Text("Default", bundle: .module.prismLocalized).font(.prism(11)).foregroundStyle(PrismTheme.textMuted)
                                 }
                             }
                             .padding(.horizontal, 11)
@@ -112,7 +112,7 @@ struct OpenWithView: View {
                 }
                 .padding(.horizontal, 7)
             } trailing: {
-                PrismStatusAction(Text("Open", bundle: .module), keys: "↵", isPrimary: true) {
+                PrismStatusAction(Text("Open", bundle: .module.prismLocalized), keys: "↵", isPrimary: true) {
                     if let app = model.selected { open(app) }
                 }
                 .disabled(model.selected == nil)

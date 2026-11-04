@@ -24,19 +24,19 @@ enum SystemPermission: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .accessibility: String(localized: "Accessibility", bundle: .module)
-        case .screenRecording: String(localized: "Screen Recording", bundle: .module)
-        case .microphone: String(localized: "Microphone", bundle: .module)
-        case .automation: String(localized: "Automation", bundle: .module)
+        case .accessibility: String(localized: "Accessibility", bundle: .module.prismLocalized)
+        case .screenRecording: String(localized: "Screen Recording", bundle: .module.prismLocalized)
+        case .microphone: String(localized: "Microphone", bundle: .module.prismLocalized)
+        case .automation: String(localized: "Automation", bundle: .module.prismLocalized)
         }
     }
 
     var purpose: String {
         switch self {
-        case .accessibility: String(localized: "Used to arrange other apps’ windows and insert dictated text.", bundle: .module)
-        case .screenRecording: String(localized: "Used to capture a screen region for Capture and Ask AI.", bundle: .module)
-        case .microphone: String(localized: "Used only while dictation is recording.", bundle: .module)
-        case .automation: String(localized: "Used to empty the Trash through Finder and run scripts you choose.", bundle: .module)
+        case .accessibility: String(localized: "Used to arrange other apps’ windows and insert dictated text.", bundle: .module.prismLocalized)
+        case .screenRecording: String(localized: "Used to capture a screen region for Capture and Ask AI.", bundle: .module.prismLocalized)
+        case .microphone: String(localized: "Used only while dictation is recording.", bundle: .module.prismLocalized)
+        case .automation: String(localized: "Used to empty the Trash through Finder and run scripts you choose.", bundle: .module.prismLocalized)
         }
     }
 

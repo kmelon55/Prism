@@ -58,8 +58,8 @@ struct PaletteView: View {
         HStack(spacing: 12) {
             PrismMark()
                 .frame(width: 25, height: 25)
-            TextField(text: $model.query, prompt: Text("Search apps, commands and files…", bundle: .module).foregroundStyle(PrismTheme.textMuted)) {
-                Text("Search apps, commands and files…", bundle: .module)
+            TextField(text: $model.query, prompt: Text("Search apps, commands and files…", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)) {
+                Text("Search apps, commands and files…", bundle: .module.prismLocalized)
             }
             .textFieldStyle(.plain)
             .font(.system(size: 16))
@@ -80,10 +80,10 @@ struct PaletteView: View {
                         Text(verbatim: "AI")
                     }
                 }
-                .help(Text("Open AI Chat", bundle: .module))
+                .help(Text("Open AI Chat", bundle: .module.prismLocalized))
                 if !model.query.isEmpty {
-                    ToolbarPill { model.query = "" } label: { Text("Clear", bundle: .module) }
-                        .help(Text("Clear search", bundle: .module))
+                    ToolbarPill { model.query = "" } label: { Text("Clear", bundle: .module.prismLocalized) }
+                        .help(Text("Clear search", bundle: .module.prismLocalized))
                 }
             }
         }
@@ -118,11 +118,11 @@ struct PaletteView: View {
             if model.hasPendingProviders {
                 PrismLoadingRows()
                     .padding(.horizontal, 12)
-                    .accessibilityLabel(Text("Searching…", bundle: .module))
+                    .accessibilityLabel(Text("Searching…", bundle: .module.prismLocalized))
             } else {
                 PrismEmptyState(
-                    title: Text("No results", bundle: .module),
-                    message: Text("Nothing matches “\(model.query)”. Try an app, action, or setting.", bundle: .module)
+                    title: Text("No results", bundle: .module.prismLocalized),
+                    message: Text("Nothing matches “\(model.query)”. Try an app, action, or setting.", bundle: .module.prismLocalized)
                 )
                 .padding(.bottom, 20)
             }
@@ -187,14 +187,14 @@ struct PaletteView: View {
                 Image(systemName: "gearshape").font(.system(size: 13, weight: .light))
             }
             .keyboardShortcut(",", modifiers: .command)
-            .help(Text("Settings", bundle: .module))
+            .help(Text("Settings", bundle: .module.prismLocalized))
         } trailing: {
             if let primary = model.selectedItem?.actions.first {
                 PrismStatusAction(Text(verbatim: primary.title), keys: "↵", isPrimary: true) { model.activate() }
                     .disabled(model.actionPanelItem != nil)
                 PrismStatusDivider()
             }
-            PrismStatusAction(Text("Actions", bundle: .module), keys: "⌘K", isActive: model.actionPanelItem != nil) {
+            PrismStatusAction(Text("Actions", bundle: .module.prismLocalized), keys: "⌘K", isActive: model.actionPanelItem != nil) {
                 model.toggleActionPanel()
             }
             .disabled(model.selectedItem == nil)

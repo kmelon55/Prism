@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 protocol SyncTransport: Sendable {
@@ -26,7 +27,7 @@ actor SyncClient: SyncTransport {
     guard let url = URL(string: value), url.scheme == "https", url.host != nil,
       url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
       url.path.isEmpty || url.path == "/"
-    else { throw SyncFailure.message("HTTPS 서버 주소를 입력하세요. 경로·계정 정보는 포함할 수 없어요.") }
+    else { throw SyncFailure.message(String(localized: "Enter an HTTPS server URL without a path or credentials.", bundle: .module.prismLocalized)) }
     return value.hasSuffix("/") ? String(value.dropLast()) : value
   }
   func request<T: Decodable & Sendable>(
@@ -55,12 +56,12 @@ actor SyncClient: SyncTransport {
       let code = (response as? HTTPURLResponse)?.statusCode ?? 0
       throw SyncFailure.message(
         code == 409
-          ? "다른 기기의 수정과 충돌했어요. 새로고침 후 공통 설정을 가져오거나 이 기기 설정을 유지하세요." : "서버 요청에 실패했어요 (\(code)).")
+          ? String(localized: "Changes conflict with another device. Refresh, then import the shared settings or keep this device's settings.", bundle: .module.prismLocalized) : String(localized: "Server request failed (\(code)).", bundle: .module.prismLocalized))
     }
     // A server cannot force an unbounded allocation on the client.
     var data = Data()
     for try await byte in bytes {
-      guard data.count < 5_000_000 else { throw SyncFailure.message("서버 응답이 너무 커요.") }
+      guard data.count < 5_000_000 else { throw SyncFailure.message(String(localized: "The server response is too large.", bundle: .module.prismLocalized)) }
       data.append(byte)
     }
     if path == "clips", method == "GET", let etag = http.value(forHTTPHeaderField: "ETag") {

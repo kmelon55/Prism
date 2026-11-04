@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// Reads a large number with Korean myriad units: `123456789` is `1억 2,345만 6,789`, `120000000` is `1억 2천만`.
@@ -8,7 +9,7 @@ enum KoreanNumber {
 
     /// Shown to Korean speakers and in the Korean region, including an English-first Mac set to Korea (`en-KR`).
     static var isPreferred: Bool {
-        Locale.preferredLanguages.contains { $0.hasPrefix("ko") } || Locale.current.region?.identifier == "KR"
+        PrismLanguage.identifier == "ko"
     }
 
     /// The reading of a plain decimal string, or nil when it is below 10,000 or not a plain number.

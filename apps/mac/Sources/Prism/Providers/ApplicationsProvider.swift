@@ -30,27 +30,27 @@ final class ApplicationsProvider: PaletteProvider {
     private func item(_ application: InstalledApplication) -> PaletteItem {
         let url = URL(filePath: application.path)
         var candidate = application.searchCandidate
-        candidate.section = String(localized: "Applications", bundle: .module)
+        candidate.section = String(localized: "Applications", bundle: .module.prismLocalized)
         return PaletteItem(
             candidate: candidate,
             icon: .file(path: application.path),
-            accessory: String(localized: "Application", bundle: .module),
+            accessory: String(localized: "Application", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "open", title: String(localized: "Open Application", bundle: .module), systemImage: "arrow.up.forward.app") {
+                PaletteAction(id: "open", title: String(localized: "Open Application", bundle: .module.prismLocalized), systemImage: "arrow.up.forward.app") {
                     _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
                     return .dismiss
                 },
-                PaletteAction(id: "reveal", title: String(localized: "Show in Finder", bundle: .module), systemImage: "folder",
+                PaletteAction(id: "reveal", title: String(localized: "Show in Finder", bundle: .module.prismLocalized), systemImage: "folder",
                               shortcut: .init("r", modifiers: [.command, .shift])) {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
                     return .dismiss
                 },
-                PaletteAction(id: "copy-path", title: String(localized: "Copy Path", bundle: .module), systemImage: "doc.on.doc",
+                PaletteAction(id: "copy-path", title: String(localized: "Copy Path", bundle: .module.prismLocalized), systemImage: "doc.on.doc",
                               shortcut: .init("c", modifiers: [.command, .shift])) {
                     PasteService.copy(application.path)
-                    return .notify(String(localized: "Copied to Clipboard", bundle: .module))
+                    return .notify(String(localized: "Copied to Clipboard", bundle: .module.prismLocalized))
                 },
-                PaletteAction(id: "configure", title: String(localized: "Configure Application", bundle: .module),
+                PaletteAction(id: "configure", title: String(localized: "Configure Application", bundle: .module.prismLocalized),
                               systemImage: "slider.horizontal.3", shortcut: .init(",", modifiers: .command)) { [weak self] in
                     self?.onConfigure?(application.name)
                     return .dismiss

@@ -1,3 +1,4 @@
+import PrismKit
 import AppKit
 import Foundation
 
@@ -5,7 +6,7 @@ enum ScriptStrings {
     /// Translates an English product message from the registry, including stored history errors. Messages with a
     /// number use a `%lld` key and messages with an OS detail after ": " use a `%@` key.
     static func localize(_ english: String) -> String {
-        let bundle = Bundle.module
+        let bundle = Bundle.module.prismLocalized
         let direct = bundle.localizedString(forKey: english, value: nil, table: nil)
         if direct != english { return direct }
         // The last number is the parameter: "Argument 2 is required.", "between 1 and 3600 seconds".
@@ -23,7 +24,7 @@ enum ScriptStrings {
     }
 
     static func localized(_ key: String.LocalizationValue) -> String {
-        String(localized: key, bundle: .module)
+        String(localized: key, bundle: .module.prismLocalized)
     }
 }
 

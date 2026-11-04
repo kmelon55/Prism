@@ -12,7 +12,7 @@ final class SyncModel {
   var devices: [SyncDevice] = []
   var clips: [(id: String, text: String)] = []
   var draft = ""
-  var status = "동기화를 켜면 연결한 기기와 설정을 공유해요."
+  var status = ""
   var busy = false
   var selectedTransfers: Set<String> = []
   var transferSource = "shared"
@@ -49,7 +49,7 @@ final class SyncModel {
           validate: { data in
             guard let value = String(data: data, encoding: .utf8),
               SyncPreference.valid(value, for: key)
-            else { throw TransferError("설정 형식이 올바르지 않아요.") }
+            else { throw TransferError(String(localized: "The settings format is invalid.", bundle: .module.prismLocalized)) }
           },
           apply: { data, _ in
             let value = String(decoding: data, as: UTF8.self)
@@ -68,7 +68,7 @@ final class SyncModel {
       {
         secrets = try JSONDecoder().decode(SyncSecrets.self, from: data)
       }
-    } catch { status = "키체인 연결 정보를 읽지 못했어요: \(error.localizedDescription)" }
+    } catch { status = String(localized: "Could not read connection details from Keychain: \(error.localizedDescription)", bundle: .module.prismLocalized) }
     let workspace = NSWorkspace.shared.notificationCenter
     observers.append(
       workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) {
@@ -107,7 +107,7 @@ final class SyncModel {
     }
     do {
       try save()
-      status = enabled ? "서버 동기화를 시작해요." : "동기화를 멈췄어요. 이 기기에서만 사용해요."
+      status = enabled ? String(localized: "Starting server sync.", bundle: .module.prismLocalized) : String(localized: "Sync stopped. Data stays on this device.", bundle: .module.prismLocalized)
       schedule()
     } catch {
       state.enabled = false
@@ -153,7 +153,7 @@ final class SyncModel {
       secrets = credentials
       connectionCode = ""
       encryptionKey = ""
-      status = "연결했어요. 공통 설정을 확인해요."
+      status = String(localized: "Connected. Checking shared settings.", bundle: .module.prismLocalized)
       schedule()
     } catch { status = error.localizedDescription }
   }
@@ -209,8 +209,8 @@ final class SyncModel {
       failures = 0
       status =
         transferMessages.isEmpty
-        ? "동기화했어요 · \(Date().formatted(date:.omitted,time:.shortened))"
-        : "확인이 필요한 항목이 있어요. 항목별 상태를 확인하세요."
+        ? String(localized: "Synced · \(Date().formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(PrismLanguage.locale)))", bundle: .module.prismLocalized)
+        : String(localized: "Some items need attention. Check their status.", bundle: .module.prismLocalized)
     } catch is CancellationError {} catch {
       failures += 1
       status = error.localizedDescription
@@ -224,7 +224,7 @@ final class SyncModel {
         id,
         try SyncCrypto.seal(text, key: secrets.key, context: "prism-v1:\(state.owner):clip:\(id)")
       )
-      status = "전송 대기 중이에요. 최신 텍스트 한 개를 다음 동기화 때 보내요."
+      status = String(localized: "Waiting to send. The latest text will be sent at the next sync.", bundle: .module.prismLocalized)
     } catch { status = error.localizedDescription }
   }
   func sendDraft() async {
@@ -238,7 +238,7 @@ final class SyncModel {
     item.setString("1", forType: .init("org.nspasteboard.ConcealedType"))
     NSPasteboard.general.clearContents()
     NSPasteboard.general.writeObjects([item])
-    status = "복사했어요."
+    status = String(localized: "Copied.", bundle: .module.prismLocalized)
   }
   func revoke(_ id: String) async {
     guard !busy, let secrets else { return }
@@ -257,7 +257,7 @@ final class SyncModel {
         self.secrets = nil
         clips = []
         try save()
-        status = "이 기기의 연결을 해제했어요."
+        status = String(localized: "This device has been disconnected.", bundle: .module.prismLocalized)
       }
     } catch { status = error.localizedDescription }
   }

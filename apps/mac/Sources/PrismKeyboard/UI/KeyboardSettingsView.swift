@@ -9,10 +9,10 @@ struct KeyboardSettingsView: View {
     let openPermissions: () -> Void
 
     var body: some View {
-        PrismSettingsPage(String(localized: "Keyboard", bundle: .module)) {
+        PrismSettingsPage(String(localized: "Keyboard", bundle: .module.prismLocalized)) {
             PrismSettingsGroup {
-                PrismSettingsRow(Text("Keyboard remapping", bundle: .module),
-                                 detail: Text("Change what keys do in every app. Turning this off restores every key at once.", bundle: .module)) {
+                PrismSettingsRow(Text("Keyboard remapping", bundle: .module.prismLocalized),
+                                 detail: Text("Change what keys do in every app. Turning this off restores every key at once.", bundle: .module.prismLocalized)) {
                     Toggle(isOn: binding(\.enabled)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
                 }
                 if let error = model.lastError {
@@ -31,20 +31,20 @@ struct KeyboardSettingsView: View {
 
     static var keywords: [String] {
         ["Keyboard remapping", "Tap and hold", "Remapped shortcuts", "Hold delay", "Apps without tap and hold", "Hyper key", "Caps Lock", "Space"]
-            .map { String(localized: String.LocalizationValue($0), bundle: .module) }
+            .map { String(localized: String.LocalizationValue($0), bundle: .module.prismLocalized) }
     }
 
     // MARK: Tap and hold
 
     private var dualRoles: some View {
-        PrismSettingsGroup(Text("Tap and hold", bundle: .module)) {
+        PrismSettingsGroup(Text("Tap and hold", bundle: .module.prismLocalized)) {
             Menu {
-                Button { addDualRole(.spaceCommand) } label: { Text("Space: tap for Space, hold for ⌘", bundle: .module) }
-                Button { addDualRole(.capsLockHyper) } label: { Text("Caps Lock: tap for Escape, hold for Hyper (⌃⌥⇧⌘)", bundle: .module) }
+                Button { addDualRole(.spaceCommand) } label: { Text("Space: tap for Space, hold for ⌘", bundle: .module.prismLocalized) }
+                Button { addDualRole(.capsLockHyper) } label: { Text("Caps Lock: tap for Escape, hold for Hyper (⌃⌥⇧⌘)", bundle: .module.prismLocalized) }
                 Divider()
-                Button { addDualRole(DualRoleRule(trigger: .return, tap: .same, hold: .control)) } label: { Text("Custom Key", bundle: .module) }
+                Button { addDualRole(DualRoleRule(trigger: .return, tap: .same, hold: .control)) } label: { Text("Custom Key", bundle: .module.prismLocalized) }
             } label: {
-                Label { Text("Add Key", bundle: .module) } icon: { Image(systemName: "plus") }
+                Label { Text("Add Key", bundle: .module.prismLocalized) } icon: { Image(systemName: "plus") }
             }
             .menuStyle(.button)
             .buttonStyle(.prism)
@@ -52,8 +52,8 @@ struct KeyboardSettingsView: View {
             .fixedSize()
         } content: {
             if model.config.dualRoles.isEmpty {
-                PrismSettingsRow(Text("No keys yet", bundle: .module),
-                                 detail: Text("A tap-and-hold key types normally when tapped and acts as modifier keys while held, such as Space as ⌘.", bundle: .module))
+                PrismSettingsRow(Text("No keys yet", bundle: .module.prismLocalized),
+                                 detail: Text("A tap-and-hold key types normally when tapped and acts as modifier keys while held, such as Space as ⌘.", bundle: .module.prismLocalized))
             }
             ForEach(model.config.dualRoles) { rule in
                 DualRoleRow(rule: rule, change: { next in
@@ -64,8 +64,8 @@ struct KeyboardSettingsView: View {
                     model.change { $0.dualRoles.removeAll { $0.id == rule.id } }
                 })
             }
-            PrismSettingsRow(Text("Hold delay", bundle: .module),
-                             detail: Text("A key pressed this long after a tap-and-hold key always counts as a shortcut. Shorter feels faster; longer forgives fast typing.", bundle: .module)) {
+            PrismSettingsRow(Text("Hold delay", bundle: .module.prismLocalized),
+                             detail: Text("A key pressed this long after a tap-and-hold key always counts as a shortcut. Shorter feels faster; longer forgives fast typing.", bundle: .module.prismLocalized)) {
                 PrismSlider(value: Binding(get: { Double(model.config.holdThreshold) }, set: { value in
                     let rounded = Int((value / 10).rounded() * 10)
                     model.change { $0.holdThreshold = rounded }
@@ -90,17 +90,17 @@ struct KeyboardSettingsView: View {
     // MARK: Remapped shortcuts
 
     private var remaps: some View {
-        PrismSettingsGroup(Text("Remapped shortcuts", bundle: .module)) {
+        PrismSettingsGroup(Text("Remapped shortcuts", bundle: .module.prismLocalized)) {
             Button {
                 model.change { $0.remaps.append(ShortcutRemap()) }
             } label: {
-                Label { Text("Add Shortcut", bundle: .module) } icon: { Image(systemName: "plus") }
+                Label { Text("Add Shortcut", bundle: .module.prismLocalized) } icon: { Image(systemName: "plus") }
             }
             .buttonStyle(.prism)
         } content: {
             if model.config.remaps.isEmpty {
-                PrismSettingsRow(Text("No shortcuts yet", bundle: .module),
-                                 detail: Text("Replace one shortcut with another, everywhere or only in one app.", bundle: .module))
+                PrismSettingsRow(Text("No shortcuts yet", bundle: .module.prismLocalized),
+                                 detail: Text("Replace one shortcut with another, everywhere or only in one app.", bundle: .module.prismLocalized))
             }
             ForEach(model.config.remaps) { remap in
                 RemapRow(remap: remap, change: { next in
@@ -117,18 +117,18 @@ struct KeyboardSettingsView: View {
     // MARK: Excluded apps
 
     private var excludedApps: some View {
-        PrismSettingsGroup(Text("Apps without tap and hold", bundle: .module)) {
+        PrismSettingsGroup(Text("Apps without tap and hold", bundle: .module.prismLocalized)) {
             Button {
                 guard let app = AppPicker.choose(), !model.config.excludedApps.contains(app) else { return }
                 model.change { $0.excludedApps.append(app) }
             } label: {
-                Label { Text("Add App", bundle: .module) } icon: { Image(systemName: "plus") }
+                Label { Text("Add App", bundle: .module.prismLocalized) } icon: { Image(systemName: "plus") }
             }
             .buttonStyle(.prism)
         } content: {
             if model.config.excludedApps.isEmpty {
-                PrismSettingsRow(Text("No apps", bundle: .module),
-                                 detail: Text("Tap-and-hold keys type normally in these apps, such as games. Remapped shortcuts still apply.", bundle: .module))
+                PrismSettingsRow(Text("No apps", bundle: .module.prismLocalized),
+                                 detail: Text("Tap-and-hold keys type normally in these apps, such as games. Remapped shortcuts still apply.", bundle: .module.prismLocalized))
             }
             ForEach(model.config.excludedApps, id: \.bundleID) { app in
                 PrismSettingsRow(Text(verbatim: app.name), detail: Text(verbatim: app.bundleID)) {
@@ -145,13 +145,13 @@ struct KeyboardSettingsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.shield").font(.system(size: 15)).foregroundStyle(PrismTheme.warning)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Accessibility access required", bundle: .module)
+                    Text("Accessibility access required", bundle: .module.prismLocalized)
                         .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(PrismTheme.text)
-                    Text("Allow Prism in Accessibility to change what keys do.", bundle: .module)
+                    Text("Allow Prism in Accessibility to change what keys do.", bundle: .module.prismLocalized)
                         .font(.system(size: 10.5, weight: .medium)).foregroundStyle(PrismTheme.textMuted)
                 }
                 Spacer(minLength: 8)
-                Text("Open Permissions", bundle: .module).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.warning)
+                Text("Open Permissions", bundle: .module.prismLocalized).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.warning)
             }
             .padding(.horizontal, 15)
             .frame(minHeight: 58)
@@ -176,9 +176,9 @@ private struct DualRoleRow: View {
     var body: some View {
         HStack(spacing: 10) {
             PrismSelect(selection: binding(\.trigger), options: TriggerKey.allCases.map { ($0, $0.title) }, minWidth: 96)
-            label(Text("Tap", bundle: .module))
+            label(Text("Tap", bundle: .module.prismLocalized))
             PrismSelect(selection: binding(\.tap), options: tapOptions, minWidth: 96)
-            label(Text("Hold", bundle: .module))
+            label(Text("Hold", bundle: .module.prismLocalized))
             PrismSelect(selection: binding(\.hold), options: HoldModifiers.allCases.map { ($0, $0.title) }, minWidth: 124)
             Spacer(minLength: 8)
             Toggle(isOn: binding(\.isEnabled)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
@@ -232,9 +232,9 @@ private struct RemapRow: View {
     }
 
     private var scopeOptions: [(value: Scope, title: String)] {
-        var options: [(value: Scope, title: String)] = [(.everywhere, String(localized: "All Apps", bundle: .module))]
+        var options: [(value: Scope, title: String)] = [(.everywhere, String(localized: "All Apps", bundle: .module.prismLocalized))]
         if let app = remap.app { options.append((.app(app), app.name)) }
-        options.append((.choose, String(localized: "Choose App…", bundle: .module)))
+        options.append((.choose, String(localized: "Choose App…", bundle: .module.prismLocalized)))
         return options
     }
 
@@ -273,7 +273,7 @@ private struct RemoveButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(Text("Remove", bundle: .module))
+        .help(Text("Remove", bundle: .module.prismLocalized))
     }
 }
 
@@ -285,7 +285,7 @@ enum AppPicker {
         panel.allowedContentTypes = [.application]
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.prompt = String(localized: "Choose", bundle: .module)
+        panel.prompt = String(localized: "Choose", bundle: .module.prismLocalized)
         guard panel.runModal() == .OK, let url = panel.url, let bundleID = Bundle(url: url)?.bundleIdentifier else { return nil }
         let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
         return AppReference(bundleID: bundleID, name: name)
@@ -295,7 +295,7 @@ enum AppPicker {
 extension TriggerKey {
     var title: String {
         switch self {
-        case .space: String(localized: "Space", bundle: .module)
+        case .space: String(localized: "Space", bundle: .module.prismLocalized)
         case .capsLock: "Caps Lock"
         case .return: "Return ↩"
         case .tab: "Tab ⇥"
@@ -313,9 +313,9 @@ extension TapOutput {
         case .escape: "Escape ⎋"
         case .return: "Return ↩"
         case .tab: "Tab ⇥"
-        case .space: String(localized: "Space", bundle: .module)
+        case .space: String(localized: "Space", bundle: .module.prismLocalized)
         case .delete: "Delete ⌫"
-        case .nothing: String(localized: "Nothing", bundle: .module)
+        case .nothing: String(localized: "Nothing", bundle: .module.prismLocalized)
         }
     }
 }

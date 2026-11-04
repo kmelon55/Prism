@@ -42,33 +42,33 @@ final class CommandHotKeys {
     }
 
     func registerTransfers() {
-        SyncTransfers.register(SyncTransfer(id: "shortcut.launcher", title: "Prism 실행 단축키", read: {
+        SyncTransfers.register(SyncTransfer(id: "shortcut.launcher", title: String(localized: "Prism launcher shortcut", bundle: .module.prismLocalized), read: {
             try TransferCodec.encode(self.launcher.accelerator)
         }, validate: { data in
             let value = try JSONDecoder().decode(String.self, from: data)
-            guard Shortcut(accelerator: value) != nil else { throw TransferError("단축키 형식이 올바르지 않아요.") }
+            guard Shortcut(accelerator: value) != nil else { throw TransferError(String(localized: "The shortcut format is invalid.", bundle: .module.prismLocalized)) }
         }, apply: { data, _ in
-            guard !self.isPaused else { throw TransferError("단축키 입력을 마친 뒤 다시 가져오세요.") }
+            guard !self.isPaused else { throw TransferError(String(localized: "Finish recording the shortcut before importing again.", bundle: .module.prismLocalized)) }
             let value = try JSONDecoder().decode(String.self, from: data)
-            guard let shortcut = Shortcut(accelerator: value), !self.commands.values.contains(shortcut.accelerator) else { throw TransferError("다른 명령의 단축키와 겹쳐요.") }
+            guard let shortcut = Shortcut(accelerator: value), !self.commands.values.contains(shortcut.accelerator) else { throw TransferError(String(localized: "This shortcut is assigned to another command.", bundle: .module.prismLocalized)) }
             let previous = self.launcher
             self.launcher = shortcut; self.registerLauncher()
             do {
-                guard self.launcherError == nil else { throw TransferError("macOS 또는 다른 앱에서 사용하는 단축키예요.") }
+                guard self.launcherError == nil else { throw TransferError(String(localized: "This shortcut is used by macOS or another app.", bundle: .module.prismLocalized)) }
                 try self.launcherStore.save(LauncherFile(accelerator: value))
             } catch { self.launcher = previous; self.registerLauncher(); throw error }
         }))
-        SyncTransfers.register(SyncTransfer(id: "shortcut.commands", title: "명령별 단축키", read: {
+        SyncTransfers.register(SyncTransfer(id: "shortcut.commands", title: String(localized: "Command shortcuts", bundle: .module.prismLocalized), read: {
             try TransferCodec.encode(self.commands)
         }, validate: { data in _ = try Self.decodeTransfer(data) }, apply: { data, replace in
-            guard !self.isPaused else { throw TransferError("단축키 입력을 마친 뒤 다시 가져오세요.") }
+            guard !self.isPaused else { throw TransferError(String(localized: "Finish recording the shortcut before importing again.", bundle: .module.prismLocalized)) }
             let incoming = try Self.decodeTransfer(data)
             let previous = self.commands
             let next = replace ? incoming : previous.merging(incoming) { _, new in new }
-            guard Set(next.values).count == next.count, !next.values.contains(self.launcher.accelerator) else { throw TransferError("단축키가 중복돼요. 기존 단축키를 확인하세요.") }
+            guard Set(next.values).count == next.count, !next.values.contains(self.launcher.accelerator) else { throw TransferError(String(localized: "Duplicate shortcuts. Check your existing shortcuts.", bundle: .module.prismLocalized)) }
             self.commands = next; self.registerCommands()
             do {
-                guard self.failures.isEmpty else { throw TransferError("등록할 수 없는 단축키가 있어 기존 설정을 유지했어요.") }
+                guard self.failures.isEmpty else { throw TransferError(String(localized: "Some shortcuts could not be registered. Your existing settings were kept.", bundle: .module.prismLocalized)) }
                 try self.commandsStore.save(CommandsFile(shortcuts: next))
             } catch { self.commands = previous; self.registerCommands(); throw error }
             NotificationCenter.default.post(name: CommandShortcuts.didChangeNotification, object: nil)
@@ -78,7 +78,7 @@ final class CommandHotKeys {
     private static func decodeTransfer(_ data: Data) throws -> [String: String] {
         let values = try JSONDecoder().decode([String: String].self, from: data)
         guard values.count <= 1000, Set(values.values).count == values.count,
-              values.allSatisfy({ !$0.key.isEmpty && $0.key.utf8.count <= 256 && (Shortcut(accelerator: $0.value) != nil || doubleTapValues.contains($0.value)) }) else { throw TransferError("단축키 설정 형식이 올바르지 않아요.") }
+              values.allSatisfy({ !$0.key.isEmpty && $0.key.utf8.count <= 256 && (Shortcut(accelerator: $0.value) != nil || doubleTapValues.contains($0.value)) }) else { throw TransferError(String(localized: "The shortcut settings format is invalid.", bundle: .module.prismLocalized)) }
         return values
     }
 
@@ -106,7 +106,7 @@ final class CommandHotKeys {
         if launcherHotKey == nil {
             launcher = previous
             registerLauncher()
-            launcherError = String(localized: "\(shortcut.displayName) is used by another app", bundle: .module)
+            launcherError = String(localized: "\(shortcut.displayName) is used by another app", bundle: .module.prismLocalized)
             return
         }
         try? launcherStore.save(LauncherFile(accelerator: shortcut.accelerator))
@@ -155,10 +155,10 @@ final class CommandHotKeys {
         do {
             launcherHotKey = try GlobalHotKey(shortcut: launcher) { [weak self] in self?.onLauncher() }
             launcherError = launcher.isUsedBySystem
-                ? String(localized: "macOS already uses \(launcher.displayName) (Keyboard Shortcuts in System Settings)", bundle: .module)
+                ? String(localized: "macOS already uses \(launcher.displayName) (Keyboard Shortcuts in System Settings)", bundle: .module.prismLocalized)
                 : nil
         } catch {
-            launcherError = String(localized: "\(launcher.displayName) is used by another app", bundle: .module)
+            launcherError = String(localized: "\(launcher.displayName) is used by another app", bundle: .module.prismLocalized)
         }
     }
 

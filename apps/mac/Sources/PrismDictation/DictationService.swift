@@ -153,9 +153,9 @@ final class DictationService {
         try settings.preflight()
         if promptMode {
             guard settings.mode.includes(.prompt) else {
-                throw DictationError(String(localized: "Enable prompt structuring first.", bundle: .module))
+                throw DictationError(String(localized: "Enable prompt structuring first.", bundle: .module.prismLocalized))
             }
-            guard settings.promptModel != nil else { throw DictationError(String(localized: "Choose a text processing model.", bundle: .module)) }
+            guard settings.promptModel != nil else { throw DictationError(String(localized: "Choose a text processing model.", bundle: .module.prismLocalized)) }
         }
         let keys = keys
         let provider = settings.provider

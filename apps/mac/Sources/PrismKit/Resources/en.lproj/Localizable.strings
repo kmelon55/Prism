@@ -1,0 +1,15 @@
+/* English source strings. Keep keys in sync with the Korean catalog. */
+"Loading" = "Loading";
+"Record Hotkey" = "Record Hotkey";
+"Add alias" = "Add alias";
+"Close model picker" = "Close model picker";
+"Remove Shortcut" = "Remove Shortcut";
+"Close actions" = "Close actions";
+"No matching actions" = "No matching actions";
+"Refresh" = "Refresh";
+"Recording Shortcut…" = "Recording Shortcut…";
+"Command" = "Command";
+"Search actions…" = "Search actions…";
+"Alias" = "Alias";
+"Hotkey" = "Hotkey";
+"Record Shortcut" = "Record Shortcut";

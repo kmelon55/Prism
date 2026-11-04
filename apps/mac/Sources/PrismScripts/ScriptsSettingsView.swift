@@ -15,18 +15,18 @@ struct ScriptsSettingsView: View {
 
     var body: some View {
         PrismSettingsPage(ScriptStrings.localized("Scripts")) {
-            PrismSettingsGroup(Text("Local directories", bundle: .module)) {
+            PrismSettingsGroup(Text("Local directories", bundle: .module.prismLocalized)) {
                 Button { chooseDirectories() } label: {
-                    Label { Text("Add Folder…", bundle: .module) } icon: { Image(systemName: "plus") }
+                    Label { Text("Add Folder…", bundle: .module.prismLocalized) } icon: { Image(systemName: "plus") }
                 }
                 .buttonStyle(.prism)
                 .disabled(!model.canAddDirectory)
             } content: {
-                PrismSettingsRow(Text("Script command folders", bundle: .module),
-                                 detail: Text("Prism lists executable scripts placed directly in these folders and picks up changes automatically. Raycast script commands work as they are.", bundle: .module))
+                PrismSettingsRow(Text("Script command folders", bundle: .module.prismLocalized),
+                                 detail: Text("Prism lists executable scripts placed directly in these folders and picks up changes automatically. Raycast script commands work as they are.", bundle: .module.prismLocalized))
                 ScriptsSettingsDivider()
                 if model.directories.isEmpty {
-                    Text("No script directories configured.", bundle: .module)
+                    Text("No script directories configured.", bundle: .module.prismLocalized)
                         .font(.system(size: 12))
                         .foregroundStyle(PrismTheme.textMuted)
                         .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
@@ -43,10 +43,10 @@ struct ScriptsSettingsView: View {
                 return !folders.isEmpty
             }
 
-            PrismSettingsGroup(Text("Command registry", bundle: .module)) {
-                PrismSettingsRow(Text("Registry status", bundle: .module), detail: Text(verbatim: statusText)) {
+            PrismSettingsGroup(Text("Command registry", bundle: .module.prismLocalized)) {
+                PrismSettingsRow(Text("Registry status", bundle: .module.prismLocalized), detail: Text(verbatim: statusText)) {
                     Button { model.refresh() } label: {
-                        Label { Text("Refresh Commands", bundle: .module) } icon: {
+                        Label { Text("Refresh Commands", bundle: .module.prismLocalized) } icon: {
                             if model.isRefreshing {
                                 ProgressView().controlSize(.small).scaleEffect(0.6).frame(width: 12, height: 12)
                             } else {
@@ -71,7 +71,7 @@ struct ScriptsSettingsView: View {
             }
 
             if !model.commands.isEmpty {
-                PrismSettingsGroup(Text("Script commands", bundle: .module)) {
+                PrismSettingsGroup(Text("Script commands", bundle: .module.prismLocalized)) {
                     ScriptsSettingsDivider()
                     ForEach(model.commands) { command in
                         commandRow(command)
@@ -79,8 +79,8 @@ struct ScriptsSettingsView: View {
                 }
             }
 
-            PrismCallout(systemImage: "terminal", title: Text("Local and explicit", bundle: .module),
-                         detail: Text("Scripts run only when you choose them, with your arguments passed literally. Output is kept on this Mac, and runs that accept a password are never saved.", bundle: .module))
+            PrismCallout(systemImage: "terminal", title: Text("Local and explicit", bundle: .module.prismLocalized),
+                         detail: Text("Scripts run only when you choose them, with your arguments passed literally. Output is kept on this Mac, and runs that accept a password are never saved.", bundle: .module.prismLocalized))
         }
         .task { await model.bootstrap() }
     }
@@ -117,7 +117,7 @@ struct ScriptsSettingsView: View {
                 if !exists {
                     PrismBadge(ScriptStrings.localized("Folder not found"), tone: .warning)
                 } else if let count = model.commandCountByDirectory[directory] {
-                    Text("\(count) commands", bundle: .module)
+                    Text("\(count) commands", bundle: .module.prismLocalized)
                         .font(.system(size: 11))
                         .foregroundStyle(PrismTheme.textMuted)
                 }
@@ -128,7 +128,7 @@ struct ScriptsSettingsView: View {
                         Image(systemName: "folder").font(.system(size: 11, weight: .medium)).frame(width: 14, height: 14)
                     }
                     .buttonStyle(.prismGhost)
-                    .help(Text("Show in Finder", bundle: .module))
+                    .help(Text("Show in Finder", bundle: .module.prismLocalized))
                     .disabled(!exists)
                     Button {
                         model.removeDirectory(directory)
@@ -136,8 +136,8 @@ struct ScriptsSettingsView: View {
                         Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).frame(width: 14, height: 14)
                     }
                     .buttonStyle(.prismGhost)
-                    .help(Text("Remove", bundle: .module))
-                    .accessibilityLabel(Text("Remove script directory \(directory)", bundle: .module))
+                    .help(Text("Remove", bundle: .module.prismLocalized))
+                    .accessibilityLabel(Text("Remove script directory \(directory)", bundle: .module.prismLocalized))
                 }
             }
             .padding(.horizontal, 4)
@@ -145,8 +145,8 @@ struct ScriptsSettingsView: View {
             ScriptsSettingsDivider()
         }
         .contextMenu {
-            Button { NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: directory)]) } label: { Text("Show in Finder", bundle: .module) }
-            Button(role: .destructive) { model.removeDirectory(directory) } label: { Text("Remove", bundle: .module) }
+            Button { NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: directory)]) } label: { Text("Show in Finder", bundle: .module.prismLocalized) }
+            Button(role: .destructive) { model.removeDirectory(directory) } label: { Text("Remove", bundle: .module.prismLocalized) }
         }
     }
 
@@ -178,8 +178,8 @@ struct ScriptsSettingsView: View {
             ScriptsSettingsDivider()
         }
         .contextMenu {
-            Button { _ = actions.reveal(command.id) } label: { Text("Show in Finder", bundle: .module) }
-            Button { _ = actions.edit(command.id) } label: { Text("Edit Script", bundle: .module) }
+            Button { _ = actions.reveal(command.id) } label: { Text("Show in Finder", bundle: .module.prismLocalized) }
+            Button { _ = actions.edit(command.id) } label: { Text("Edit Script", bundle: .module.prismLocalized) }
         }
     }
 

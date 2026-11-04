@@ -1,3 +1,4 @@
+import PrismKit
 // Ported from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import AppKit
 import SwiftUI
@@ -69,10 +70,10 @@ struct DictationOverlayView: View {
     }
 
     private func statusText(_ phase: DictationPhase) -> String {
-        guard phase == .processing else { return String(localized: "Transcribing…", bundle: .module) }
+        guard phase == .processing else { return String(localized: "Transcribing…", bundle: .module.prismLocalized) }
         return controller.processingMode == .prompt
-            ? String(localized: "Structuring prompt…", bundle: .module)
-            : String(localized: "Refining…", bundle: .module)
+            ? String(localized: "Structuring prompt…", bundle: .module.prismLocalized)
+            : String(localized: "Refining…", bundle: .module.prismLocalized)
     }
 }
 

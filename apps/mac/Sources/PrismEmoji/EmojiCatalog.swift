@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// One fully-qualified Unicode Emoji 16.0 sequence with CLDR 46 English and Korean names.
@@ -22,12 +23,12 @@ enum SkinTone: String, CaseIterable, Sendable, Identifiable {
 
     var title: String {
         switch self {
-        case .none: String(localized: "Default", bundle: .module)
-        case .light: String(localized: "Light", bundle: .module)
-        case .mediumLight: String(localized: "Medium-light", bundle: .module)
-        case .medium: String(localized: "Medium", bundle: .module)
-        case .mediumDark: String(localized: "Medium-dark", bundle: .module)
-        case .dark: String(localized: "Dark", bundle: .module)
+        case .none: String(localized: "Default", bundle: .module.prismLocalized)
+        case .light: String(localized: "Light", bundle: .module.prismLocalized)
+        case .mediumLight: String(localized: "Medium-light", bundle: .module.prismLocalized)
+        case .medium: String(localized: "Medium", bundle: .module.prismLocalized)
+        case .mediumDark: String(localized: "Medium-dark", bundle: .module.prismLocalized)
+        case .dark: String(localized: "Dark", bundle: .module.prismLocalized)
         }
     }
 

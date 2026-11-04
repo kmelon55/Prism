@@ -14,7 +14,7 @@ enum ShortcutsSettingsPane {
     static func make(hotKeys: CommandHotKeys, aliases: CommandAliases,
                      toggles: CommandToggles = CommandToggles(paths: AppPaths.current()),
                      items: @escaping @MainActor () async -> [PaletteItem]) -> SettingsPane {
-        SettingsPane(id: id, title: String(localized: "Commands", bundle: .module), systemImage: "slider.horizontal.3",
+        SettingsPane(id: id, title: String(localized: "Commands", bundle: .module.prismLocalized), systemImage: "slider.horizontal.3",
                      group: .tools, order: 10, keywords: keywords) {
             ShortcutsSettingsView(hotKeys: hotKeys, aliases: aliases, toggles: toggles, loadItems: items)
         }
@@ -35,7 +35,7 @@ enum ShortcutsSettingsPane {
 
     static var keywords: [String] {
         ["Command", "Alias", "Hotkey", "Search commands", "Assigned"]
-            .map { String(localized: String.LocalizationValue($0), bundle: .module) }
+            .map { String(localized: String.LocalizationValue($0), bundle: .module.prismLocalized) }
     }
 }
 
@@ -58,10 +58,10 @@ private struct ShortcutsSettingsView: View {
     }
 
     var body: some View {
-        PrismSettingsPage(String(localized: "Commands", bundle: .module)) {
+        PrismSettingsPage(String(localized: "Commands", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 10) {
                 CommandSearchField(query: $query)
-                PrismSettingsNote(Text("A shortcut runs the command from any app. An alias finds it first when typed exactly. Applications appear when you search for them.", bundle: .module))
+                PrismSettingsNote(Text("A shortcut runs the command from any app. An alias finds it first when typed exactly. Applications appear when you search for them.", bundle: .module.prismLocalized))
             }
             let sections = sections
             PrismCommandTable {
@@ -74,7 +74,7 @@ private struct ShortcutsSettingsView: View {
                     }
                 }
                 if sections.isEmpty {
-                    Text("No commands match this search.", bundle: .module)
+                    Text("No commands match this search.", bundle: .module.prismLocalized)
                         .font(.system(size: 12))
                         .foregroundStyle(PrismTheme.textMuted)
                         .frame(maxWidth: .infinity, minHeight: 64)
@@ -149,10 +149,10 @@ private struct ShortcutsSettingsView: View {
 
     private func detail(for item: PaletteItem) -> Text? {
         if hotKeys.failures.contains(item.id) {
-            return Text("Used by macOS or another app", bundle: .module).foregroundColor(PrismTheme.danger)
+            return Text("Used by macOS or another app", bundle: .module.prismLocalized).foregroundColor(PrismTheme.danger)
         }
         if !toggles.isEnabled(item.id) {
-            return Text("Off", bundle: .module)
+            return Text("Off", bundle: .module.prismLocalized)
         }
         if query.isEmpty || item.subtitle.isEmpty { return nil }
         return Text(verbatim: item.subtitle)
@@ -165,13 +165,13 @@ private struct ShortcutsSettingsView: View {
         let assigned = items.filter { hotKeys.commands[$0.id] != nil || aliases.aliases[$0.id] != nil }
         let visible: [PaletteItem]
         if query.isEmpty {
-            let applications = String(localized: "Applications", bundle: .module)
+            let applications = String(localized: "Applications", bundle: .module.prismLocalized)
             visible = items.filter { hotKeys.commands[$0.id] == nil && aliases.aliases[$0.id] == nil && $0.section != applications }
         } else {
             visible = CommandSearch.rank(items, query: query, aliases: aliases.searchAliases) { $0.candidate }
         }
         var result: [(String, [PaletteItem])] = []
-        if query.isEmpty, !assigned.isEmpty { result.append((String(localized: "Assigned", bundle: .module), assigned)) }
+        if query.isEmpty, !assigned.isEmpty { result.append((String(localized: "Assigned", bundle: .module.prismLocalized), assigned)) }
         var order: [String] = []
         var buckets: [String: [PaletteItem]] = [:]
         for item in visible {
@@ -193,8 +193,8 @@ private struct CommandSearchField: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(PrismTheme.textMuted)
-            TextField(text: $query, prompt: Text("Search commands", bundle: .module)) {
-                Text("Search commands", bundle: .module)
+            TextField(text: $query, prompt: Text("Search commands", bundle: .module.prismLocalized)) {
+                Text("Search commands", bundle: .module.prismLocalized)
             }
             .textFieldStyle(.plain)
             .font(.system(size: 12, weight: .medium))
@@ -212,7 +212,7 @@ private struct CommandSearchField: View {
                         .foregroundStyle(PrismTheme.textMuted)
                 }
                 .buttonStyle(.plain)
-                .help(Text("Clear", bundle: .module))
+                .help(Text("Clear", bundle: .module.prismLocalized))
             }
         }
         .padding(.horizontal, 11)
@@ -240,7 +240,7 @@ private struct DoubleTapShortcutRecorder: View {
             Button(action: toggle) {
                 Group {
                     if isRecording {
-                        Text("Key combo / modifier twice…", bundle: .module)
+                        Text("Key combo / modifier twice…", bundle: .module.prismLocalized)
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(PrismTheme.text)
                             .lineLimit(1)
@@ -250,7 +250,7 @@ private struct DoubleTapShortcutRecorder: View {
                             ForEach(Array(keys.enumerated()), id: \.offset) { _, key in KeyCap(key) }
                         }
                     } else {
-                        Text("Record Hotkey", bundle: .module)
+                        Text("Record Hotkey", bundle: .module.prismLocalized)
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(PrismTheme.textMuted)
                     }
@@ -264,7 +264,7 @@ private struct DoubleTapShortcutRecorder: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(Text("Press a key combination, or tap a modifier twice.", bundle: .module))
+            .help(Text("Press a key combination, or tap a modifier twice.", bundle: .module.prismLocalized))
             if value != nil, !isRecording {
                 Button { onChange(nil) } label: {
                     Image(systemName: "xmark")
@@ -274,7 +274,7 @@ private struct DoubleTapShortcutRecorder: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(Text("Remove Shortcut", bundle: .module))
+                .help(Text("Remove Shortcut", bundle: .module.prismLocalized))
             }
         }
         .onDisappear(perform: stop)

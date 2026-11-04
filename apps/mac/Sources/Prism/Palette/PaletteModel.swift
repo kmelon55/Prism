@@ -169,7 +169,7 @@ final class PaletteModel {
         let leads = ranked.filter(\.leadsEmptyQuery)
         var rest = ranked.filter { !$0.leadsEmptyQuery }
         let favorites = rest.filter { $0.candidate.favoriteOrder != nil }.map {
-            relabeled($0, String(localized: "Favorites", bundle: .module))
+            relabeled($0, String(localized: "Favorites", bundle: .module.prismLocalized))
         }
         rest.removeAll { $0.candidate.favoriteOrder != nil }
         let recentIDs = Set(rest.filter { usageBoost($0.id) > 0 }
@@ -177,7 +177,7 @@ final class PaletteModel {
             .prefix(Self.recentLimit).map(\.id))
         let recent = rest.filter { recentIDs.contains($0.id) }
             .sorted { $0.candidate.rankingBoost > $1.candidate.rankingBoost }
-            .map { relabeled($0, String(localized: "Recent", bundle: .module)) }
+            .map { relabeled($0, String(localized: "Recent", bundle: .module.prismLocalized)) }
         rest.removeAll { recentIDs.contains($0.id) }
         return leads + favorites + recent + rest
     }

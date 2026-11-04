@@ -40,6 +40,11 @@ enum SnapshotRenderer {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         palette.isRenderingSnapshots = true
 
+        if arguments.contains("--verify-localization") {
+            await verifyLocalization(to: directory, palette: palette, settings: settings)
+            return
+        }
+
         let model = palette.model
         // Render one task-sized page for focused visual review, with no hardware effects.
         if let widget = values("--notch-only").first {
@@ -130,6 +135,55 @@ enum SnapshotRenderer {
         for _ in 0..<50 where model.hasPendingProviders {
             try? await Task.sleep(for: .milliseconds(100))
         }
+    }
+
+    /// Keeps the same feature models and hosting view alive through English → Korean → English.
+    /// The language override is process-local; installed app preferences and services are untouched.
+    private static func verifyLocalization(to directory: URL, palette: PaletteController, settings: SettingsWindowController) async {
+        let defaults = UserDefaults.standard
+        let original = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        defer { defaults.setVolatileDomain(original, forName: UserDefaults.argumentDomain) }
+        let host = NSHostingView(rootView: PrismLocalizedContent {
+            SettingsRootView(model: settings.model)
+                .background(Color(nsColor: PrismTheme.shellTint(opacity: 1)))
+        })
+        let window = NSWindow(contentRect: CGRect(origin: snapshotOrigin, size: SettingsWindowController.size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) - 1)
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        var report: [[String: Any]] = []
+        for (index, language) in ["en", "ko", "en"].enumerated() {
+            var override = original
+            override["AppleLanguages"] = [language]
+            defaults.setVolatileDomain(override, forName: UserDefaults.argumentDomain)
+            NotificationCenter.default.post(name: PrismLanguage.didChange, object: nil)
+            try? await Task.sleep(for: .milliseconds(150))
+            var panes: [[String: Any]] = []
+            for pane in settings.model.panes {
+                settings.model.selection = pane.id
+                try? await Task.sleep(for: .milliseconds(350))
+                host.layoutSubtreeIfNeeded()
+                let filename = "\(index)-\(language)-\(pane.id).png"
+                if let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                    host.cacheDisplay(in: host.bounds, to: bitmap)
+                    try? bitmap.representation(using: .png, properties: [:])?.write(to: directory.appending(path: filename))
+                }
+                panes.append(["id": pane.id, "title": pane.title, "keywords": pane.keywords, "image": filename])
+            }
+            let commands = await palette.model.allSearchableItems()
+            report.append(["language": PrismLanguage.identifier, "panes": panes,
+                           "commands": commands.map { ["id": $0.id, "title": $0.title, "subtitle": $0.subtitle] },
+                           "menu": NSApp.mainMenu?.items.flatMap { $0.submenu?.items.map(\.title) ?? [] } ?? [],
+                           "transfers": SyncTransfers.registered.values.map { ["id": $0.id, "title": $0.title] }])
+        }
+        try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            .write(to: directory.appending(path: "localization.json"))
+        print("Language switch snapshots written to \(directory.path)")
     }
 
     private static func selectionSnapshots(_ model: PaletteModel, to directory: URL) async {

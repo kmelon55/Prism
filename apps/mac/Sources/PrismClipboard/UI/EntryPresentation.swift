@@ -1,3 +1,4 @@
+import PrismKit
 import AppKit
 import SwiftUI
 
@@ -93,7 +94,7 @@ struct EntryPresentation {
 
 enum ClipboardFormat {
     static var locale: Locale {
-        Bundle.module.preferredLocalizations.first.map(Locale.init(identifier:)) ?? .current
+        PrismLanguage.locale
     }
 
     static func relative(_ date: Date, now: Date = Date()) -> String {

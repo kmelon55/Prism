@@ -18,7 +18,7 @@ enum SyncKeyTransfer {
     guard status == errSecSuccess, let data = result as? Data,
       let value = String(data: data, encoding: .utf8)
     else {
-      throw TransferError("API 설정에서 키 사용을 허용한 뒤 다시 시도하세요. 키를 읽을 수 없어 동기화를 건너뛰었어요.")
+      throw TransferError(String(localized: "Allow key access in API settings and try again. Sync was skipped because the key could not be read.", bundle: .module.prismLocalized))
     }
     return try TransferCodec.encode(Optional(value))
   }
@@ -27,18 +27,18 @@ enum SyncKeyTransfer {
     if let value {
       guard !value.isEmpty, value.utf8.count <= 4096,
         value.utf8.allSatisfy({ $0 > 32 && $0 < 127 })
-      else { throw TransferError("API 키 형식이 올바르지 않아요.") }
+      else { throw TransferError(String(localized: "The API key format is invalid.", bundle: .module.prismLocalized)) }
     }
     return value
   }
   @MainActor static func register() {
     for (account, title) in [
-      ("openai", "OpenAI API 키"), ("vercel", "Vercel API 키"), ("openrouter", "OpenRouter API 키"),
-      ("dictation-groq", "Groq 음성 API 키"), ("dictation-xai", "xAI 음성 API 키"),
+      ("openai", "OpenAI API key"), ("vercel", "Vercel API key"), ("openrouter", "OpenRouter API key"),
+      ("dictation-groq", "Groq speech API key"), ("dictation-xai", "xAI speech API key"),
     ] {
       SyncTransfers.register(
         SyncTransfer(
-          id: "key." + account, title: title, sensitive: true, read: { try read(account) },
+          id: "key." + account, title: String(localized: String.LocalizationValue(title), bundle: .module.prismLocalized), sensitive: true, read: { try read(account) },
           validate: { _ = try decode($0) },
           apply: { data, _ in
             if let value = try decode(data) {

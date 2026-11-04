@@ -49,7 +49,7 @@ struct ScriptRunView: View {
     /// `.script-run-header`: back arrow, title and description, and the run state on the right.
     private var header: some View {
         HStack(spacing: 12) {
-            PrismBackButton(help: Text("Back", bundle: .module)) { actions.context.popScreen() }
+            PrismBackButton(help: Text("Back", bundle: .module.prismLocalized)) { actions.context.popScreen() }
             if let command {
                 PaletteIconImage(icon: actions.icon(for: command))
                     .frame(width: 26, height: 26)
@@ -97,7 +97,7 @@ struct ScriptRunView: View {
                 let selected = argument.data.first { $0.value == binding.wrappedValue }
                 Menu {
                     if argument.optional {
-                        Button { binding.wrappedValue = "" } label: { Text("None", bundle: .module) }
+                        Button { binding.wrappedValue = "" } label: { Text("None", bundle: .module.prismLocalized) }
                         Divider()
                     }
                     ForEach(Array(argument.data.enumerated()), id: \.offset) { _, option in
@@ -228,7 +228,7 @@ struct ScriptRunView: View {
                 ScriptOutputView(stdout: snapshot.stdout, stderr: snapshot.stderr, follows: snapshot.state == .running)
                     .overlay {
                         if snapshot.stdout.isEmpty && snapshot.stderr.isEmpty {
-                            Text("No output yet.", bundle: .module)
+                            Text("No output yet.", bundle: .module.prismLocalized)
                                 .font(.prism(11))
                                 .foregroundStyle(PrismTheme.textMuted)
                                 .allowsHitTesting(false)
@@ -236,7 +236,7 @@ struct ScriptRunView: View {
                     }
                     .overlay(alignment: .bottomTrailing) {
                         if snapshot.stdoutTruncated || snapshot.stderrTruncated {
-                            Text("Output truncated at 64 KiB.", bundle: .module)
+                            Text("Output truncated at 64 KiB.", bundle: .module.prismLocalized)
                                 .font(.prism(11))
                                 .foregroundStyle(PrismTheme.textMuted)
                                 .padding(.horizontal, 8)
@@ -252,7 +252,7 @@ struct ScriptRunView: View {
                     .padding(.horizontal, 26)
                     .padding(.vertical, 18)
             } else if session.starting {
-                Text("Starting script…", bundle: .module)
+                Text("Starting script…", bundle: .module.prismLocalized)
                     .font(.prism(12))
                     .foregroundStyle(PrismTheme.textMuted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -273,9 +273,9 @@ struct ScriptRunView: View {
     private var emptyState: some View {
         PrismEmptyState(
             symbol: "terminal",
-            title: Text("Ready to run", bundle: .module),
+            title: Text("Ready to run", bundle: .module.prismLocalized),
             message: command?.argumentError == nil
-                ? Text(arguments.isEmpty ? "Press Return to run this script." : "Fill in the arguments, then press Return.", bundle: .module)
+                ? Text(arguments.isEmpty ? "Press Return to run this script." : "Fill in the arguments, then press Return.", bundle: .module.prismLocalized)
                 : nil
         )
     }
@@ -286,16 +286,16 @@ struct ScriptRunView: View {
         PrismStatusBar {
             Group {
                 if isBusy {
-                    Text("You can go back while the script runs.", bundle: .module)
+                    Text("You can go back while the script runs.", bundle: .module.prismLocalized)
                 } else if let command {
-                    Text("Timeout: \(command.timeoutSeconds) seconds", bundle: .module)
+                    Text("Timeout: \(command.timeoutSeconds) seconds", bundle: .module.prismLocalized)
                 }
             }
             .lineLimit(1)
             .padding(.horizontal, 7)
         } trailing: {
             if snapshot?.state == .running {
-                PrismStatusAction(session.cancelling ? Text("Cancelling…", bundle: .module) : Text("Cancel", bundle: .module), keys: "⌘.") {
+                PrismStatusAction(session.cancelling ? Text("Cancelling…", bundle: .module.prismLocalized) : Text("Cancel", bundle: .module.prismLocalized), keys: "⌘.") {
                     Task { await model.cancel(scriptID) }
                 }
                 .keyboardShortcut(".", modifiers: .command)
@@ -303,7 +303,7 @@ struct ScriptRunView: View {
                 PrismStatusDivider()
             }
             if let snapshot, !(snapshot.stdout.isEmpty && snapshot.stderr.isEmpty) {
-                PrismStatusAction(Text("Copy Output", bundle: .module), keys: "⇧⌘C", action: copyOutput)
+                PrismStatusAction(Text("Copy Output", bundle: .module.prismLocalized), keys: "⇧⌘C", action: copyOutput)
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                 PrismStatusDivider()
             }
@@ -311,13 +311,13 @@ struct ScriptRunView: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(isBusy || isInvalid || model.historyError != nil)
             PrismStatusDivider()
-            PrismStatusAction(Text("Back", bundle: .module), keys: "esc") { actions.context.popScreen() }
+            PrismStatusAction(Text("Back", bundle: .module.prismLocalized), keys: "esc") { actions.context.popScreen() }
         }
     }
 
     private var runTitle: Text {
-        if session.errorOperation == .start { return Text("Retry start", bundle: .module) }
-        return snapshot == nil ? Text("Run Script", bundle: .module) : Text("Run Again", bundle: .module)
+        if session.errorOperation == .start { return Text("Retry start", bundle: .module.prismLocalized) }
+        return snapshot == nil ? Text("Run Script", bundle: .module.prismLocalized) : Text("Run Again", bundle: .module.prismLocalized)
     }
 
     // MARK: Behavior
@@ -441,9 +441,9 @@ struct ScriptStatusBadge: View {
                 if let result = session.snapshot?.result {
                     Group {
                         if let code = result.exitCode {
-                            Text("\(Int(result.durationMs)) ms · Exit code \(Int(code))", bundle: .module)
+                            Text("\(Int(result.durationMs)) ms · Exit code \(Int(code))", bundle: .module.prismLocalized)
                         } else {
-                            Text("\(Int(result.durationMs)) ms", bundle: .module)
+                            Text("\(Int(result.durationMs)) ms", bundle: .module.prismLocalized)
                         }
                     }
                     .font(.prism(11).monospacedDigit())
@@ -465,16 +465,16 @@ struct ScriptStatusBadge: View {
     private var state: ScriptRunState? { session.snapshot?.state }
 
     private var title: Text {
-        if session.starting { return Text("Starting script…", bundle: .module) }
-        if session.cancelling { return Text("Cancelling…", bundle: .module) }
+        if session.starting { return Text("Starting script…", bundle: .module.prismLocalized) }
+        if session.cancelling { return Text("Cancelling…", bundle: .module.prismLocalized) }
         switch state {
-        case .running: return Text("Running", bundle: .module)
-        case .success: return Text("Script succeeded", bundle: .module)
-        case .failure: return Text("Script failed", bundle: .module)
-        case .cancelled: return Text("Script cancelled", bundle: .module)
-        case .timedOut: return Text("Script timed out", bundle: .module)
-        case .interrupted: return Text("Script interrupted", bundle: .module)
-        case nil: return Text("Ready to run", bundle: .module)
+        case .running: return Text("Running", bundle: .module.prismLocalized)
+        case .success: return Text("Script succeeded", bundle: .module.prismLocalized)
+        case .failure: return Text("Script failed", bundle: .module.prismLocalized)
+        case .cancelled: return Text("Script cancelled", bundle: .module.prismLocalized)
+        case .timedOut: return Text("Script timed out", bundle: .module.prismLocalized)
+        case .interrupted: return Text("Script interrupted", bundle: .module.prismLocalized)
+        case nil: return Text("Ready to run", bundle: .module.prismLocalized)
         }
     }
 

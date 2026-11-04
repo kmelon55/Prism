@@ -51,9 +51,9 @@ struct ClipboardHistoryView: View {
 
     private var searchBar: some View {
         HStack(spacing: 12) {
-            PrismBackButton(help: Text("Back to all commands", bundle: .module), action: model.goBack)
-            TextField(text: $model.query, prompt: Text("Search Clipboard History…", bundle: .module).foregroundStyle(PrismTheme.textMuted)) {
-                Text("Search clipboard history", bundle: .module)
+            PrismBackButton(help: Text("Back to all commands", bundle: .module.prismLocalized), action: model.goBack)
+            TextField(text: $model.query, prompt: Text("Search Clipboard History…", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)) {
+                Text("Search clipboard history", bundle: .module.prismLocalized)
             }
             .textFieldStyle(.plain)
             .font(.system(size: 16))
@@ -69,7 +69,7 @@ struct ClipboardHistoryView: View {
             }
             if !model.query.isEmpty {
                 Button { model.query = "" } label: {
-                    Text("Clear", bundle: .module)
+                    Text("Clear", bundle: .module.prismLocalized)
                         .font(.prism(11, weight: 600))
                         .foregroundStyle(PrismTheme.textMuted)
                         .padding(.horizontal, 7)
@@ -87,14 +87,14 @@ struct ClipboardHistoryView: View {
     /// "Clipboard type [All types ⌄]" with the capture status on the right (`.clipboard-type-filter`).
     private var typeFilter: some View {
         HStack(spacing: 10) {
-            Text("Clipboard type", bundle: .module)
+            Text("Clipboard type", bundle: .module.prismLocalized)
             Menu {
                 Picker(selection: $model.filter) {
                     ForEach(ClipboardHistoryModel.Filter.allCases) { filter in
                         Text(verbatim: filter.title).tag(filter)
                     }
                 } label: {
-                    Text("Clipboard type", bundle: .module)
+                    Text("Clipboard type", bundle: .module.prismLocalized)
                 }
                 .pickerStyle(.inline)
             } label: {
@@ -113,7 +113,7 @@ struct ClipboardHistoryView: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(Text("Clipboard type (⌘P)", bundle: .module))
+            .help(Text("Clipboard type (⌘P)", bundle: .module.prismLocalized))
             Spacer(minLength: 8)
             CaptureStatusLabel(settings: model.settings)
         }
@@ -159,17 +159,17 @@ struct ClipboardHistoryView: View {
             Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.isEnabled {
             PrismEmptyState(
-                title: Text("Clipboard History is off", bundle: .module),
-                message: Text("Enable it in Settings → Clipboard to keep copied text on this device.", bundle: .module),
-                button: (Text("Open Clipboard Settings", bundle: .module), model.openSettings)
+                title: Text("Clipboard History is off", bundle: .module.prismLocalized),
+                message: Text("Enable it in Settings → Clipboard to keep copied text on this device.", bundle: .module.prismLocalized),
+                button: (Text("Open Clipboard Settings", bundle: .module.prismLocalized), model.openSettings)
             )
         } else if model.entries.isEmpty {
             PrismEmptyState(
                 symbol: model.errorMessage == nil ? "circle.dashed" : "exclamationmark.triangle",
-                title: model.errorMessage.map { Text(verbatim: $0) } ?? Text("No clipboard items", bundle: .module),
+                title: model.errorMessage.map { Text(verbatim: $0) } ?? Text("No clipboard items", bundle: .module.prismLocalized),
                 message: model.query.isEmpty
-                    ? Text("Copied text, images and files will appear here.", bundle: .module)
-                    : Text("No clipboard history matches “\(model.query)”.", bundle: .module)
+                    ? Text("Copied text, images and files will appear here.", bundle: .module.prismLocalized)
+                    : Text("No clipboard history matches “\(model.query)”.", bundle: .module.prismLocalized)
             )
         } else {
             GeometryReader { proxy in
@@ -180,7 +180,7 @@ struct ClipboardHistoryView: View {
                         ClipboardPreviewPane(entry: entry, store: model.store)
                             .id(entry.id)
                     } else {
-                        Text("Select an entry to preview its contents.", bundle: .module)
+                        Text("Select an entry to preview its contents.", bundle: .module.prismLocalized)
                             .font(.prism(12))
                             .foregroundStyle(PrismTheme.textMuted)
                             .multilineTextAlignment(.center)
@@ -226,13 +226,13 @@ struct ClipboardHistoryView: View {
             PrismStatusButton(action: model.openSettings) {
                 Image(systemName: "gearshape").font(.system(size: 13, weight: .light))
             }
-            .help(Text("Open Clipboard Settings", bundle: .module))
+            .help(Text("Open Clipboard Settings", bundle: .module.prismLocalized))
         } trailing: {
             if let primary = model.actions.first {
                 PrismStatusAction(Text(verbatim: primary.title), keys: "↵", isPrimary: true) { model.activate() }
                     .disabled(model.isActionPanelOpen)
                 PrismStatusDivider()
-                PrismStatusAction(Text("Actions", bundle: .module), keys: "⌘K", isActive: model.isActionPanelOpen) {
+                PrismStatusAction(Text("Actions", bundle: .module.prismLocalized), keys: "⌘K", isActive: model.isActionPanelOpen) {
                     model.toggleActionPanel()
                 }
             }
@@ -287,7 +287,7 @@ struct ClipboardRow: View {
                 Image(systemName: "pin")
                     .font(.system(size: 10))
                     .foregroundStyle(PrismTheme.textMuted)
-                    .accessibilityLabel(Text("Pinned", bundle: .module))
+                    .accessibilityLabel(Text("Pinned", bundle: .module.prismLocalized))
             }
         }
         .padding(.horizontal, 11)
@@ -355,10 +355,10 @@ private struct ClearConfirmation: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onCancel)
             VStack(alignment: .leading, spacing: 10) {
-                Text("Delete all clipboard history?", bundle: .module)
+                Text("Delete all clipboard history?", bundle: .module.prismLocalized)
                     .font(.prism(13, weight: 600))
                     .foregroundStyle(PrismTheme.text)
-                Text("Permanently delete all clipboard entries, including pins? History will stay enabled if it is on.", bundle: .module)
+                Text("Permanently delete all clipboard entries, including pins? History will stay enabled if it is on.", bundle: .module.prismLocalized)
                     .font(.prism(12))
                     .foregroundStyle(PrismTheme.textSecondary)
                     .lineSpacing(2)
@@ -366,11 +366,11 @@ private struct ClearConfirmation: View {
                 HStack(spacing: 8) {
                     Spacer()
                     Button(action: onCancel) {
-                        HStack(spacing: 6) { Text("Cancel", bundle: .module); KeyCap("esc") }
+                        HStack(spacing: 6) { Text("Cancel", bundle: .module.prismLocalized); KeyCap("esc") }
                     }
                     .buttonStyle(.prism)
                     Button(action: onConfirm) {
-                        HStack(spacing: 6) { Text("Delete All", bundle: .module); KeyCap("↵") }
+                        HStack(spacing: 6) { Text("Delete All", bundle: .module.prismLocalized); KeyCap("↵") }
                     }
                     .buttonStyle(.prismDestructive)
                 }

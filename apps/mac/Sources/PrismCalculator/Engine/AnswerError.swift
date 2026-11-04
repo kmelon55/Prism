@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// A recognized request that cannot be answered, such as `1 kg to cm`. The palette shows the message as a
@@ -11,5 +12,5 @@ struct AnswerError: Error, Equatable {
 }
 
 func localized(_ key: String.LocalizationValue) -> String {
-    String(localized: key, bundle: .module)
+    String(localized: key, bundle: .module.prismLocalized)
 }

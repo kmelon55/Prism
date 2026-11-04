@@ -50,7 +50,7 @@ let package = Package(
         .testTarget(name: "PrismUpdatesTests", dependencies: ["PrismUpdates"]),
         .target(name: "PrismNotch", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismNotchTests", dependencies: ["PrismNotch"]),
-        .target(name: "PrismSync", dependencies: ["PrismKit"]),
+        .target(name: "PrismSync", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismSyncTests", dependencies: ["PrismSync"]),
         .target(name: "PrismKeyboard", dependencies: ["PrismKit"], resources: [.process("Resources")]),
         .testTarget(name: "PrismKeyboardTests", dependencies: ["PrismKeyboard"]),

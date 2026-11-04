@@ -238,3 +238,6 @@
 "Inserting…" = "입력 중…";
 
 "Speak naturally." = "편하게 말해보세요";
+"Local · whisper.cpp" = "로컬 · whisper.cpp";
+"Correct punctuation, spelling and spacing. Remove redundant repetitions and fillers. Preserve the speaker's meaning and tone without summarizing or adding information." = "문장부호, 맞춤법, 띄어쓰기를 고쳐주세요. 불필요한 반복과 군더더기를 없애되, 요약하거나 정보를 덧붙이지 않고 말한 사람의 의미와 말투를 유지해주세요.";
+"Rewrite as a clear prompt for another AI. Organize the stated goal, context, constraints and requested output. Do not add requirements or details that the speaker did not state. Do not answer the prompt." = "다른 AI에게 전달할 명확한 프롬프트로 다듬어주세요. 말한 목표, 맥락, 제약 조건, 원하는 결과물을 정리해주세요. 말하지 않은 요구사항이나 세부 내용을 추가하지 말고, 프롬프트에 답하지 마세요.";

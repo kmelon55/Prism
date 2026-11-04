@@ -1,3 +1,4 @@
+import PrismKit
 // Adapted from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import SwiftUI
 
@@ -44,6 +45,6 @@ struct WaveformView: View {
         }
         .animation(motionDisabled ? nil : .smooth(duration: 0.10), value: amplitude)
         .animation(motionDisabled ? nil : .easeOut(duration: 0.18), value: phase)
-        .accessibilityLabel(phase == .recording ? Text("Recording", bundle: .module) : Text("Transcribing…", bundle: .module))
+        .accessibilityLabel(phase == .recording ? Text("Recording", bundle: .module.prismLocalized) : Text("Transcribing…", bundle: .module.prismLocalized))
     }
 }

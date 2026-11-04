@@ -67,8 +67,8 @@ struct LibraryRunView: View {
                 if model.needsQuery {
                     HStack(spacing: 9) {
                         PrismSearchGlyph()
-                        TextField(text: $model.query, prompt: Text("Query", bundle: .module).foregroundStyle(PrismTheme.textMuted)) {
-                            Text("Query", bundle: .module)
+                        TextField(text: $model.query, prompt: Text("Query", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)) {
+                            Text("Query", bundle: .module.prismLocalized)
                         }
                         .textFieldStyle(.plain)
                         .font(.prism(14))
@@ -95,11 +95,11 @@ struct LibraryRunView: View {
             }
             content
             PrismStatusBar {
-                Text("Execution preview", bundle: .module)
+                Text("Execution preview", bundle: .module.prismLocalized)
                     .foregroundStyle(PrismTheme.textMuted)
                     .padding(.horizontal, 7)
             } trailing: {
-                PrismStatusAction(Text("Refresh Preview", bundle: .module), keys: "⌘R") { model.refresh() }
+                PrismStatusAction(Text("Refresh Preview", bundle: .module.prismLocalized), keys: "⌘R") { model.refresh() }
                     .keyboardShortcut("r", modifiers: .command)
                 PrismStatusDivider()
                 PrismStatusAction(Text(verbatim: model.action.title), keys: "↵", isPrimary: true) { submit() }
@@ -133,7 +133,7 @@ struct LibraryRunView: View {
                         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.03)))
                         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(PrismTheme.line))
                 } else if model.needsQuery && model.error == nil {
-                    Text("Type a search term to fill in {query}.", bundle: .module)
+                    Text("Type a search term to fill in {query}.", bundle: .module.prismLocalized)
                         .font(.prism(12))
                         .foregroundStyle(PrismTheme.textMuted)
                         .padding(.top, 4)
@@ -168,7 +168,7 @@ struct DeleteConfirmationView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(onBack: onCancel) {
-                Text("Delete Entry", bundle: .module)
+                Text("Delete Entry", bundle: .module.prismLocalized)
                     .font(.prism(15, weight: 550))
                     .foregroundStyle(PrismTheme.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,7 +180,7 @@ struct DeleteConfirmationView: View {
                     .foregroundStyle(PrismTheme.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 6)
-                Text("This can’t be undone.", bundle: .module)
+                Text("This can’t be undone.", bundle: .module.prismLocalized)
                     .font(.prism(12, weight: 500))
                     .foregroundStyle(PrismTheme.textMuted)
             }
@@ -189,7 +189,7 @@ struct DeleteConfirmationView: View {
             PrismStatusBar {
                 EmptyView()
             } trailing: {
-                PrismStatusAction(Text("Cancel", bundle: .module), keys: "esc") { onCancel?() }
+                PrismStatusAction(Text("Cancel", bundle: .module.prismLocalized), keys: "esc") { onCancel?() }
                 PrismStatusDivider()
                 PrismStatusButton(tint: PrismTheme.danger, action: confirm) {
                     HStack(spacing: 6) {

@@ -80,13 +80,13 @@ final class DictationKeys: @unchecked Sendable {
     }
 
     func save(_ key: String, for provider: SpeechProvider) throws -> DictationKeyInfo {
-        guard let account = Self.account(for: provider) else { throw DictationError(String(localized: "This provider does not use an API key.", bundle: .module)) }
+        guard let account = Self.account(for: provider) else { throw DictationError(String(localized: "This provider does not use an API key.", bundle: .module.prismLocalized)) }
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, key.utf8.count <= 4096, key.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 32 && $0.value < 127 }) else {
-            throw DictationError(String(localized: "Enter an API key without spaces or line breaks.", bundle: .module))
+            throw DictationError(String(localized: "Enter an API key without spaces or line breaks.", bundle: .module.prismLocalized))
         }
         do { try storage.save(Data(key.utf8), service: service, account: account) } catch {
-            throw DictationError(String(localized: "Could not save the API key.", bundle: .module))
+            throw DictationError(String(localized: "Could not save the API key.", bundle: .module.prismLocalized))
         }
         store(key, for: account)
         return DictationKeyInfo(configured: true, maskedKey: DictationKeyInfo.masked(key))
@@ -95,7 +95,7 @@ final class DictationKeys: @unchecked Sendable {
     func delete(for provider: SpeechProvider) throws {
         guard let account = Self.account(for: provider) else { return }
         do { try storage.delete(service: service, account: account) } catch {
-            throw DictationError(String(localized: "Could not delete the key.", bundle: .module))
+            throw DictationError(String(localized: "Could not delete the key.", bundle: .module.prismLocalized))
         }
         store(nil, for: account)
     }
@@ -121,10 +121,10 @@ final class DictationKeys: @unchecked Sendable {
         if service == self.service, let key = cached(account) { return key }
         let data: Data?
         do { data = try storage.read(service: service, account: account) } catch {
-            throw DictationError(String(localized: "Keychain access was denied. Try again and approve access in the macOS dialog.", bundle: .module))
+            throw DictationError(String(localized: "Keychain access was denied. Try again and approve access in the macOS dialog.", bundle: .module.prismLocalized))
         }
         guard let data, let key = String(data: data, encoding: .utf8), !key.isEmpty else {
-            throw DictationError(String(localized: "Save an API key in dictation settings.", bundle: .module))
+            throw DictationError(String(localized: "Save an API key in dictation settings.", bundle: .module.prismLocalized))
         }
         if service == self.service { store(key, for: account) }
         return key

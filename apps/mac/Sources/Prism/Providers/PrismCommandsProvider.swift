@@ -16,16 +16,16 @@ final class PrismCommandsProvider: PaletteProvider {
 
     func results(for query: String) async -> [PaletteItem] {
         let prism = "Prism"
-        let maintenance = String(localized: "Prism maintenance", bundle: .module)
+        let maintenance = String(localized: "Prism maintenance", bundle: .module.prismLocalized)
         return [
-            command("prism:preferences", String(localized: "Prism Settings", bundle: .module),
-                    String(localized: "Make the palette feel native to you", bundle: .module), "gearshape", prism,
+            command("prism:preferences", String(localized: "Prism Settings", bundle: .module.prismLocalized),
+                    String(localized: "Make the palette feel native to you", bundle: .module.prismLocalized), "gearshape", prism,
                     ["settings", "preferences", "설정", "환경설정"], hidden: true) { [openSettings] in
                 openSettings()
                 return .dismiss
             },
-            command("prism:cycle-theme", String(localized: "Cycle Appearance", bundle: .module),
-                    String(localized: "System → dark → light", bundle: .module), "circle.lefthalf.filled", prism,
+            command("prism:cycle-theme", String(localized: "Cycle Appearance", bundle: .module.prismLocalized),
+                    String(localized: "System → dark → light", bundle: .module.prismLocalized), "circle.lefthalf.filled", prism,
                     ["theme", "dark", "light", "system", "appearance", "테마", "다크", "라이트"], hidden: true) {
                 let current = ThemePreference(rawValue: UserDefaults.standard.string(forKey: PreferenceKey.theme) ?? "") ?? .system
                 let next: ThemePreference = switch current {
@@ -37,26 +37,26 @@ final class PrismCommandsProvider: PaletteProvider {
                 Appearance.apply(next)
                 return .notify(next.title)
             },
-            command("prism:hide", String(localized: "Hide Prism", bundle: .module),
-                    String(localized: "Keep Prism ready in the background", bundle: .module), "eye.slash", prism,
+            command("prism:hide", String(localized: "Hide Prism", bundle: .module.prismLocalized),
+                    String(localized: "Keep Prism ready in the background", bundle: .module.prismLocalized), "eye.slash", prism,
                     ["hide", "close", "숨기기"], hidden: true) { .dismiss },
-            command("prism:quit", String(localized: "Quit Prism", bundle: .module),
-                    String(localized: "Stop Prism and its background shortcuts", bundle: .module), "power", prism,
+            command("prism:quit", String(localized: "Quit Prism", bundle: .module.prismLocalized),
+                    String(localized: "Stop Prism and its background shortcuts", bundle: .module.prismLocalized), "power", prism,
                     ["quit", "exit", "종료"], hidden: true) {
                 NSApp.terminate(nil)
                 return .dismiss
             },
-            command("prism:refresh-application-index", String(localized: "Refresh application index", bundle: .module),
-                    String(localized: "Find recently installed or removed applications", bundle: .module),
+            command("prism:refresh-application-index", String(localized: "Refresh application index", bundle: .module.prismLocalized),
+                    String(localized: "Find recently installed or removed applications", bundle: .module.prismLocalized),
                     "arrow.clockwise", maintenance, ["refresh", "rescan", "apps", "새로고침"], hidden: true) { [refreshApplications] in
                 refreshApplications()
-                return .notify(String(localized: "Refreshing applications…", bundle: .module))
+                return .notify(String(localized: "Refreshing applications…", bundle: .module.prismLocalized))
             },
-            command("prism:clear-application-icon-cache", String(localized: "Clear application icon cache", bundle: .module),
-                    String(localized: "Discard locally saved application artwork", bundle: .module),
+            command("prism:clear-application-icon-cache", String(localized: "Clear application icon cache", bundle: .module.prismLocalized),
+                    String(localized: "Discard locally saved application artwork", bundle: .module.prismLocalized),
                     "photo.badge.arrow.down", maintenance, ["icon", "cache", "clear", "아이콘", "캐시"], hidden: true) {
                 AppIconCache.shared.removeAll()
-                return .notify(String(localized: "Icon cache cleared", bundle: .module))
+                return .notify(String(localized: "Icon cache cleared", bundle: .module.prismLocalized))
             },
         ]
     }
@@ -69,7 +69,7 @@ final class PrismCommandsProvider: PaletteProvider {
         PaletteItem(
             candidate: SearchCandidate(id: id, title: title, subtitle: subtitle, section: section, keywords: keywords),
             icon: .symbol(symbol),
-            accessory: String(localized: "Command", bundle: .module),
+            accessory: String(localized: "Command", bundle: .module.prismLocalized),
             actions: [PaletteAction(id: id, title: title, systemImage: symbol, run: run)],
             hiddenWhenQueryIsEmpty: hidden
         )

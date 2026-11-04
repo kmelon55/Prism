@@ -92,7 +92,7 @@ struct ClipboardPreviewPane: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(PrismTheme.lineStrong))
                         .frame(maxWidth: CGFloat(entry.width ?? 640), maxHeight: CGFloat(entry.height ?? 640))
-                        .accessibilityLabel(Text("Clipboard image preview", bundle: .module))
+                        .accessibilityLabel(Text("Clipboard image preview", bundle: .module.prismLocalized))
                 } else if loadError == nil {
                     ProgressView().controlSize(.small)
                 }
@@ -134,7 +134,7 @@ struct ClipboardPreviewPane: View {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(PrismTheme.warning)
                 Text(verbatim: loadError).font(.prism(12)).foregroundStyle(PrismTheme.textSecondary)
-                Button { attempt += 1 } label: { Text("Retry", bundle: .module) }
+                Button { attempt += 1 } label: { Text("Retry", bundle: .module.prismLocalized) }
                     .buttonStyle(.prismGhost)
             }
             .padding(.top, 8)
@@ -152,23 +152,23 @@ struct ClipboardPreviewPane: View {
 
     private func details(_ presentation: EntryPresentation) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            DetailRow(label: Text("Type", bundle: .module), value: presentation.kindTitle)
+            DetailRow(label: Text("Type", bundle: .module.prismLocalized), value: presentation.kindTitle)
             switch entry.kind {
             case .text:
                 let text = fullText ?? entry.text
-                DetailRow(label: Text("Characters", bundle: .module), value: text.count.formatted(.number.locale(ClipboardFormat.locale)))
+                DetailRow(label: Text("Characters", bundle: .module.prismLocalized), value: text.count.formatted(.number.locale(ClipboardFormat.locale)))
             case .image:
                 if let width = entry.width, let height = entry.height {
-                    DetailRow(label: Text("Dimensions", bundle: .module), value: "\(width) × \(height)")
+                    DetailRow(label: Text("Dimensions", bundle: .module.prismLocalized), value: "\(width) × \(height)")
                 }
                 if let mimeType = entry.mimeType {
-                    DetailRow(label: Text("Format", bundle: .module), value: mimeType.replacingOccurrences(of: "image/", with: "").uppercased())
+                    DetailRow(label: Text("Format", bundle: .module.prismLocalized), value: mimeType.replacingOccurrences(of: "image/", with: "").uppercased())
                 }
             case .files:
-                DetailRow(label: Text("Files", bundle: .module), value: entry.fileCount.formatted(.number.locale(ClipboardFormat.locale)))
+                DetailRow(label: Text("Files", bundle: .module.prismLocalized), value: entry.fileCount.formatted(.number.locale(ClipboardFormat.locale)))
             }
-            DetailRow(label: Text("Size", bundle: .module), value: ClipboardFormat.bytes(entry.byteSize))
-            DetailRow(label: Text("Copied", bundle: .module), value: ClipboardFormat.dateTime(entry.capturedAt))
+            DetailRow(label: Text("Size", bundle: .module.prismLocalized), value: ClipboardFormat.bytes(entry.byteSize))
+            DetailRow(label: Text("Copied", bundle: .module.prismLocalized), value: ClipboardFormat.dateTime(entry.capturedAt))
             if let note {
                 Text(verbatim: note)
                     .font(.prism(11))

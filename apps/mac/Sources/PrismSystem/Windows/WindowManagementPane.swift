@@ -8,7 +8,7 @@ enum WindowManagementPane {
 
     @MainActor
     static func make(store: WindowOptionsStore, context: any PrismContext) -> SettingsPane {
-        SettingsPane(id: id, title: String(localized: "Window Management", bundle: .module), systemImage: "square.dashed", group: .tools, order: 0,
+        SettingsPane(id: id, title: String(localized: "Window Management", bundle: .module.prismLocalized), systemImage: "square.dashed", group: .tools, order: 0,
                      keywords: keywords) { [weak context] in
             WindowManagementView(store: store) { context?.openSettings(paneID: PermissionsPane.id) }
         }
@@ -81,7 +81,7 @@ private struct WindowManagementView: View {
     }
 
     var body: some View {
-        PrismSettingsPage(String(localized: "Window Management", bundle: .module)) {
+        PrismSettingsPage(String(localized: "Window Management", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 0) {
                 WindowLayoutPreview(options: model.options, state: $preview)
                     .padding(.top, 4)
@@ -113,18 +113,18 @@ private struct WindowManagementView: View {
 
     private var options: some View {
         VStack(alignment: .leading, spacing: 0) {
-            row(Text("Cycle window sizes", bundle: .module), detail: Text("Repeat Left or Right Half to change size.", bundle: .module)) {
+            row(Text("Cycle window sizes", bundle: .module.prismLocalized), detail: Text("Repeat Left or Right Half to change size.", bundle: .module.prismLocalized)) {
                 Toggle(isOn: binding(\.cycle)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
             }
             if model.options.cycle {
-                row(Text("Cycle order", bundle: .module)) {
+                row(Text("Cycle order", bundle: .module.prismLocalized)) {
                     PrismSelect(selection: binding(\.reverseCycle), options: [(false, "1/2 → 1/3 → 2/3"), (true, "1/2 → 2/3 → 1/3")])
                 }
                 .transition(.opacity)
             }
-            slider(\.gap, range: WindowOptions.gapRange, unit: "px", title: Text("Window gap", bundle: .module))
-            slider(\.edgeGap, range: WindowOptions.gapRange, unit: "px", title: Text("Screen edge gap", bundle: .module))
-            slider(\.almostMaximize, range: WindowOptions.almostMaximizeRange, unit: "%", title: Text("Almost Maximize size", bundle: .module))
+            slider(\.gap, range: WindowOptions.gapRange, unit: "px", title: Text("Window gap", bundle: .module.prismLocalized))
+            slider(\.edgeGap, range: WindowOptions.gapRange, unit: "px", title: Text("Screen edge gap", bundle: .module.prismLocalized))
+            slider(\.almostMaximize, range: WindowOptions.almostMaximizeRange, unit: "%", title: Text("Almost Maximize size", bundle: .module.prismLocalized))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .prismSettingsCard()
@@ -161,7 +161,7 @@ private struct WindowManagementView: View {
             Text(verbatim: error.message).foregroundStyle(PrismTheme.textSecondary)
             Spacer(minLength: 8)
             if error == .invalidSaved || error == .invalid || error == .unreadable {
-                Button { model.resetDamagedFile() } label: { Text("Reset to Defaults", bundle: .module) }
+                Button { model.resetDamagedFile() } label: { Text("Reset to Defaults", bundle: .module.prismLocalized) }
                     .buttonStyle(.prism)
             }
         }
@@ -172,7 +172,7 @@ private struct WindowManagementView: View {
 
     private var layoutsHeader: some View {
         HStack(spacing: 10) {
-            Text("Layouts & shortcuts", bundle: .module)
+            Text("Layouts & shortcuts", bundle: .module.prismLocalized)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(PrismTheme.text)
             Text(verbatim: "\(WindowLayout.allCases.count)")
@@ -181,12 +181,12 @@ private struct WindowManagementView: View {
                 .foregroundStyle(PrismTheme.textSecondary)
                 .padding(.horizontal, 6)
             PrismSelect(selection: $filter, options: [
-                (.all, String(localized: "All layouts", bundle: .module)),
-                (.split, String(localized: "Split layouts", bundle: .module)),
-                (.position, String(localized: "Size & position", bundle: .module)),
-                (.display, String(localized: "Displays", bundle: .module)),
+                (.all, String(localized: "All layouts", bundle: .module.prismLocalized)),
+                (.split, String(localized: "Split layouts", bundle: .module.prismLocalized)),
+                (.position, String(localized: "Size & position", bundle: .module.prismLocalized)),
+                (.display, String(localized: "Displays", bundle: .module.prismLocalized)),
             ])
-            .help(Text("Filter window commands", bundle: .module))
+            .help(Text("Filter window commands", bundle: .module.prismLocalized))
             Spacer(minLength: 0)
         }
     }
@@ -197,13 +197,13 @@ private struct WindowManagementView: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.shield").font(.system(size: 15)).foregroundStyle(PrismTheme.warning)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Accessibility access required", bundle: .module)
+                    Text("Accessibility access required", bundle: .module.prismLocalized)
                         .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(PrismTheme.text)
-                    Text("Review permission before using window layouts.", bundle: .module)
+                    Text("Review permission before using window layouts.", bundle: .module.prismLocalized)
                         .font(.system(size: 10.5, weight: .medium)).foregroundStyle(PrismTheme.textMuted)
                 }
                 Spacer(minLength: 8)
-                Text("Open Permissions", bundle: .module).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.warning)
+                Text("Open Permissions", bundle: .module.prismLocalized).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.warning)
             }
             .padding(.horizontal, 15)
             .frame(minHeight: 58)
@@ -217,9 +217,9 @@ private struct WindowManagementView: View {
     private var layoutsTable: some View {
         PrismCommandTable(showsHeader: false) {
             HStack(spacing: 12) {
-                Text("Layout", bundle: .module).padding(.leading, 49).frame(maxWidth: .infinity, alignment: .leading)
-                Text("Alias", bundle: .module).frame(width: PrismCommandRowMetrics.aliasWidth, alignment: .leading)
-                Text("Hotkey", bundle: .module).frame(width: PrismCommandRowMetrics.trailingWidth, alignment: .leading)
+                Text("Layout", bundle: .module.prismLocalized).padding(.leading, 49).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Alias", bundle: .module.prismLocalized).frame(width: PrismCommandRowMetrics.aliasWidth, alignment: .leading)
+                Text("Hotkey", bundle: .module.prismLocalized).frame(width: PrismCommandRowMetrics.trailingWidth, alignment: .leading)
             }
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(PrismTheme.textMuted)
@@ -275,7 +275,7 @@ private struct WindowLayoutPreview: View {
             desktop
                 .frame(maxWidth: .infinity)
             VStack(alignment: .leading, spacing: 12) {
-                Text("Try repeating a command", bundle: .module)
+                Text("Try repeating a command", bundle: .module.prismLocalized)
                     .font(.system(size: 11))
                     .foregroundStyle(PrismTheme.textSecondary)
                 HStack(spacing: 8) {
@@ -296,7 +296,7 @@ private struct WindowLayoutPreview: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Window layout preview", bundle: .module))
+        .accessibilityLabel(Text("Window layout preview", bundle: .module.prismLocalized))
     }
 
     private var desktop: some View {

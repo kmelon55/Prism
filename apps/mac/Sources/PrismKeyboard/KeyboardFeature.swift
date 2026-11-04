@@ -14,7 +14,7 @@ public enum KeyboardFeature {
         let model = KeyboardModel(configURL: context.paths.file(KeyboardConfig.fileName))
         return FeatureContribution(
             settingsPanes: [
-                SettingsPane(id: settingsPaneID, title: String(localized: "Keyboard", bundle: .module), systemImage: "keyboard.badge.ellipsis",
+                SettingsPane(id: settingsPaneID, title: String(localized: "Keyboard", bundle: .module.prismLocalized), systemImage: "keyboard.badge.ellipsis",
                              group: .tools, order: 15, keywords: KeyboardSettingsView.keywords) { [weak context] in
                     KeyboardSettingsView(model: model) { context?.openSettings(paneID: permissionsPaneID) }
                 },

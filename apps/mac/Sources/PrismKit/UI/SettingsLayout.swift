@@ -206,7 +206,7 @@ public struct PrismCommandTable<Rows: View>: View {
     /// `firstColumn` names the first column ("Command", or "Layout" for window layouts).
     public init(showsHeader: Bool = true, firstColumn: Text? = nil, @ViewBuilder rows: () -> Rows) {
         self.showsHeader = showsHeader
-        self.firstColumn = firstColumn ?? Text("Command", bundle: .module)
+        self.firstColumn = firstColumn ?? Text("Command", bundle: .module.prismLocalized)
         self.rows = rows()
     }
 
@@ -215,8 +215,8 @@ public struct PrismCommandTable<Rows: View>: View {
             if showsHeader {
                 HStack(spacing: 12) {
                     firstColumn.padding(.leading, 49).frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Alias", bundle: .module).frame(width: PrismCommandRowMetrics.aliasWidth, alignment: .leading)
-                    Text("Hotkey", bundle: .module).frame(width: PrismCommandRowMetrics.trailingWidth, alignment: .leading)
+                    Text("Alias", bundle: .module.prismLocalized).frame(width: PrismCommandRowMetrics.aliasWidth, alignment: .leading)
+                    Text("Hotkey", bundle: .module.prismLocalized).frame(width: PrismCommandRowMetrics.trailingWidth, alignment: .leading)
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(PrismTheme.textMuted)
@@ -275,7 +275,7 @@ public struct PrismCommandRow<Glyph: View, Hotkey: View>: View {
                 }
                 .padding(.leading, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                TextField(text: $alias, prompt: Text("Add alias", bundle: .module)) { Text("Alias", bundle: .module) }
+                TextField(text: $alias, prompt: Text("Add alias", bundle: .module.prismLocalized)) { Text("Alias", bundle: .module.prismLocalized) }
                     .labelsHidden()
                     .textFieldStyle(PrismTextFieldStyle(height: 31))
                     .font(.system(size: 11))

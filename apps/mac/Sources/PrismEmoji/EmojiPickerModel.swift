@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 import Observation
 
@@ -42,7 +43,8 @@ final class EmojiPickerModel {
     private(set) var status: String?
     private(set) var storageFailed = false
 
-    let useKorean: Bool
+    private let koreanOverride: Bool?
+    var useKorean: Bool { koreanOverride ?? (PrismLanguage.identifier == "ko") }
     @ObservationIgnored private let actions: EmojiActions
     @ObservationIgnored private let recents: EmojiRecents
     @ObservationIgnored private let defaults: UserDefaults
@@ -51,13 +53,13 @@ final class EmojiPickerModel {
 
     init(
         actions: EmojiActions, recents: EmojiRecents, defaults: UserDefaults = .standard,
-        useKorean: Bool = Bundle.module.preferredLocalizations.first?.hasPrefix("ko") == true,
+        useKorean: Bool? = nil,
         loader: @escaping () async -> EmojiCatalog?
     ) {
         self.actions = actions
         self.recents = recents
         self.defaults = defaults
-        self.useKorean = useKorean
+        self.koreanOverride = useKorean
         self.loader = loader
         let recent = recents.load()
         self.recent = recent
@@ -158,7 +160,7 @@ final class EmojiPickerModel {
         if operation == .paste, !actions.canPaste() {
             failure = EmojiFailure(
                 emoji: emoji, operation: .paste,
-                detail: String(localized: "Allow Prism in Privacy & Security › Accessibility to paste into other apps.", bundle: .module),
+                detail: String(localized: "Allow Prism in Privacy & Security › Accessibility to paste into other apps.", bundle: .module.prismLocalized),
                 needsAccessibility: true
             )
             return
@@ -179,7 +181,7 @@ final class EmojiPickerModel {
         let saved = recents.remember(emoji, in: recent, isKnown: { catalog.byEmoji[$0] != nil })
         recent = saved.recent
         storageFailed = !saved.saved
-        status = operation == .paste ? String(localized: "Pasted", bundle: .module) : String(localized: "Copied", bundle: .module)
+        status = operation == .paste ? String(localized: "Pasted", bundle: .module.prismLocalized) : String(localized: "Copied", bundle: .module.prismLocalized)
         if category == EmojiCategory.recent.id, !isSearching {
             let selected = selectedItem?.emoji
             refresh()

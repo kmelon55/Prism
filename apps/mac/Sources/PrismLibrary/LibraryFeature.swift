@@ -12,7 +12,7 @@ public enum LibraryFeature {
         let services = LibraryServices(context: context, model: model)
         Self.services = services
         store?.registerTransfers(ensureReady: {
-            guard model.pendingWrites == 0 else { throw TransferError("라이브러리 저장이 끝나면 다시 동기화해요.") }
+            guard model.pendingWrites == 0 else { throw TransferError(L10n.tr("Sync again after the library finishes saving.")) }
             try services.notes.model.ensureTransferReady()
         }, didApply: { entries in
             services.notes.model.refreshAfterTransfer(entries)

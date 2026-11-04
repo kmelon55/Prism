@@ -12,7 +12,7 @@ struct ModelPickerSheet: View {
 
     var body: some View {
         PrismPickerPanel {
-            PrismPickerHeader(Text("Speech model", bundle: .module), onClose: { dismiss() })
+            PrismPickerHeader(Text("Speech model", bundle: .module.prismLocalized), onClose: { dismiss() })
             PrismPillTabs(selection: Binding(get: { settings.provider }, set: { provider in
                 guard provider != settings.provider else { return }
                 error = nil
@@ -93,7 +93,7 @@ private struct RemoteModelList: View {
                 }
                 HStack(spacing: 8) {
                     PrismSearchWell {
-                        TextField(text: $query, prompt: Text("Search by model or maker", bundle: .module)) { EmptyView() }
+                        TextField(text: $query, prompt: Text("Search by model or maker", bundle: .module.prismLocalized)) { EmptyView() }
                             .focused($searchFocused)
                             .onSubmit(chooseSelection)
                             .onKeyPress(.downArrow) { move(1); return .handled }
@@ -103,7 +103,7 @@ private struct RemoteModelList: View {
                         Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .medium)).frame(width: 16, height: 38)
                     }
                     .buttonStyle(.prism)
-                    .help(Text("Refresh models", bundle: .module))
+                    .help(Text("Refresh models", bundle: .module.prismLocalized))
                     .disabled(!canLoad || loading)
                 }
                 list
@@ -121,17 +121,17 @@ private struct RemoteModelList: View {
     @ViewBuilder
     private var list: some View {
         if !canLoad {
-            note(Text("Set the API key and address to load supported models.", bundle: .module), systemImage: "key")
+            note(Text("Set the API key and address to load supported models.", bundle: .module.prismLocalized), systemImage: "key")
         } else if loading, catalog == nil {
-            VStack { ProgressView().controlSize(.small); Text("Loading supported models…", bundle: .module).font(.system(size: 12)).foregroundStyle(PrismTheme.textMuted) }
+            VStack { ProgressView().controlSize(.small); Text("Loading supported models…", bundle: .module.prismLocalized).font(.system(size: 12)).foregroundStyle(PrismTheme.textMuted) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error {
             note(Text(verbatim: error), systemImage: "exclamationmark.triangle")
         } else if let catalog, catalog.models.isEmpty {
-            note(Text("The API response lists no file transcription models. Check the server documentation or enter a model ID.", bundle: .module),
+            note(Text("The API response lists no file transcription models. Check the server documentation or enter a model ID.", bundle: .module.prismLocalized),
                  systemImage: "tray")
         } else if catalog != nil, filtered.isEmpty {
-            note(Text("No results.", bundle: .module), systemImage: "magnifyingglass")
+            note(Text("No results.", bundle: .module.prismLocalized), systemImage: "magnifyingglass")
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -155,9 +155,9 @@ private struct RemoteModelList: View {
             }
             if let catalog {
                 HStack {
-                    Text("Transcription models confirmed by the provider API", bundle: .module) + Text(verbatim: " · \(catalog.models.count)")
+                    Text("Transcription models confirmed by the provider API", bundle: .module.prismLocalized) + Text(verbatim: " · \(catalog.models.count)")
                     Spacer()
-                    Button { chooseSelection() } label: { Text("Use Model", bundle: .module) }
+                    Button { chooseSelection() } label: { Text("Use Model", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                         .keyboardShortcut(searchFocused ? nil : .defaultAction)
                         .disabled(!selectable(selection))
@@ -169,15 +169,15 @@ private struct RemoteModelList: View {
     }
 
     private var manual: some View {
-        PrismDisclosure(Text("Enter a model ID", bundle: .module)) {
+        PrismDisclosure(Text("Enter a model ID", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 8) {
-                DictationNote(Text("Check the provider's documentation to confirm that a manual ID supports file transcription.", bundle: .module))
+                DictationNote(Text("Check the provider's documentation to confirm that a manual ID supports file transcription.", bundle: .module.prismLocalized))
                 HStack(spacing: 6) {
-                    TextField(text: $manualModel, prompt: Text("File transcription model ID", bundle: .module)) { EmptyView() }
+                    TextField(text: $manualModel, prompt: Text("File transcription model ID", bundle: .module.prismLocalized)) { EmptyView() }
                         .labelsHidden()
                         .textFieldStyle(.prism)
                         .onSubmit { choose(manualModel) }
-                    Button { choose(manualModel) } label: { Text("Use This Model", bundle: .module) }
+                    Button { choose(manualModel) } label: { Text("Use This Model", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                         .disabled(manualModel.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -212,8 +212,8 @@ private struct RemoteModelList: View {
 
     private var xai: some View {
         VStack(alignment: .leading, spacing: 12) {
-            DictationNote(Text("xAI's /stt endpoint picks the transcription model on the server. It has no model selection API.", bundle: .module))
-            Button { choose("grok-stt") } label: { Text("Use This Provider", bundle: .module) }
+            DictationNote(Text("xAI's /stt endpoint picks the transcription model on the server. It has no model selection API.", bundle: .module.prismLocalized))
+            Button { choose("grok-stt") } label: { Text("Use This Provider", bundle: .module.prismLocalized) }
                 .buttonStyle(.prismPrimary)
                 .keyboardShortcut(.defaultAction)
             if !keyConfigured {
@@ -323,7 +323,7 @@ private struct LocalModelList: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                DictationNote(Text("Download once to transcribe on this Mac. Local speech recognition needs no API key and does not upload audio.", bundle: .module))
+                DictationNote(Text("Download once to transcribe on this Mac. Local speech recognition needs no API key and does not upload audio.", bundle: .module.prismLocalized))
                 engine
                 VStack(spacing: 6) {
                     ForEach(LocalModel.all) { model in
@@ -340,7 +340,7 @@ private struct LocalModelList: View {
                             Text(verbatim: "\(LocalModel.sizeText(download.downloaded)) / \(LocalModel.sizeText(download.total))")
                                 .font(.system(size: 11)).foregroundStyle(PrismTheme.textMuted).monospacedDigit()
                             Spacer()
-                            Button { manager.cancelDownload() } label: { Text("Cancel Download", bundle: .module) }.buttonStyle(.prism)
+                            Button { manager.cancelDownload() } label: { Text("Cancel Download", bundle: .module.prismLocalized) }.buttonStyle(.prism)
                         }
                     }
                 }
@@ -365,13 +365,13 @@ private struct LocalModelList: View {
                 .frame(width: 6, height: 6)
                 .padding(.top, 5)
             VStack(alignment: .leading, spacing: 4) {
-                Text(manager.whisperPath != nil ? "Speech engine ready" : "Speech engine required", bundle: .module)
+                Text(manager.whisperPath != nil ? "Speech engine ready" : "Speech engine required", bundle: .module.prismLocalized)
                     .font(.system(size: 12, weight: .semibold))
                 if let path = manager.whisperPath {
                     Text(verbatim: path).font(.system(size: 11)).foregroundStyle(PrismTheme.textSecondary).lineLimit(1).truncationMode(.middle)
                 } else {
                     Text(manager.canInstallEngine ? "Install whisper.cpp with your existing Homebrew. This also installs its required dependencies."
-                                                  : "Install Homebrew or choose an existing whisper-cli in Advanced settings.", bundle: .module)
+                                                  : "Install Homebrew or choose an existing whisper-cli in Advanced settings.", bundle: .module.prismLocalized)
                         .font(.system(size: 11)).foregroundStyle(PrismTheme.textSecondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -379,12 +379,12 @@ private struct LocalModelList: View {
             if manager.whisperPath == nil {
                 if manager.canInstallEngine {
                     Button(action: installEngine) {
-                        Text(manager.installingEngine ? "Installing speech engine…" : "Install Speech Engine", bundle: .module)
+                        Text(manager.installingEngine ? "Installing speech engine…" : "Install Speech Engine", bundle: .module.prismLocalized)
                     }
                     .buttonStyle(.prism)
                     .disabled(locked)
                 }
-                Button { manager.refresh(preferredWhisperPath: whisperPath) } label: { Text("Check Again", bundle: .module) }
+                Button { manager.refresh(preferredWhisperPath: whisperPath) } label: { Text("Check Again", bundle: .module.prismLocalized) }
                     .buttonStyle(.prism)
                     .disabled(manager.installingEngine)
             }
@@ -416,20 +416,20 @@ private struct LocalModelList: View {
     }
 
     private func status(_ model: LocalModel, path: String?, selected: Bool) -> String {
-        if busy == model.id || manager.verifying == model.id { return String(localized: "Preparing model…", bundle: .module) }
-        if selected { return String(localized: "Selected", bundle: .module) }
-        return path != nil ? String(localized: "Use model", bundle: .module) : String(localized: "Download and use", bundle: .module)
+        if busy == model.id || manager.verifying == model.id { return String(localized: "Preparing model…", bundle: .module.prismLocalized) }
+        if selected { return String(localized: "Selected", bundle: .module.prismLocalized) }
+        return path != nil ? String(localized: "Use model", bundle: .module.prismLocalized) : String(localized: "Download and use", bundle: .module.prismLocalized)
     }
 
     private var advanced: some View {
-        PrismDisclosure(Text("Advanced · use existing files", bundle: .module)) {
+        PrismDisclosure(Text("Advanced · use existing files", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 8) {
-                DictationNote(Text("Existing Whisp models and custom whisper.cpp files are used in place, without changes.", bundle: .module))
-                pathField(Text("Local model file", bundle: .module), text: $modelPath, placeholder: "ggml-model.bin", directory: false)
+                DictationNote(Text("Existing Whisp models and custom whisper.cpp files are used in place, without changes.", bundle: .module.prismLocalized))
+                pathField(Text("Local model file", bundle: .module.prismLocalized), text: $modelPath, placeholder: "ggml-model.bin", directory: false)
                 pathField(Text(verbatim: "whisper.cpp"), text: $whisperPath, placeholder: DictationSettings.defaultWhisperPath, directory: false)
                 HStack {
                     Spacer()
-                    Button(action: useFiles) { Text("Use Local Model", bundle: .module) }
+                    Button(action: useFiles) { Text("Use Local Model", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                         .disabled(modelPath.isEmpty || whisperPath.isEmpty || locked)
                 }
@@ -455,7 +455,7 @@ private struct LocalModelList: View {
                 if panel.runModal() == .OK, let url = panel.url { text.wrappedValue = url.path }
             } label: { Image(systemName: "folder").font(.system(size: 12)) }
             .buttonStyle(.prism)
-            .help(Text("Choose File…", bundle: .module))
+            .help(Text("Choose File…", bundle: .module.prismLocalized))
         }
     }
 
@@ -470,7 +470,7 @@ private struct LocalModelList: View {
                 let path = try await manager.prepare(model)
                 manager.refresh(preferredWhisperPath: settings.whisperPath)
                 guard let whisper = manager.whisperPath else {
-                    notice = String(localized: "Model downloaded. Install the speech engine, then select the model to use it.", bundle: .module)
+                    notice = String(localized: "Model downloaded. Install the speech engine, then select the model to use it.", bundle: .module.prismLocalized)
                     return
                 }
                 var next = service.settings
@@ -494,7 +494,7 @@ private struct LocalModelList: View {
             defer { busy = nil }
             do {
                 whisperPath = try await manager.installEngine()
-                notice = String(localized: "Speech engine ready. Select a model to use it.", bundle: .module)
+                notice = String(localized: "Speech engine ready. Select a model to use it.", bundle: .module.prismLocalized)
             } catch {
                 self.error = error.localizedDescription
             }

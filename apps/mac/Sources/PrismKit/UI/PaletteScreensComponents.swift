@@ -430,8 +430,8 @@ public struct PrismActionPanel: View {
         self.actions = actions
         self.selection = selection
         self.query = query
-        self.searchPrompt = searchPrompt ?? String(localized: "Search actions…", bundle: .module)
-        self.emptyText = emptyText ?? String(localized: "No matching actions", bundle: .module)
+        self.searchPrompt = searchPrompt ?? String(localized: "Search actions…", bundle: .module.prismLocalized)
+        self.emptyText = emptyText ?? String(localized: "No matching actions", bundle: .module.prismLocalized)
         self.onMove = onMove
         self.onSelect = onSelect
         self.onDismiss = onDismiss
@@ -454,7 +454,7 @@ public struct PrismActionPanel: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                PrismBackButton(help: Text("Close actions", bundle: .module), action: onDismiss)
+                PrismBackButton(help: Text("Close actions", bundle: .module.prismLocalized), action: onDismiss)
                 Text(verbatim: title)
                     .font(.prism(12, weight: 600))
                     .foregroundStyle(PrismTheme.textSecondary)

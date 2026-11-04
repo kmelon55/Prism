@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
       # The signing integration test needs the local signing identity, so it runs only on the signing Mac.
-      - run: node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs scripts/sign-updater.test.mjs scripts/native-release-feed.test.mjs scripts/android-release.test.mjs
+      - run: node --test scripts/macos-signing.test.mjs scripts/verify-updater.test.mjs scripts/sign-updater.test.mjs scripts/native-release-feed.test.mjs scripts/android-release.test.mjs scripts/localization.test.mjs
       - run: swift build
         working-directory: apps/mac
       - run: swift test

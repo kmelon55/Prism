@@ -116,7 +116,7 @@ struct ClipboardSettingsView: View {
 
     var body: some View {
         PrismSettingsPage(ClipboardText.localize("Clipboard")) {
-            PrismSettingsGroup(Text("Clipboard shortcut", bundle: .module)) {
+            PrismSettingsGroup(Text("Clipboard shortcut", bundle: .module.prismLocalized)) {
                 PrismCommandTable(showsHeader: false) {
                     PrismCommandShortcutRow(commandID: ClipboardFeature.openHistoryCommandID, title: ClipboardText.localize("Clipboard History")) {
                         Image(systemName: "clipboard").font(.system(size: 14))
@@ -149,18 +149,18 @@ struct ClipboardSettingsView: View {
             Task { await model.refresh() }
         }
         .confirmationDialog(
-            Text("Confirm clipboard history change", bundle: .module),
+            Text("Confirm clipboard history change", bundle: .module.prismLocalized),
             isPresented: Binding(get: { model.confirmation != nil }, set: { if !$0 { model.confirmation = nil } }),
             presenting: model.confirmation
         ) { action in
             Button(role: .destructive) { model.execute(action) } label: {
                 switch action {
-                case .disable: Text("Disable and Delete", bundle: .module)
-                case .clear: Text("Delete All", bundle: .module)
-                default: Text("Shorten and Delete", bundle: .module)
+                case .disable: Text("Disable and Delete", bundle: .module.prismLocalized)
+                case .clear: Text("Delete All", bundle: .module.prismLocalized)
+                default: Text("Shorten and Delete", bundle: .module.prismLocalized)
                 }
             }
-            Button(role: .cancel) {} label: { Text("Cancel", bundle: .module) }
+            Button(role: .cancel) {} label: { Text("Cancel", bundle: .module.prismLocalized) }
         } message: { action in
             Text(verbatim: model.confirmationMessage(action))
         }
@@ -171,8 +171,8 @@ struct ClipboardSettingsView: View {
     // MARK: Cards
 
     private var returnAction: some View {
-        PrismCardSetting(Text("Return action", bundle: .module)) {
-            Text("Choose what Return and double-click do. Command+Return uses the other action.", bundle: .module)
+        PrismCardSetting(Text("Return action", bundle: .module.prismLocalized)) {
+            Text("Choose what Return and double-click do. Command+Return uses the other action.", bundle: .module.prismLocalized)
         } control: {
             PrismWideSelect(selection: Binding(get: { state.preferences.primaryAction }, set: { model.request(.primary($0)) }), options: [
                 (ClipboardPrimaryAction.paste, ClipboardText.localize("Paste to previous app")),
@@ -183,8 +183,8 @@ struct ClipboardSettingsView: View {
     }
 
     private var historySwitch: some View {
-        PrismCardSetting(Text("Clipboard history", bundle: .module)) {
-            Text("Off by default. After you enable history, copied text, supported images, and local file references are saved on this device across restarts.", bundle: .module)
+        PrismCardSetting(Text("Clipboard history", bundle: .module.prismLocalized)) {
+            Text("Off by default. After you enable history, copied text, supported images, and local file references are saved on this device across restarts.", bundle: .module.prismLocalized)
         } control: {
             Toggle(isOn: Binding(get: { state.enabled }, set: { model.request($0 ? .enable : .disable) })) { EmptyView() }
                 .toggleStyle(.prism)
@@ -194,14 +194,14 @@ struct ClipboardSettingsView: View {
     }
 
     private var captureStatus: some View {
-        PrismCardSetting(Text("Capture status", bundle: .module)) {
+        PrismCardSetting(Text("Capture status", bundle: .module.prismLocalized)) {
             Text(verbatim: statusText)
-            Text("Pausing keeps saved entries. Content copied while paused is not added on resume.", bundle: .module)
+            Text("Pausing keeps saved entries. Content copied while paused is not added on resume.", bundle: .module.prismLocalized)
         } control: {
             PrismWideSelect(selection: Binding(get: { state.isPaused ? -1 : 0 }, set: { if $0 >= 0 { model.request(.pause($0)) } }),
                             options: pauseOptions)
                 .disabled(model.busy || !state.enabled)
-                .help(Text("Pause recording", bundle: .module))
+                .help(Text("Pause recording", bundle: .module.prismLocalized))
         }
     }
 
@@ -222,8 +222,8 @@ struct ClipboardSettingsView: View {
     }
 
     private var retention: some View {
-        PrismCardSetting(Text("Keep history for", bundle: .module)) {
-            Text("Pinned entries stay until deleted. Up to 1,000 entries and 128 MB total: text 128 KB, images 8 MB, and 64 file references per entry.", bundle: .module)
+        PrismCardSetting(Text("Keep history for", bundle: .module.prismLocalized)) {
+            Text("Pinned entries stay until deleted. Up to 1,000 entries and 128 MB total: text 128 KB, images 8 MB, and 64 file references per entry.", bundle: .module.prismLocalized)
         } control: {
             PrismWideSelect(selection: Binding(get: { state.retentionDays }, set: { model.request(.retention($0)) }), options: [
                 (1, ClipboardText.localize("1 day")), (7, ClipboardText.localize("1 week")),
@@ -234,8 +234,8 @@ struct ClipboardSettingsView: View {
     }
 
     private var clearHistory: some View {
-        PrismCardSetting(Text("Clear stored history", bundle: .module)) {
-            Text("Clear and disable both delete all saved entries, including pins. Your current system clipboard is unchanged.", bundle: .module)
+        PrismCardSetting(Text("Clear stored history", bundle: .module.prismLocalized)) {
+            Text("Clear and disable both delete all saved entries, including pins. Your current system clipboard is unchanged.", bundle: .module.prismLocalized)
             if model.state != nil {
                 Text(verbatim: String(format: ClipboardText.localize("%lld entries · %lld pinned"), Int64(state.entryCount), Int64(state.pinnedCount)))
             }
@@ -243,7 +243,7 @@ struct ClipboardSettingsView: View {
             Button { model.request(.clear) } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "trash").font(.system(size: 11))
-                    Text("Clear history", bundle: .module)
+                    Text("Clear history", bundle: .module.prismLocalized)
                 }
             }
             .buttonStyle(.prism)
@@ -254,9 +254,9 @@ struct ClipboardSettingsView: View {
     // MARK: Exclusions
 
     private var exclusions: some View {
-        PrismSettingsGroup(Text("Excluded applications", bundle: .module)) {
+        PrismSettingsGroup(Text("Excluded applications", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 0) {
-                PrismSettingsNote(Text("On macOS, skip clipboard changes observed while these apps are active. Existing entries are kept.", bundle: .module))
+                PrismSettingsNote(Text("On macOS, skip clipboard changes observed while these apps are active. Existing entries are kept.", bundle: .module.prismLocalized))
                     .padding(.bottom, 8)
                 ForEach(state.preferences.excludedApplications) { app in
                     HStack(spacing: 12) {
@@ -266,7 +266,7 @@ struct ClipboardSettingsView: View {
                             Text(verbatim: app.id).font(.system(size: 11)).foregroundStyle(PrismTheme.textMuted)
                         }
                         Spacer(minLength: 12)
-                        Button { model.request(.include(id: app.id)) } label: { Text("Remove", bundle: .module) }
+                        Button { model.request(.include(id: app.id)) } label: { Text("Remove", bundle: .module.prismLocalized) }
                             .buttonStyle(.prism)
                             .disabled(model.busy)
                     }
@@ -276,7 +276,7 @@ struct ClipboardSettingsView: View {
                 Button { model.chooseExcludedApplication() } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus").font(.system(size: 11))
-                        Text("Add Application…", bundle: .module)
+                        Text("Add Application…", bundle: .module.prismLocalized)
                     }
                 }
                 .buttonStyle(.prism)
@@ -293,7 +293,7 @@ struct ClipboardSettingsView: View {
         let error = model.error ?? state.persistenceError.map(ClipboardText.localize)
         if let error {
             notice(systemImage: "exclamationmark.triangle", text: error) {
-                Button { model.retryLast() } label: { Text("Retry", bundle: .module) }
+                Button { model.retryLast() } label: { Text("Retry", bundle: .module.prismLocalized) }
                     .buttonStyle(.prism)
                     .disabled(model.busy)
             }
@@ -326,10 +326,10 @@ struct ClipboardSettingsView: View {
         HStack(alignment: .center, spacing: 13) {
             Image(systemName: "clipboard").font(.system(size: 14)).foregroundStyle(PrismTheme.textSecondary)
             VStack(alignment: .leading, spacing: 5) {
-                Text("Private by design", bundle: .module).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.text)
+                Text("Private by design", bundle: .module.prismLocalized).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.text)
                 Group {
-                    Text("Stored locally without a network connection. Private, concealed, and transient macOS items and obvious text credentials are skipped. Unmarked sensitive content may still be saved. File contents are never read or stored.", bundle: .module)
-                    Text("macOS supports PNG, JPEG, WebP, TIFF, and local file references. TIFF is saved as PNG. Images are limited to 8,192 pixels per side and 16 megapixels. HEIC, GIF, HTML-only, and mixed items are skipped.", bundle: .module)
+                    Text("Stored locally without a network connection. Private, concealed, and transient macOS items and obvious text credentials are skipped. Unmarked sensitive content may still be saved. File contents are never read or stored.", bundle: .module.prismLocalized)
+                    Text("macOS supports PNG, JPEG, WebP, TIFF, and local file references. TIFF is saved as PNG. Images are limited to 8,192 pixels per side and 16 megapixels. HEIC, GIF, HTML-only, and mixed items are skipped.", bundle: .module.prismLocalized)
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(PrismTheme.textMuted)

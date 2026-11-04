@@ -10,7 +10,7 @@ public enum ScriptsFeature {
     public static func make(context: any PrismContext) -> FeatureContribution {
         let model = ScriptsModel(paths: context.paths)
         let actions = ScriptActions(model: model, context: context)
-        let pane = SettingsPane(id: settingsPaneID, title: String(localized: "Scripts", bundle: .module), systemImage: "terminal", group: .tools, order: 40,
+        let pane = SettingsPane(id: settingsPaneID, title: String(localized: "Scripts", bundle: .module.prismLocalized), systemImage: "terminal", group: .tools, order: 40,
                                 keywords: ScriptsSettingsView.keywords) {
             ScriptsSettingsView(model: model, actions: actions)
         }

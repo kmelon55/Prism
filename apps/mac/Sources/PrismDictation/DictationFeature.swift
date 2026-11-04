@@ -12,14 +12,14 @@ public enum DictationFeature {
         return FeatureContribution(
             providers: [DictationCommandsProvider(service: service, context: context)],
             settingsPanes: [
-                SettingsPane(id: settingsPaneID, title: String(localized: "Dictation", bundle: .module), systemImage: "mic", order: 30,
+                SettingsPane(id: settingsPaneID, title: String(localized: "Dictation", bundle: .module.prismLocalized), systemImage: "mic", order: 30,
                              keywords: ["Current model", "Dictation enhancement", "Refine speech", "Structure prompt", "Default action",
                                         "Waveform overlay", "Spoken language", "Recognition hints and vocabulary", "Permissions", "Dictation Recovery"]
-                                 .map { String(localized: String.LocalizationValue($0), bundle: .module) } + ["Whisper", "whisper.cpp", "STT"]) {
+                                 .map { String(localized: String.LocalizationValue($0), bundle: .module.prismLocalized) } + ["Whisper", "whisper.cpp", "STT"]) {
                     DictationSettingsView(service: service)
                 },
             ],
-            notchWidgets: [NotchWidget(id: "dictation", title: String(localized: "Dictation", bundle: .module), systemImage: "mic",
+            notchWidgets: [NotchWidget(id: "dictation", title: String(localized: "Dictation", bundle: .module.prismLocalized), systemImage: "mic",
                                        activity: { service.controller.busy ? DictationNotchView.title(service.controller.phase) : nil },
                                        compactContent: { AnyView(DictationCompactView(controller: service.controller)) }) { [weak context] dismiss in
                 DictationNotchView(service: service, dismiss: dismiss, settings: { [weak context] in
@@ -46,20 +46,20 @@ final class DictationCommandsProvider: PaletteProvider {
 
     func results(for query: String) async -> [PaletteItem] {
         let recording = service.controller.phase == .recording
-        let section = String(localized: "Productivity", bundle: .module)
+        let section = String(localized: "Productivity", bundle: .module.prismLocalized)
         return [
             PaletteItem(
                 candidate: SearchCandidate(
                     id: CommandShortcutsFile.dictationCommand,
-                    title: String(localized: "Dictation", bundle: .module),
-                    subtitle: String(localized: "Start recording · Run again to transcribe and insert", bundle: .module),
+                    title: String(localized: "Dictation", bundle: .module.prismLocalized),
+                    subtitle: String(localized: "Start recording · Run again to transcribe and insert", bundle: .module.prismLocalized),
                     section: section,
                     keywords: ["dictation", "whisp", "voice", "speech", "transcribe", "음성", "받아쓰기", "녹음", "전사"]),
                 icon: .symbol("mic.fill", tint: .red),
-                accessory: String(localized: "Command", bundle: .module),
+                accessory: String(localized: "Command", bundle: .module.prismLocalized),
                 actions: [
                     PaletteAction(id: "toggle-dictation",
-                                  title: recording ? String(localized: "Finish Dictation", bundle: .module) : String(localized: "Start Dictation", bundle: .module),
+                                  title: recording ? String(localized: "Finish Dictation", bundle: .module.prismLocalized) : String(localized: "Start Dictation", bundle: .module.prismLocalized),
                                   systemImage: recording ? "stop.circle" : "mic") { [service] in
                         service.toggle(promptMode: false)
                         return .dismiss
@@ -69,14 +69,14 @@ final class DictationCommandsProvider: PaletteProvider {
             PaletteItem(
                 candidate: SearchCandidate(
                     id: CommandShortcutsFile.promptCommand,
-                    title: String(localized: "Structure prompt", bundle: .module),
-                    subtitle: String(localized: "Speak to create a clear prompt · Run again to insert", bundle: .module),
+                    title: String(localized: "Structure prompt", bundle: .module.prismLocalized),
+                    subtitle: String(localized: "Speak to create a clear prompt · Run again to insert", bundle: .module.prismLocalized),
                     section: section,
                     keywords: ["dictation", "prompt", "프롬프트", "정리", "음성"]),
                 icon: .symbol("wand.and.stars", tint: .purple),
-                accessory: String(localized: "Command", bundle: .module),
+                accessory: String(localized: "Command", bundle: .module.prismLocalized),
                 actions: [
-                    PaletteAction(id: "toggle-dictation-prompt", title: String(localized: "Structure prompt", bundle: .module),
+                    PaletteAction(id: "toggle-dictation-prompt", title: String(localized: "Structure prompt", bundle: .module.prismLocalized),
                                   systemImage: "wand.and.stars") { [service] in
                         service.toggle(promptMode: true)
                         return .dismiss
@@ -87,7 +87,7 @@ final class DictationCommandsProvider: PaletteProvider {
     }
 
     private var settingsAction: PaletteAction {
-        PaletteAction(id: "dictation-settings", title: String(localized: "Dictation Settings", bundle: .module), systemImage: "gearshape") { [weak context] in
+        PaletteAction(id: "dictation-settings", title: String(localized: "Dictation Settings", bundle: .module.prismLocalized), systemImage: "gearshape") { [weak context] in
             context?.openSettings(paneID: DictationFeature.settingsPaneID)
             return .dismiss
         }

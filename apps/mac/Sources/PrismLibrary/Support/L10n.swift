@@ -1,3 +1,4 @@
+import PrismKit
 import AppKit
 import Foundation
 
@@ -8,7 +9,7 @@ enum L10n {
 
     static func tr(_ key: String) -> String {
         if let overrideBundle { return overrideBundle.localizedString(forKey: key, value: key, table: nil) }
-        return String(localized: String.LocalizationValue(key), bundle: .module)
+        return String(localized: String.LocalizationValue(key), bundle: .module.prismLocalized)
     }
 }
 

@@ -22,13 +22,13 @@ final class SystemCommandsProvider: PaletteProvider {
         PaletteItem(
             candidate: SearchCandidate(
                 id: setting.commandID, title: setting.title, subtitle: setting.subtitle,
-                section: String(localized: "System Settings", bundle: .module),
+                section: String(localized: "System Settings", bundle: .module.prismLocalized),
                 keywords: setting.keywords, searchAliases: SystemStrings.bilingual(setting.englishTitle)
             ),
             icon: setting.iconPath.map { .file(path: $0) } ?? .symbol(setting.systemImage),
-            accessory: String(localized: "System Settings", bundle: .module),
+            accessory: String(localized: "System Settings", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "open-system-setting", title: String(localized: "Open \(setting.title)", bundle: .module),
+                PaletteAction(id: "open-system-setting", title: String(localized: "Open \(setting.title)", bundle: .module.prismLocalized),
                               systemImage: "gearshape") {
                     NSWorkspace.shared.open(setting.url)
                     return .dismiss
@@ -41,12 +41,12 @@ final class SystemCommandsProvider: PaletteProvider {
         PaletteItem(
             candidate: SearchCandidate(
                 id: action.commandID, title: action.title, subtitle: action.subtitle,
-                section: String(localized: "System Actions", bundle: .module),
+                section: String(localized: "System Actions", bundle: .module.prismLocalized),
                 keywords: action.keywords, searchAliases: SystemStrings.bilingual(action.englishTitle),
                 rankingBoost: boost
             ),
             icon: action.iconPath.map { .file(path: $0) } ?? .symbol(action.systemImage, tint: action.needsConfirmation ? .red : nil),
-            accessory: String(localized: "Command", bundle: .module),
+            accessory: String(localized: "Command", bundle: .module.prismLocalized),
             actions: [
                 PaletteAction(id: action == .lockScreen ? "lock-screen" : "run-system-action", title: action.title,
                               systemImage: action.systemImage, isDestructive: action.needsConfirmation) { [runner] in
@@ -72,10 +72,10 @@ final class SystemActionRunner {
 
     /// The palette outcome for running `action`: a confirmation screen, or the result of running it directly.
     func start(_ action: SystemAction) async -> PaletteActionOutcome {
-        guard !isBusy else { return .notify(String(localized: "A system action is already pending.", bundle: .module)) }
+        guard !isBusy else { return .notify(String(localized: "A system action is already pending.", bundle: .module.prismLocalized)) }
         guard action.needsConfirmation else { return await perform(action) }
         if action == .quitAllApps, SystemActionExecutor.quittableApplications().isEmpty {
-            return .notify(String(localized: "No apps to quit", bundle: .module))
+            return .notify(String(localized: "No apps to quit", bundle: .module.prismLocalized))
         }
         return .push(confirmationScreen(for: action))
     }
@@ -103,7 +103,7 @@ final class SystemActionRunner {
 
     @discardableResult
     func perform(_ action: SystemAction) async -> PaletteActionOutcome {
-        guard !isBusy else { return .notify(String(localized: "A system action is already pending.", bundle: .module)) }
+        guard !isBusy else { return .notify(String(localized: "A system action is already pending.", bundle: .module.prismLocalized)) }
         isBusy = true
         defer { isBusy = false }
         context.hidePalette()

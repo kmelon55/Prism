@@ -1,3 +1,4 @@
+import PrismKit
 // Adapted from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import AVFoundation
 import Foundation
@@ -69,12 +70,12 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Di
 
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         guard self.recorder === recorder else { return }
-        onFailure?(String(localized: "The microphone disconnected, so recording stopped.", bundle: .module))
+        onFailure?(String(localized: "The microphone disconnected, so recording stopped.", bundle: .module.prismLocalized))
     }
 
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         guard self.recorder === recorder else { return }
-        onFailure?(String(localized: "An error occurred while recording from the microphone.", bundle: .module))
+        onFailure?(String(localized: "An error occurred while recording from the microphone.", bundle: .module.prismLocalized))
     }
 
     private func sampleLevel() {
@@ -101,8 +102,8 @@ enum AudioRecorderError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .permissionDenied: String(localized: "Allow Prism to use the microphone in System Settings.", bundle: .module)
-        case .couldNotStart: String(localized: "Could not start recording from the microphone.", bundle: .module)
+        case .permissionDenied: String(localized: "Allow Prism to use the microphone in System Settings.", bundle: .module.prismLocalized)
+        case .couldNotStart: String(localized: "Could not start recording from the microphone.", bundle: .module.prismLocalized)
         }
     }
 }

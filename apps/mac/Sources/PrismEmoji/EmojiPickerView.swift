@@ -25,13 +25,13 @@ struct EmojiPickerView: View {
     private var header: some View {
         // `.emoji-header`: back arrow, magnifier, search field and the skin tone select.
         PrismScreenHeader {
-            PrismBackButton(help: Text("Close emoji picker", bundle: .module), action: onClose)
+            PrismBackButton(help: Text("Close emoji picker", bundle: .module.prismLocalized), action: onClose)
                 .disabled(model.busy)
             HStack(spacing: 9) {
                 PrismSearchGlyph()
                 ScreenSearchField(
                     text: $model.query,
-                    placeholder: String(localized: "Search in Korean or English", bundle: .module),
+                    placeholder: String(localized: "Search in Korean or English", bundle: .module.prismLocalized),
                     onCommand: handle
                 )
             }
@@ -46,7 +46,7 @@ struct EmojiPickerView: View {
                     Text(verbatim: "\(tone.swatch)  \(tone.title)").tag(tone)
                 }
             } label: {
-                Text("Skin tone", bundle: .module)
+                Text("Skin tone", bundle: .module.prismLocalized)
             }
             .pickerStyle(.inline)
         } label: {
@@ -68,7 +68,7 @@ struct EmojiPickerView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(Text("Skin tone", bundle: .module))
+        .help(Text("Skin tone", bundle: .module.prismLocalized))
     }
 
     private func handle(_ command: SearchFieldCommand) -> Bool {
@@ -143,10 +143,10 @@ struct EmojiPickerView: View {
     private var content: some View {
         if model.catalog == nil {
             if model.loadFailed {
-                PrismEmptyState(symbol: "exclamationmark.triangle", title: Text("Emoji could not be loaded.", bundle: .module),
-                                button: (Text("Retry loading", bundle: .module), { Task { await model.load() } }))
+                PrismEmptyState(symbol: "exclamationmark.triangle", title: Text("Emoji could not be loaded.", bundle: .module.prismLocalized),
+                                button: (Text("Retry loading", bundle: .module.prismLocalized), { Task { await model.load() } }))
             } else {
-                Text("Loading emoji…", bundle: .module)
+                Text("Loading emoji…", bundle: .module.prismLocalized)
                     .font(.prism(13))
                     .foregroundStyle(PrismTheme.textMuted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -161,8 +161,8 @@ struct EmojiPickerView: View {
     private var emptyState: some View {
         let recentEmpty = !model.isSearching && model.category == EmojiCategory.recent.id
         return PrismEmptyState(
-            title: Text(recentEmpty ? "No recent emoji yet" : "No matching emoji", bundle: .module),
-            message: Text(recentEmpty ? "Your successful choices appear here." : "Try another word in Korean or English.", bundle: .module)
+            title: Text(recentEmpty ? "No recent emoji yet" : "No matching emoji", bundle: .module.prismLocalized),
+            message: Text(recentEmpty ? "Your successful choices appear here." : "Try another word in Korean or English.", bundle: .module.prismLocalized)
         )
     }
 
@@ -181,10 +181,10 @@ struct EmojiPickerView: View {
                             }
                             .contextMenu {
                                 Button { Task { await model.perform(item.emoji, .paste) } } label: {
-                                    Label { Text("Paste", bundle: .module) } icon: { Image(systemName: "doc.on.clipboard") }
+                                    Label { Text("Paste", bundle: .module.prismLocalized) } icon: { Image(systemName: "doc.on.clipboard") }
                                 }
                                 Button { Task { await model.perform(item.emoji, .copy) } } label: {
-                                    Label { Text("Copy", bundle: .module) } icon: { Image(systemName: "doc.on.doc") }
+                                    Label { Text("Copy", bundle: .module.prismLocalized) } icon: { Image(systemName: "doc.on.doc") }
                                 }
                             }
                     }
@@ -202,7 +202,7 @@ struct EmojiPickerView: View {
             }
             .overlay(alignment: .bottom) {
                 if model.storageFailed {
-                    Text("Recent choices could not be saved on this device.", bundle: .module)
+                    Text("Recent choices could not be saved on this device.", bundle: .module.prismLocalized)
                         .font(.prism(11))
                         .foregroundStyle(PrismTheme.textMuted)
                         .padding(.horizontal, 10)
@@ -222,9 +222,9 @@ struct EmojiPickerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Group {
                     if failure.needsAccessibility {
-                        Text("Pasting needs Accessibility permission.", bundle: .module)
+                        Text("Pasting needs Accessibility permission.", bundle: .module.prismLocalized)
                     } else {
-                        Text(failure.operation == .copy ? "Copy failed. Try again when ready." : "Paste failed. Check the original app, then retry.", bundle: .module)
+                        Text(failure.operation == .copy ? "Copy failed. Try again when ready." : "Paste failed. Check the original app, then retry.", bundle: .module.prismLocalized)
                     }
                 }
                 .font(.prism(12))
@@ -235,16 +235,16 @@ struct EmojiPickerView: View {
             }
             Spacer(minLength: 8)
             if failure.needsAccessibility {
-                Button(action: onOpenAccessibilitySettings) { Text("Open Settings", bundle: .module) }
+                Button(action: onOpenAccessibilitySettings) { Text("Open Settings", bundle: .module.prismLocalized) }
             } else {
                 Button { Task { await model.retry() } } label: {
-                    Text(failure.operation == .copy ? "Retry copy" : "Retry paste", bundle: .module)
+                    Text(failure.operation == .copy ? "Retry copy" : "Retry paste", bundle: .module.prismLocalized)
                 }
             }
             if failure.operation == .paste {
-                Button { Task { await model.copyInstead() } } label: { Text("Copy instead", bundle: .module) }
+                Button { Task { await model.copyInstead() } } label: { Text("Copy instead", bundle: .module.prismLocalized) }
             }
-            Button { model.dismissFailure() } label: { Text("Dismiss", bundle: .module) }
+            Button { model.dismissFailure() } label: { Text("Dismiss", bundle: .module.prismLocalized) }
         }
         .buttonStyle(.prism)
         .disabled(model.busy)
@@ -258,23 +258,23 @@ struct EmojiPickerView: View {
         HStack(spacing: 12) {
             HStack(spacing: 10) {
                 Text(verbatim: model.selectedItem?.emoji ?? "☺️").font(.system(size: 22))
-                Text(verbatim: model.selectedItem.map(model.label) ?? String(localized: "Choose an emoji", bundle: .module))
+                Text(verbatim: model.selectedItem.map(model.label) ?? String(localized: "Choose an emoji", bundle: .module.prismLocalized))
                     .font(.prism(12))
                     .foregroundStyle(PrismTheme.textSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             if model.busy {
-                Text("Working…", bundle: .module).font(.prism(12)).foregroundStyle(PrismTheme.textMuted)
+                Text("Working…", bundle: .module.prismLocalized).font(.prism(12)).foregroundStyle(PrismTheme.textMuted)
             } else if let status = model.status {
                 Text(verbatim: status).font(.prism(12)).foregroundStyle(PrismTheme.textMuted)
             }
             if model.selectedItem != nil {
                 HStack(spacing: 2) {
-                    ModeButton(title: Text("Paste", bundle: .module), keys: "↵", isPrimary: true) {
+                    ModeButton(title: Text("Paste", bundle: .module.prismLocalized), keys: "↵", isPrimary: true) {
                         Task { await model.performPrimary() }
                     }
-                    ModeButton(title: Text("Copy", bundle: .module), keys: "⌘↵", isPrimary: false) {
+                    ModeButton(title: Text("Copy", bundle: .module.prismLocalized), keys: "⌘↵", isPrimary: false) {
                         Task { model.failure?.operation == .paste ? await model.copyInstead() : await model.performCopy() }
                     }
                 }

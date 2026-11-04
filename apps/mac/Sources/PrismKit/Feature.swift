@@ -53,24 +53,26 @@ public struct SettingsPane: Identifiable {
     }
 
     public let id: String
-    public var title: String
+    private let titleProvider: () -> String
+    public var title: String { titleProvider() }
     public var systemImage: String
     public var group: Group
     /// Position within the group. Lower comes first.
     public var order: Int
     /// Extra words the settings search matches, such as the labels of the pane's rows.
-    public var keywords: [String]
+    private let keywordsProvider: () -> [String]
+    public var keywords: [String] { keywordsProvider() }
     /// The pane draws its own `PrismSettingsPage`; the window only supplies the glass and the sidebar.
     public var content: @MainActor () -> AnyView
 
-    public init<Content: View>(id: String, title: String, systemImage: String, group: Group = .preferences, order: Int,
-                               keywords: [String] = [], @ViewBuilder content: @escaping @MainActor () -> Content) {
+    public init<Content: View>(id: String, title: @autoclosure @escaping () -> String, systemImage: String, group: Group = .preferences, order: Int,
+                               keywords: @autoclosure @escaping () -> [String] = [], @ViewBuilder content: @escaping @MainActor () -> Content) {
         self.id = id
-        self.title = title
+        self.titleProvider = title
         self.systemImage = systemImage
         self.group = group
         self.order = order
-        self.keywords = keywords
+        self.keywordsProvider = keywords
         self.content = { AnyView(content()) }
     }
 }

@@ -31,7 +31,7 @@ public enum EmojiFeature {
             Permissions.openAccessibilitySettings()
         }
         let model = EmojiPickerModel(actions: actions, recents: recents) { await EmojiCatalogLoader.shared.load() }
-        return PaletteScreen(id: "emoji", title: String(localized: "Emoji", bundle: .module), expanded: true) {
+        return PaletteScreen(id: "emoji", title: String(localized: "Emoji", bundle: .module.prismLocalized), expanded: true) {
             EmojiPickerView(
                 model: model,
                 onClose: close,
@@ -54,18 +54,18 @@ final class EmojiCommandProvider: PaletteProvider {
         guard let context else { return [] }
         let candidate = SearchCandidate(
             id: EmojiFeature.commandID,
-            title: String(localized: "Emoji", bundle: .module),
-            subtitle: String(localized: "Find emoji to copy or paste", bundle: .module),
-            section: String(localized: "Productivity", bundle: .module),
+            title: String(localized: "Emoji", bundle: .module.prismLocalized),
+            subtitle: String(localized: "Find emoji to copy or paste", bundle: .module.prismLocalized),
+            section: String(localized: "Productivity", bundle: .module.prismLocalized),
             keywords: ["emoji", "emojis", "이모지", "이모티콘", "표정", "symbols", "emoticon"],
             searchAliases: ["Emoji", "이모지"]
         )
         return [PaletteItem(
             candidate: candidate,
             icon: .symbol("face.smiling", tint: .orange),
-            accessory: String(localized: "Command", bundle: .module),
+            accessory: String(localized: "Command", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "open-emoji", title: String(localized: "Open", bundle: .module), systemImage: "face.smiling") { [weak context] in
+                PaletteAction(id: "open-emoji", title: String(localized: "Open", bundle: .module.prismLocalized), systemImage: "face.smiling") { [weak context] in
                     guard let context else { return .keepOpen }
                     return .push(EmojiFeature.screen(context: context))
                 },

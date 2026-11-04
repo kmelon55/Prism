@@ -1,3 +1,4 @@
+import PrismKit
 // Catalog decoding, filtering, ordering and pricing ported from Whisp VercelModelCatalog.swift
 // (via `dictation/catalog.rs`). Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import Foundation
@@ -15,7 +16,7 @@ struct SpeechModel: Identifiable, Equatable, Sendable {
 
     /// Duration price per hour first, then audio input/output per million tokens. Prices come only from the API.
     var priceText: String {
-        if free { return String(localized: "Free", bundle: .module) }
+        if free { return String(localized: "Free", bundle: .module.prismLocalized) }
         func number(_ key: String) -> Double? { pricing[key].flatMap(Double.init).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil } }
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US")
@@ -24,12 +25,12 @@ struct SpeechModel: Identifiable, Equatable, Sendable {
         formatter.maximumFractionDigits = 4
         func format(_ value: Double) -> String { formatter.string(from: value as NSNumber) ?? "\(value)" }
         if let duration = number("transcription_duration_cost_per_second") {
-            return "$\(format(duration * 3600))/" + String(localized: "hr", bundle: .module)
+            return "$\(format(duration * 3600))/" + String(localized: "hr", bundle: .module.prismLocalized)
         }
         if let input = number("audio_input_token_cost") ?? number("input"), let output = number("output") {
-            return "$\(format(input * 1e6)) / $\(format(output * 1e6)) · " + String(localized: "input / output · per 1M tokens", bundle: .module)
+            return "$\(format(input * 1e6)) / $\(format(output * 1e6)) · " + String(localized: "input / output · per 1M tokens", bundle: .module.prismLocalized)
         }
-        return String(localized: "Price unavailable", bundle: .module)
+        return String(localized: "Price unavailable", bundle: .module.prismLocalized)
     }
 }
 
@@ -52,7 +53,7 @@ struct SpeechModelCatalog: Sendable {
         probe.baseURL = baseURL
         try probe.validate()
         switch provider {
-        case .local: throw DictationError(String(localized: "Choose a local model file.", bundle: .module))
+        case .local: throw DictationError(String(localized: "Choose a local model file.", bundle: .module.prismLocalized))
         case .vercel: return "https://ai-gateway.vercel.sh/v1/models"
         default:
             var base = baseURL.trimmingTrailing("/")
@@ -73,7 +74,7 @@ struct SpeechModelCatalog: Sendable {
 
     /// GET only, no redirects, at most 4 MiB, and provider error bodies are never shown.
     static func fetch(_ source: String, apiKey: String?, session: URLSession = catalogSession) async throws -> Data {
-        guard let url = URL(string: source) else { throw DictationError(String(localized: "Enter a valid HTTPS API base URL.", bundle: .module)) }
+        guard let url = URL(string: source) else { throw DictationError(String(localized: "Enter a valid HTTPS API base URL.", bundle: .module.prismLocalized)) }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 20
@@ -81,21 +82,21 @@ struct SpeechModelCatalog: Sendable {
         let (data, http): (Data, HTTPURLResponse)
         do {
             (data, http) = try await DictationHTTP.send(request, session: session, limit: 4 * 1_048_576,
-                                                         tooLarge: String(localized: "The model list response is too large.", bundle: .module))
+                                                         tooLarge: String(localized: "The model list response is too large.", bundle: .module.prismLocalized))
         } catch let error as DictationError {
             throw error
         } catch {
-            throw DictationError(String(localized: "Could not connect to the model list. Check the network and API address.", bundle: .module))
+            throw DictationError(String(localized: "Could not connect to the model list. Check the network and API address.", bundle: .module.prismLocalized))
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw DictationError(String(localized: "Model list error (\(http.statusCode)). Check the API key and access, then refresh.", bundle: .module))
+            throw DictationError(String(localized: "Model list error (\(http.statusCode)). Check the API key and access, then refresh.", bundle: .module.prismLocalized))
         }
         return data
     }
 
     static func decode(provider: SpeechProvider, body: Data) throws -> [SpeechModel] {
         guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any], let rows = object["data"] as? [[String: Any]] else {
-            throw DictationError(String(localized: "Could not read the model list response.", bundle: .module))
+            throw DictationError(String(localized: "Could not read the model list response.", bundle: .module.prismLocalized))
         }
         func contains(_ row: [String: Any], _ field: String, _ member: String) -> Bool {
             (row[field] as? [Any])?.contains { $0 as? String == member } ?? false
@@ -127,8 +128,8 @@ struct SpeechModelCatalog: Sendable {
                 id: id, name: (row["name"] as? String).map { String($0.prefix(200)) } ?? id,
                 description: text(row["description"], limit: 600), ownedBy: text(row["owned_by"], limit: 100),
                 batchCompatible: !realtime && !diarize,
-                unavailableReason: realtime ? String(localized: "Realtime-only model", bundle: .module)
-                    : diarize ? String(localized: "Speaker diarization options are not supported yet.", bundle: .module) : nil,
+                unavailableReason: realtime ? String(localized: "Realtime-only model", bundle: .module.prismLocalized)
+                    : diarize ? String(localized: "Speaker diarization options are not supported yet.", bundle: .module.prismLocalized) : nil,
                 free: contains(row, "tags", "free"), pricing: pricing))
         }
         return models.sorted {

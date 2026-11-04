@@ -96,8 +96,10 @@ final class EntryEditorController: NSObject, NSWindowDelegate {
         editor = next
         let window = window ?? makeWindow()
         window.title = next.windowTitle
-        window.contentView = FirstClickHostingView(rootView: EntryEditorView(model: next, onCancel: { [weak self] in self?.close() },
-                                                                     onSave: { [weak self] in self?.save() }))
+        window.contentView = FirstClickHostingView(rootView: PrismLocalizedContent { [weak self, weak window] in EntryEditorView(model: next, onCancel: { [weak self] in self?.close() },
+                                                                     onSave: { [weak self] in self?.save() })
+            .onReceive(NotificationCenter.default.publisher(for: PrismLanguage.didChange)) { [weak window] _ in window?.title = next.windowTitle }
+        })
         window.setContentSize(window.contentView?.fittingSize ?? NSSize(width: 520, height: 420))
         if !window.isVisible { window.center() }
         self.window = window
@@ -172,9 +174,9 @@ struct EntryEditorView: View {
     /// `.library-editor`: labeled fields stacked 18 points apart, then the hint and the buttons.
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            field(Text("Name", bundle: .module)) {
+            field(Text("Name", bundle: .module.prismLocalized)) {
                 TextField(text: $model.draft.title, prompt: Text(namePrompt).foregroundStyle(PrismTheme.textMuted)) {
-                    Text("Name", bundle: .module)
+                    Text("Name", bundle: .module.prismLocalized)
                 }
                 .textFieldStyle(PrismTextFieldStyle(height: 35))
                 .focused($nameFocused)
@@ -236,7 +238,7 @@ struct EntryEditorView: View {
 
     @ViewBuilder
     private var linkFields: some View {
-        field(Text("Type", bundle: .module)) {
+        field(Text("Type", bundle: .module.prismLocalized)) {
             PrismSegmented(selection: Binding(get: { model.draft.kind }, set: { model.setLinkKind($0) }), options: [
                 (LibraryEntry.Kind.link, L10n.tr("Web Link"), "globe"),
                 (LibraryEntry.Kind.path, L10n.tr("File or Folder"), "folder"),
@@ -244,19 +246,19 @@ struct EntryEditorView: View {
             .fixedSize()
         }
         if model.draft.kind == .link {
-            field(Text("Address", bundle: .module)) {
+            field(Text("Address", bundle: .module.prismLocalized)) {
                 TextField(text: $model.draft.value, prompt: Text(verbatim: "https://www.google.com/search?q={query}").foregroundStyle(PrismTheme.textMuted)) {
-                    Text("Address", bundle: .module)
+                    Text("Address", bundle: .module.prismLocalized)
                 }
                 .textFieldStyle(PrismTextFieldStyle(height: 35))
                 .font(.system(size: 12, design: .monospaced))
                 .autocorrectionDisabled()
             }
         } else {
-            field(Text("Path", bundle: .module)) {
+            field(Text("Path", bundle: .module.prismLocalized)) {
                 HStack(spacing: 8) {
                     if model.draft.value.isEmpty {
-                        Text("None", bundle: .module).foregroundStyle(PrismTheme.textMuted)
+                        Text("None", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)
                     } else {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: model.draft.value)).resizable().frame(width: 16, height: 16)
                         Text(verbatim: (model.draft.value as NSString).abbreviatingWithTildeInPath)
@@ -280,14 +282,14 @@ struct EntryEditorView: View {
 
     @ViewBuilder
     private var snippetFields: some View {
-        field(Text("Content", bundle: .module)) {
+        field(Text("Content", bundle: .module.prismLocalized)) {
             PrismTextEditor(text: $model.draft.value, minHeight: 170)
                 .frame(maxHeight: 220)
         }
-        field(Text("Keyword", bundle: .module)) {
+        field(Text("Keyword", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 6) {
                 TextField(text: $model.keywordBinding, prompt: Text(verbatim: ";email").foregroundStyle(PrismTheme.textMuted)) {
-                    Text("Keyword", bundle: .module)
+                    Text("Keyword", bundle: .module.prismLocalized)
                 }
                 .textFieldStyle(PrismTextFieldStyle(height: 35))
                 .font(.system(size: 12, design: .monospaced))

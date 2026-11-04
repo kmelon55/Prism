@@ -32,19 +32,19 @@ struct BackupSettingsView: View {
     private var localBackup: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Local backup", bundle: .module).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
-                PrismSettingsNote(Text("Choose what to export or import. Existing library items win conflicts.", bundle: .module))
+                Text("Local backup", bundle: .module.prismLocalized).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
+                PrismSettingsNote(Text("Choose what to export or import. Existing library items win conflicts.", bundle: .module.prismLocalized))
             }
             categories
-            PrismDisclosure(Text("Backup contents & privacy", bundle: .module)) {
+            PrismDisclosure(Text("Backup contents & privacy", bundle: .module.prismLocalized)) {
                 VStack(alignment: .leading, spacing: 8) {
-                    hint(Text("Safe preferences include appearance, language, and aliases. Keys, histories, permissions, script folders, and hotkeys are excluded.", bundle: .module))
-                    hint(Text("Path references are optional. They restore saved paths only; file search roots and AI access are never granted. Missing targets remain unavailable until repaired.", bundle: .module))
-                    hint(Text("Backup files are not encrypted. Keep them somewhere private. Maximum file size: 20 MB.", bundle: .module))
+                    hint(Text("Safe preferences include appearance, language, and aliases. Keys, histories, permissions, script folders, and hotkeys are excluded.", bundle: .module.prismLocalized))
+                    hint(Text("Path references are optional. They restore saved paths only; file search roots and AI access are never granted. Missing targets remain unavailable until repaired.", bundle: .module.prismLocalized))
+                    hint(Text("Backup files are not encrypted. Keep them somewhere private. Maximum file size: 20 MB.", bundle: .module.prismLocalized))
                 }
                 .padding(.leading, 15)
             }
-            PrismSettingsRow(Text("Backup folder", bundle: .module), detail: lastBackupText) {
+            PrismSettingsRow(Text("Backup folder", bundle: .module.prismLocalized), detail: lastBackupText) {
                 HStack(spacing: 8) {
                     if let location = backup.location {
                         Button { backup.revealLocation() } label: {
@@ -56,9 +56,9 @@ struct BackupSettingsView: View {
                         .buttonStyle(.prismGhost)
                         .help(location.path)
                     } else {
-                        Text("Not chosen", bundle: .module).font(.system(size: 12)).foregroundStyle(PrismTheme.textMuted)
+                        Text("Not chosen", bundle: .module.prismLocalized).font(.system(size: 12)).foregroundStyle(PrismTheme.textMuted)
                     }
-                    Button { backup.chooseLocation() } label: { Text("Choose…", bundle: .module) }
+                    Button { backup.chooseLocation() } label: { Text("Choose…", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
             }
@@ -67,18 +67,18 @@ struct BackupSettingsView: View {
                 if backup.busy == .backup || backup.busy == .export || backup.busy == .review { ProgressView().controlSize(.small) }
                 Spacer(minLength: 0)
                 Button { Task { await backup.exportAs() } } label: {
-                    iconLabel("square.and.arrow.down", Text("Export backup", bundle: .module))
+                    iconLabel("square.and.arrow.down", Text("Export backup", bundle: .module.prismLocalized))
                 }
                 .buttonStyle(.prism)
                 .disabled(backup.isBusy || !backup.categories.any)
                 Button { Task { await backup.chooseBackupToReview() } } label: {
-                    iconLabel("square.and.arrow.up", Text("Choose backup to review", bundle: .module))
+                    iconLabel("square.and.arrow.up", Text("Choose backup to review", bundle: .module.prismLocalized))
                 }
                 .buttonStyle(.prism)
                 .disabled(backup.isBusy || !backup.categories.any)
-                .help(Text("Nothing changes until you confirm the review.", bundle: .module))
+                .help(Text("Nothing changes until you confirm the review.", bundle: .module.prismLocalized))
                 Button { Task { await backup.backUpNow() } } label: {
-                    iconLabel("externaldrive", Text("Back Up Now", bundle: .module))
+                    iconLabel("externaldrive", Text("Back Up Now", bundle: .module.prismLocalized))
                 }
                 .buttonStyle(.prismPrimary)
                 .keyboardShortcut("s", modifiers: [.command])
@@ -91,29 +91,29 @@ struct BackupSettingsView: View {
 
     private var lastBackupText: Text {
         if let date = backup.lastBackup {
-            Text("Last backup: \(date.formatted(date: .abbreviated, time: .shortened))", bundle: .module)
+            Text("Last backup: \(date.formatted(date: .abbreviated, time: .shortened))", bundle: .module.prismLocalized)
         } else {
-            Text("No backup yet", bundle: .module)
+            Text("No backup yet", bundle: .module.prismLocalized)
         }
     }
 
     private var categories: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Backup categories", bundle: .module).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
+            Text("Backup categories", bundle: .module.prismLocalized).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
             PrismFlowLayout(horizontalSpacing: 20, verticalSpacing: 12) {
-                Toggle(isOn: $backup.categories.notes) { Text("Notes", bundle: .module) }
-                Toggle(isOn: $backup.categories.snippets) { Text("Snippets", bundle: .module) }
-                Toggle(isOn: $backup.categories.quicklinks) { Text("Quicklinks", bundle: .module) }
-                Toggle(isOn: $backup.categories.pathLinks) { Text("Path references", bundle: .module) }
-                    .help(Text("Saved paths only. File search folders and AI access are never granted.", bundle: .module))
-                Toggle(isOn: $backup.categories.favorites) { Text("Favorites", bundle: .module) }
-                Toggle(isOn: $backup.categories.preferences) { Text("Safe preferences", bundle: .module) }
-                    .help(Text("Appearance, language and aliases. Keys, histories, permissions, script folders and hotkeys are never included.", bundle: .module))
+                Toggle(isOn: $backup.categories.notes) { Text("Notes", bundle: .module.prismLocalized) }
+                Toggle(isOn: $backup.categories.snippets) { Text("Snippets", bundle: .module.prismLocalized) }
+                Toggle(isOn: $backup.categories.quicklinks) { Text("Quicklinks", bundle: .module.prismLocalized) }
+                Toggle(isOn: $backup.categories.pathLinks) { Text("Path references", bundle: .module.prismLocalized) }
+                    .help(Text("Saved paths only. File search folders and AI access are never granted.", bundle: .module.prismLocalized))
+                Toggle(isOn: $backup.categories.favorites) { Text("Favorites", bundle: .module.prismLocalized) }
+                Toggle(isOn: $backup.categories.preferences) { Text("Safe preferences", bundle: .module.prismLocalized) }
+                    .help(Text("Appearance, language and aliases. Keys, histories, permissions, script folders and hotkeys are never included.", bundle: .module.prismLocalized))
             }
             .toggleStyle(.prismLeadingCheckbox)
             .disabled(backup.isBusy)
             if !backup.categories.any {
-                Text("Select at least one backup category.", bundle: .module).font(.system(size: 11)).foregroundStyle(PrismTheme.danger)
+                Text("Select at least one backup category.", bundle: .module.prismLocalized).font(.system(size: 11)).foregroundStyle(PrismTheme.danger)
             }
             Rectangle().fill(PrismTheme.separator).frame(height: 1)
         }
@@ -134,17 +134,17 @@ struct BackupSettingsView: View {
     // MARK: Review
 
     private func reviewGroup(_ review: BackupModel.Review) -> some View {
-        PrismSettingsGroup(Text("Review “\(review.fileName)”", bundle: .module)) {
-            Button { backup.closeReview() } label: { Text("Close review", bundle: .module) }
+        PrismSettingsGroup(Text("Review “\(review.fileName)”", bundle: .module.prismLocalized)) {
+            Button { backup.closeReview() } label: { Text("Close review", bundle: .module.prismLocalized) }
                 .buttonStyle(.prismGhost)
                 .disabled(backup.isBusy)
         } content: {
             VStack(alignment: .leading, spacing: 14) {
-                hint(Text("Only new library items will be added. Missing library favorites are skipped. Review expires after 10 minutes or a library change.", bundle: .module))
+                hint(Text("Only new library items will be added. Missing library favorites are skipped. Review expires after 10 minutes or a library change.", bundle: .module.prismLocalized))
                 if !review.libraryRows.isEmpty {
                     countsTable(review)
                     if !review.pathReferences.isEmpty {
-                        PrismDisclosure(Text("Review path targets", bundle: .module)) {
+                        PrismDisclosure(Text("Review path targets", bundle: .module.prismLocalized)) {
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(review.pathReferences) { reference in
                                     VStack(alignment: .leading, spacing: 3) {
@@ -160,7 +160,7 @@ struct BackupSettingsView: View {
                         }
                     }
                     if !review.missingFavorites.isEmpty {
-                        PrismDisclosure(Text("Favorites skipped because their library targets are missing", bundle: .module)) {
+                        PrismDisclosure(Text("Favorites skipped because their library targets are missing", bundle: .module.prismLocalized)) {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(review.missingFavorites, id: \.id) { favorite in
                                     HStack {
@@ -176,7 +176,7 @@ struct BackupSettingsView: View {
                     }
                     HStack(spacing: 8) {
                         if review.additions == 0 && !backup.libraryApplied {
-                            PrismSettingsNote(Text("No new library items to import.", bundle: .module))
+                            PrismSettingsNote(Text("No new library items to import.", bundle: .module.prismLocalized))
                         }
                         Spacer(minLength: 0)
                         if backup.busy == .apply { ProgressView().controlSize(.small) }
@@ -184,17 +184,17 @@ struct BackupSettingsView: View {
                             confirmLibrary = true
                         } label: {
                             if backup.libraryApplied {
-                                iconLabel("checkmark", Text("Library restored", bundle: .module))
+                                iconLabel("checkmark", Text("Library restored", bundle: .module.prismLocalized))
                             } else {
-                                Text("Import \(review.additions) New Items", bundle: .module)
+                                Text("Import \(review.additions) New Items", bundle: .module.prismLocalized)
                             }
                         }
                         .buttonStyle(.prismPrimary)
                         .disabled(backup.isBusy || backup.libraryApplied || review.additions == 0)
-                        .confirmationDialog(Text("Import \(review.additions) new library items?", bundle: .module), isPresented: $confirmLibrary) {
-                            Button { Task { await backup.applyLibrary() } } label: { Text("Import", bundle: .module) }
+                        .confirmationDialog(Text("Import \(review.additions) new library items?", bundle: .module.prismLocalized), isPresented: $confirmLibrary) {
+                            Button { Task { await backup.applyLibrary() } } label: { Text("Import", bundle: .module.prismLocalized) }
                         } message: {
-                            Text("Only new items are added. Existing items are kept and nothing is deleted.", bundle: .module)
+                            Text("Only new items are added. Existing items are kept and nothing is deleted.", bundle: .module.prismLocalized)
                         }
                     }
                 }
@@ -207,11 +207,11 @@ struct BackupSettingsView: View {
     private func countsTable(_ review: BackupModel.Review) -> some View {
         Grid(alignment: .trailing, horizontalSpacing: 18, verticalSpacing: 0) {
             GridRow {
-                Text("Category", bundle: .module).gridColumnAlignment(.leading)
-                Text("In file", bundle: .module)
-                Text("Add", bundle: .module)
-                Text("Conflicts kept", bundle: .module)
-                Text("Skipped", bundle: .module)
+                Text("Category", bundle: .module.prismLocalized).gridColumnAlignment(.leading)
+                Text("In file", bundle: .module.prismLocalized)
+                Text("Add", bundle: .module.prismLocalized)
+                Text("Conflicts kept", bundle: .module.prismLocalized)
+                Text("Skipped", bundle: .module.prismLocalized)
             }
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(PrismTheme.textMuted)
@@ -235,24 +235,24 @@ struct BackupSettingsView: View {
     }
 
     private func preferencesGroup(_ review: BackupModel.Review) -> some View {
-        PrismSettingsGroup(Text("Restore safe preferences separately", bundle: .module)) {
+        PrismSettingsGroup(Text("Restore safe preferences separately", bundle: .module.prismLocalized)) {
             if let preferences = review.preferences {
                 let added = review.aliasReview.filter { $0.status == .add }.count
                 // `.backup-preferences dl`: label over value, side by side.
                 PrismFlowLayout(horizontalSpacing: 22, verticalSpacing: 12) {
-                    term(Text("Language", bundle: .module), languageName(preferences.language))
-                    term(Text("Appearance", bundle: .module), themeName(preferences.theme))
-                    term(Text("Application icons", bundle: .module), onOff(preferences.showApplicationIcons))
+                    term(Text("Language", bundle: .module.prismLocalized), languageName(preferences.language))
+                    term(Text("Appearance", bundle: .module.prismLocalized), themeName(preferences.theme))
+                    term(Text("Application icons", bundle: .module.prismLocalized), onOff(preferences.showApplicationIcons))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Aliases in backup", bundle: .module).foregroundStyle(PrismTheme.textSecondary)
-                        Text("\(added) to add · \(review.aliasReview.count - added) kept or skipped", bundle: .module).foregroundStyle(PrismTheme.text)
+                        Text("Aliases in backup", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textSecondary)
+                        Text("\(added) to add · \(review.aliasReview.count - added) kept or skipped", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.text)
                     }
                 }
                 .font(.system(size: 12))
                 .padding(.bottom, 14)
                 VStack(alignment: .leading, spacing: 14) {
                     if !review.aliasReview.isEmpty {
-                        PrismDisclosure(Text("Review alias changes", bundle: .module)) {
+                        PrismDisclosure(Text("Review alias changes", bundle: .module.prismLocalized)) {
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(review.aliasReview) { alias in
                                     HStack(alignment: .firstTextBaseline) {
@@ -269,30 +269,30 @@ struct BackupSettingsView: View {
                             .padding(.leading, 15)
                         }
                     }
-                    hint(Text("This replaces appearance and language. Existing aliases and alias conflicts are kept. Library import is a separate operation.", bundle: .module))
-                    PrismSettingsNote(Text("Language applies the next time Prism opens. Opacity, blur and reduce motion are kept for the Tauri app; this version follows the system.", bundle: .module))
+                    hint(Text("This replaces appearance and language. Existing aliases and alias conflicts are kept. Library import is a separate operation.", bundle: .module.prismLocalized))
+                    PrismSettingsNote(Text("Appearance and language apply immediately. Command aliases are restored with these settings.", bundle: .module.prismLocalized))
                     HStack(spacing: 8) {
                         Spacer(minLength: 0)
                         if backup.busy == .preferences { ProgressView().controlSize(.small) }
                         Button { confirmPreferences = true } label: {
                             if backup.preferencesApplied {
-                                iconLabel("checkmark", Text("Safe preferences restored", bundle: .module))
+                                iconLabel("checkmark", Text("Safe preferences restored", bundle: .module.prismLocalized))
                             } else {
-                                Text("Restore Appearance, Language, and Aliases", bundle: .module)
+                                Text("Restore Appearance, Language, and Aliases", bundle: .module.prismLocalized)
                             }
                         }
                         .buttonStyle(.prism)
                         .disabled(backup.isBusy || backup.preferencesApplied)
-                        .confirmationDialog(Text("Restore appearance, language, and aliases?", bundle: .module), isPresented: $confirmPreferences) {
-                            Button { Task { await backup.restorePreferences() } } label: { Text("Restore", bundle: .module) }
+                        .confirmationDialog(Text("Restore appearance, language, and aliases?", bundle: .module.prismLocalized), isPresented: $confirmPreferences) {
+                            Button { Task { await backup.restorePreferences() } } label: { Text("Restore", bundle: .module.prismLocalized) }
                         } message: {
-                            Text("This replaces appearance and language. Existing aliases and alias conflicts are kept. Library import is a separate operation.", bundle: .module)
+                            Text("This replaces appearance and language. Existing aliases and alias conflicts are kept. Library import is a separate operation.", bundle: .module.prismLocalized)
                         }
                     }
                     statusRow(for: [.preferences])
                 }
             } else {
-                PrismSettingsNote(Text("This backup contains no safe preferences.", bundle: .module))
+                PrismSettingsNote(Text("This backup contains no safe preferences.", bundle: .module.prismLocalized))
             }
         }
     }

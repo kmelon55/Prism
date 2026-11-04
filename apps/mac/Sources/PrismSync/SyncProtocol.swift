@@ -1,3 +1,4 @@
+import PrismKit
 import CryptoKit
 import Foundation
 
@@ -54,7 +55,7 @@ enum SyncCrypto {
   }
   static func key(_ string: String) throws -> SymmetricKey {
     guard let data = Data(base64Encoded: string), data.count == 32 else {
-      throw SyncFailure.message("암호화 키는 32바이트 Base64여야 해요.")
+      throw SyncFailure.message(String(localized: "The encryption key must be 32 bytes encoded as Base64.", bundle: .module.prismLocalized))
     }
     return SymmetricKey(data: data)
   }
@@ -67,12 +68,12 @@ enum SyncCrypto {
     -> String
   {
     guard let data = Data(base64Encoded: value), data.count <= maximum else {
-      throw SyncFailure.message("암호화된 데이터가 올바르지 않아요.")
+      throw SyncFailure.message(String(localized: "The encrypted data is invalid.", bundle: .module.prismLocalized))
     }
     let plain = try AES.GCM.open(
       AES.GCM.SealedBox(combined: data), using: self.key(key), authenticating: Data(context.utf8))
     guard let text = String(data: plain, encoding: .utf8) else {
-      throw SyncFailure.message("텍스트를 읽을 수 없어요.")
+      throw SyncFailure.message(String(localized: "Could not read the text.", bundle: .module.prismLocalized))
     }
     return text
   }
@@ -82,10 +83,10 @@ enum SyncPreference {
     "theme": "system", "showApplicationIcons": "true", "reduceMotion": "false",
     "backgroundOpacity": "0.64", "backgroundBlur": "12.0",
   ]
-  static let titles = [
-    "theme": "테마", "showApplicationIcons": "앱 아이콘", "reduceMotion": "동작 줄이기",
-    "backgroundOpacity": "배경 불투명도", "backgroundBlur": "배경 흐림",
-  ]
+  static var titles: [String: String] { [
+    "theme": String(localized: "Theme", bundle: .module.prismLocalized), "showApplicationIcons": String(localized: "Application icons", bundle: .module.prismLocalized), "reduceMotion": String(localized: "Reduce motion", bundle: .module.prismLocalized),
+    "backgroundOpacity": String(localized: "Background opacity", bundle: .module.prismLocalized), "backgroundBlur": String(localized: "Background blur", bundle: .module.prismLocalized),
+  ] }
   static func valid(_ value: String, for key: String) -> Bool {
     switch key {
     case "theme": ["system", "light", "dark"].contains(value)
@@ -103,7 +104,7 @@ enum SyncPreference {
     return String(describing: value)
   }
   static func apply(_ value: String, for key: String) throws {
-    guard valid(value, for: key) else { throw SyncFailure.message("지원하지 않는 설정이에요.") }
+    guard valid(value, for: key) else { throw SyncFailure.message(String(localized: "This setting is not supported.", bundle: .module.prismLocalized)) }
     switch key {
     case "theme": UserDefaults.standard.set(value, forKey: key)
     case "showApplicationIcons", "reduceMotion":

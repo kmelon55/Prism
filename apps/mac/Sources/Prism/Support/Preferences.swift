@@ -35,9 +35,9 @@ enum ThemePreference: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: String(localized: "System", bundle: .module)
-        case .light: String(localized: "Light", bundle: .module)
-        case .dark: String(localized: "Dark", bundle: .module)
+        case .system: String(localized: "System", bundle: .module.prismLocalized)
+        case .light: String(localized: "Light", bundle: .module.prismLocalized)
+        case .dark: String(localized: "Dark", bundle: .module.prismLocalized)
         }
     }
 }

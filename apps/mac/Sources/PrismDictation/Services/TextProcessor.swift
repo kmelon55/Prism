@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// Built-in instructions for the two enhancements. Same text as `dictation/processing.rs`.
@@ -8,11 +9,25 @@ enum ProcessingPrompts {
 
     static func defaultInstruction(_ mode: ProcessingMode) -> String { mode == .cleanup ? cleanup : prompt }
 
+    /// Translate only Prism's built-in instructions. Custom text remains exactly as the user wrote it.
+    static func displayInstruction(_ mode: ProcessingMode, stored: String, language: String = PrismLanguage.identifier) -> String {
+        guard isDefaultInstruction(mode, stored: stored) else { return stored }
+        return PrismLanguage.bundle(.module, language: language)
+            .localizedString(forKey: defaultInstruction(mode), value: defaultInstruction(mode), table: nil)
+    }
+
+    static func isDefaultInstruction(_ mode: ProcessingMode, stored: String) -> Bool {
+        let source = defaultInstruction(mode)
+        return ["en", "ko"].contains { language in
+            stored == PrismLanguage.bundle(.module, language: language).localizedString(forKey: source, value: source, table: nil)
+        }
+    }
+
     /// The system message: the fixed preservation rules followed by the user's task, or the default when blank.
     static func instruction(_ mode: ProcessingMode, custom: String?) throws -> String {
         let task = custom.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 } ?? defaultInstruction(mode)
         guard task.utf8.count <= 8000, !task.contains("\0") else {
-            throw DictationError(String(localized: "Processing prompt is too long.", bundle: .module))
+            throw DictationError(String(localized: "Processing prompt is too long.", bundle: .module.prismLocalized))
         }
         return "\(preserve)\n\(task)"
     }
@@ -46,17 +61,17 @@ struct TextProcessor: Sendable {
         case .compatible: (compatibleBase ?? "") + "chat/completions"
         }
         guard let url = URL(string: address), url.host?.isEmpty == false else {
-            throw DictationError(String(localized: "Set up the custom server in AI settings.", bundle: .module))
+            throw DictationError(String(localized: "Set up the custom server in AI settings.", bundle: .module.prismLocalized))
         }
         if provider != .compatible, apiKey?.isEmpty != false {
-            throw DictationError(String(localized: "Save an API key first.", bundle: .module))
+            throw DictationError(String(localized: "Save an API key first.", bundle: .module.prismLocalized))
         }
         return TextEndpoint(url: url, apiKey: apiKey)
     }
 
     func rewrite(_ text: String, provider: TextProvider, model: String, instruction: String, endpoint: TextEndpoint) async throws -> (String, UsageMeasurement) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 32_000 else {
-            throw DictationError(String(localized: "Dictation is too long to refine. The original text is available.", bundle: .module))
+            throw DictationError(String(localized: "Dictation is too long to refine. The original text is available.", bundle: .module.prismLocalized))
         }
         let messages: [[String: String]] = [["role": "system", "content": instruction], ["role": "user", "content": text]]
         let body: [String: Any] = provider == .openai
@@ -69,12 +84,12 @@ struct TextProcessor: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let key = endpoint.apiKey { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         let (data, http) = try await DictationHTTP.send(request, session: session, limit: 4 * 1_048_576,
-                                                         tooLarge: String(localized: "Text processing was incomplete. Used the original text.", bundle: .module))
+                                                         tooLarge: String(localized: "Text processing was incomplete. Used the original text.", bundle: .module.prismLocalized))
         guard (200..<300).contains(http.statusCode) else {
-            throw DictationError(String(localized: "Text processing failed (\(http.statusCode)). Used the original text.", bundle: .module))
+            throw DictationError(String(localized: "Text processing failed (\(http.statusCode)). Used the original text.", bundle: .module.prismLocalized))
         }
         guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let output = Self.responseText(provider, value) else {
-            throw DictationError(String(localized: "Text processing was incomplete. Used the original text.", bundle: .module))
+            throw DictationError(String(localized: "Text processing was incomplete. Used the original text.", bundle: .module.prismLocalized))
         }
         return (output, UsageMeasurement(response: data))
     }

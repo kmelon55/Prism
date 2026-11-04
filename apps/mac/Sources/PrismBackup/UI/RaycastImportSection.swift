@@ -35,11 +35,11 @@ struct RaycastImportSection: View {
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(PrismTheme.surfaceSelected))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PrismTheme.lineStrong))
             VStack(alignment: .leading, spacing: 7) {
-                Text("Bring your Raycast setup", bundle: .module)
+                Text("Bring your Raycast setup", bundle: .module.prismLocalized)
                     .font(.system(size: 15, weight: .semibold))
                     .tracking(-0.3)
                     .foregroundStyle(PrismTheme.text)
-                Text("Your shortcuts, snippets, and quicklinks. Ready for Prism.", bundle: .module)
+                Text("Your shortcuts, snippets, and quicklinks. Ready for Prism.", bundle: .module.prismLocalized)
                     .font(.system(size: 12))
                     .foregroundStyle(PrismTheme.textSecondary)
             }
@@ -59,7 +59,7 @@ struct RaycastImportSection: View {
                 Button { Task { await model.chooseFile() } } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "doc.badge.arrow.up").font(.system(size: 11))
-                        Text("Choose Raycast export", bundle: .module)
+                        Text("Choose Raycast export", bundle: .module.prismLocalized)
                     }
                 }
                 .buttonStyle(.prismPrimary)
@@ -68,31 +68,31 @@ struct RaycastImportSection: View {
             if model.needsPassword {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        SecureField(text: $model.password, prompt: Text("Export password", bundle: .module)) {
-                            Text("Export password", bundle: .module)
+                        SecureField(text: $model.password, prompt: Text("Export password", bundle: .module.prismLocalized)) {
+                            Text("Export password", bundle: .module.prismLocalized)
                         }
                         .labelsHidden()
                         .textFieldStyle(PrismTextFieldStyle(height: 34))
                         .focused($passwordFocused)
                         .onSubmit { Task { await model.unlock() } }
                         if model.busy { ProgressView().controlSize(.small) }
-                        Button { Task { await model.unlock() } } label: { Text("Unlock", bundle: .module) }
+                        Button { Task { await model.unlock() } } label: { Text("Unlock", bundle: .module.prismLocalized) }
                             .buttonStyle(.prism)
                             .disabled(model.busy || model.password.isEmpty)
                     }
-                    PrismSettingsNote(Text("This export is encrypted.", bundle: .module)
+                    PrismSettingsNote(Text("This export is encrypted.", bundle: .module.prismLocalized)
                         + Text(verbatim: " ")
-                        + Text("The password is used only to decode the file on this Mac and is never saved.", bundle: .module))
+                        + Text("The password is used only to decode the file on this Mac and is never saved.", bundle: .module.prismLocalized))
                 }
                 .padding(.vertical, 2)
                 .onAppear { passwordFocused = true }
             }
             if model.fileURL == nil {
-                PrismDisclosure(Text("How to export from Raycast", bundle: .module)) {
+                PrismDisclosure(Text("How to export from Raycast", bundle: .module.prismLocalized)) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("1. Run Export Settings & Data in Raycast.", bundle: .module)
-                        Text("2. Save the .rayconfig file and remember its export password.", bundle: .module)
-                        Text("3. Choose the file here, then review what to bring over.", bundle: .module)
+                        Text("1. Run Export Settings & Data in Raycast.", bundle: .module.prismLocalized)
+                        Text("2. Save the .rayconfig file and remember its export password.", bundle: .module.prismLocalized)
+                        Text("3. Choose the file here, then review what to bring over.", bundle: .module.prismLocalized)
                     }
                     .font(.system(size: 12))
                     .lineSpacing(4)
@@ -114,7 +114,7 @@ struct RaycastImportSection: View {
             }
             .padding(.top, 6)
             VStack(alignment: .leading, spacing: 10) {
-                Text("Bring over", bundle: .module).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
+                Text("Bring over", bundle: .module.prismLocalized).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
                 PrismFlowLayout(horizontalSpacing: 20, verticalSpacing: 10) {
                     ForEach(ImportItem.Category.allCases, id: \.self) { category in
                         Toggle(isOn: Binding(get: { model.isCategorySelected(category) }, set: { model.setCategory(category, selected: $0) })) {
@@ -136,25 +136,25 @@ struct RaycastImportSection: View {
             .frame(height: min(CGFloat(rows.count) * 50, 290))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(PrismTheme.lineStrong))
-            .accessibilityLabel(Text("Import preview", bundle: .module))
+            .accessibilityLabel(Text("Import preview", bundle: .module.prismLocalized))
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
-                Button { model.cancel() } label: { Text("Cancel", bundle: .module) }
+                Button { model.cancel() } label: { Text("Cancel", bundle: .module.prismLocalized) }
                     .buttonStyle(.prism)
                     .keyboardShortcut(.cancelAction)
                     .disabled(model.busy)
-                Button { confirmImport = true } label: { Text("Import \(model.selected.count) Items", bundle: .module) }
+                Button { confirmImport = true } label: { Text("Import \(model.selected.count) Items", bundle: .module.prismLocalized) }
                     .buttonStyle(.prismPrimary)
                     .disabled(model.busy || model.selected.isEmpty)
-                    .confirmationDialog(Text("Import \(model.selected.count) items from Raycast?", bundle: .module), isPresented: $confirmImport) {
-                        Button { Task { await model.apply() } } label: { Text("Import", bundle: .module) }
+                    .confirmationDialog(Text("Import \(model.selected.count) items from Raycast?", bundle: .module.prismLocalized), isPresented: $confirmImport) {
+                        Button { Task { await model.apply() } } label: { Text("Import", bundle: .module.prismLocalized) }
                     } message: {
-                        Text("Existing settings stay unless you select a replacement. You can undo the import afterwards.", bundle: .module)
+                        Text("Existing settings stay unless you select a replacement. You can undo the import afterwards.", bundle: .module.prismLocalized)
                     }
             }
-            PrismSettingsNote(Text("A local recovery copy is saved before import. Quit Raycast before activating the same hotkeys.", bundle: .module)
+            PrismSettingsNote(Text("A local recovery copy is saved before import. Quit Raycast before activating the same hotkeys.", bundle: .module.prismLocalized)
                 + Text(verbatim: " ")
-                + Text("Existing settings stay unless you select a replacement. Unsupported items are skipped.", bundle: .module))
+                + Text("Existing settings stay unless you select a replacement. Unsupported items are skipped.", bundle: .module.prismLocalized))
         }
     }
 
@@ -228,19 +228,19 @@ struct RaycastImportSection: View {
     private func recovery(_ journal: MigrationJournal) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Import recovery", bundle: .module).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
+                Text("Import recovery", bundle: .module.prismLocalized).font(.system(size: 12, weight: .semibold)).foregroundStyle(PrismTheme.text)
                 Spacer()
-                Text("\(journal.applied) imported · \(journal.failed) failed · \(journal.undone) undone", bundle: .module)
+                Text("\(journal.applied) imported · \(journal.failed) failed · \(journal.undone) undone", bundle: .module.prismLocalized)
                     .font(.system(size: 11)).foregroundStyle(PrismTheme.textSecondary)
             }
             if journal.isInterrupted {
                 HStack(spacing: 7) {
                     Image(systemName: "exclamationmark.triangle").foregroundStyle(PrismTheme.warning)
-                    Text("An import was interrupted. Undo can recover changes already written.", bundle: .module).foregroundStyle(PrismTheme.textSecondary)
+                    Text("An import was interrupted. Undo can recover changes already written.", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textSecondary)
                 }
                 .font(.system(size: 11))
             }
-            PrismDisclosure(Text("View results", bundle: .module)) {
+            PrismDisclosure(Text("View results", bundle: .module.prismLocalized)) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(journal.changes, id: \.item.id) { change in
                         HStack(alignment: .firstTextBaseline) {
@@ -260,24 +260,24 @@ struct RaycastImportSection: View {
             HStack(spacing: 8) {
                 if model.busy { ProgressView().controlSize(.small) }
                 Spacer()
-                Button { confirmDiscard = true } label: { Text("Discard Recovery…", bundle: .module) }
+                Button { confirmDiscard = true } label: { Text("Discard Recovery…", bundle: .module.prismLocalized) }
                     .buttonStyle(.prismDestructive)
                     .disabled(model.busy)
-                    .confirmationDialog(Text("Discard the import recovery copy?", bundle: .module), isPresented: $confirmDiscard) {
-                        Button(role: .destructive) { Task { await model.discardRecovery() } } label: { Text("Discard Recovery", bundle: .module) }
+                    .confirmationDialog(Text("Discard the import recovery copy?", bundle: .module.prismLocalized), isPresented: $confirmDiscard) {
+                        Button(role: .destructive) { Task { await model.discardRecovery() } } label: { Text("Discard Recovery", bundle: .module.prismLocalized) }
                     } message: {
-                        Text("Imported items stay. You will no longer be able to undo this import.", bundle: .module)
+                        Text("Imported items stay. You will no longer be able to undo this import.", bundle: .module.prismLocalized)
                     }
                 Button { Task { await model.undo() } } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.counterclockwise").font(.system(size: 11))
-                        Text("Undo Import", bundle: .module)
+                        Text("Undo Import", bundle: .module.prismLocalized)
                     }
                 }
                 .buttonStyle(.prism)
                 .disabled(model.busy || !journal.canUndo)
             }
-            PrismSettingsNote(Text("Undo keeps anything you changed after importing.", bundle: .module))
+            PrismSettingsNote(Text("Undo keeps anything you changed after importing.", bundle: .module.prismLocalized))
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(PrismTheme.surfaceSelected.opacity(0.5)))

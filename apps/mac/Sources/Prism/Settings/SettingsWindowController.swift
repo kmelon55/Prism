@@ -37,6 +37,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         model.panes = panes.sorted { ($0.group.rawValue, $0.order) < ($1.group.rawValue, $1.order) }
     }
 
+    func refreshLanguage() {
+        window?.title = String(localized: "Prism Settings", bundle: .module.prismLocalized)
+    }
+
     func show(paneID: String? = nil) {
         if let paneID { model.selection = paneID }
         let window = window ?? makeWindow()
@@ -52,7 +56,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
-        window.title = String(localized: "Prism Settings", bundle: .module)
+        window.title = String(localized: "Prism Settings", bundle: .module.prismLocalized)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isOpaque = false
@@ -66,7 +70,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         let glass = NSView.prismGlassBackground(opacity: PaletteController.backgroundOpacity)
         glass.setBlurRadius(Glass.blur)
-        let host = FirstClickHostingView(rootView: SettingsRootView(model: model))
+        let host = FirstClickHostingView(rootView: PrismLocalizedContent { [model] in SettingsRootView(model: model) })
         host.translatesAutoresizingMaskIntoConstraints = false
         glass.contentView.addSubview(host)
         NSLayoutConstraint.activate([
@@ -133,8 +137,8 @@ private struct SettingsSidebar: View {
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass").font(.system(size: 11, weight: .medium))
                     .foregroundStyle(PrismTheme.textMuted)
-                TextField(text: $model.query, prompt: Text("Search settings…", bundle: .module)) {
-                    Text("Search settings…", bundle: .module)
+                TextField(text: $model.query, prompt: Text("Search settings…", bundle: .module.prismLocalized)) {
+                    Text("Search settings…", bundle: .module.prismLocalized)
                 }
                 .textFieldStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
@@ -157,7 +161,7 @@ private struct SettingsSidebar: View {
                 VStack(alignment: .leading, spacing: 3) {
                     let sections = model.sections
                     if sections.isEmpty {
-                        Text("No matching settings", bundle: .module)
+                        Text("No matching settings", bundle: .module.prismLocalized)
                             .font(.system(size: 11))
                             .foregroundStyle(PrismTheme.textMuted)
                             .padding(10)
@@ -186,9 +190,9 @@ private struct SettingsSidebar: View {
 
     static func title(_ group: SettingsPane.Group) -> String {
         switch group {
-        case .preferences: String(localized: "Preferences", bundle: .module)
-        case .tools: String(localized: "Tools", bundle: .module)
-        case .privacy: String(localized: "Privacy", bundle: .module)
+        case .preferences: String(localized: "Preferences", bundle: .module.prismLocalized)
+        case .tools: String(localized: "Tools", bundle: .module.prismLocalized)
+        case .privacy: String(localized: "Privacy", bundle: .module.prismLocalized)
         }
     }
 }

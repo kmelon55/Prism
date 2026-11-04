@@ -247,7 +247,7 @@ struct LibraryScreenView: View {
         VStack(alignment: .leading, spacing: 0) {
             // `.library-heading`: back arrow and the tab's name.
             HStack(spacing: 12) {
-                PrismBackButton(help: Text("Back", bundle: .module), action: model.goBack)
+                PrismBackButton(help: Text("Back", bundle: .module.prismLocalized), action: model.goBack)
                 Text(verbatim: model.tab.title)
                     .font(.prism(15, weight: 550))
                     .foregroundStyle(PrismTheme.text)
@@ -282,7 +282,7 @@ struct LibraryScreenView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13))
                     .foregroundStyle(PrismTheme.textMuted)
-                TextField(text: $model.query, prompt: Text("Search", bundle: .module).foregroundStyle(PrismTheme.textMuted)) {
+                TextField(text: $model.query, prompt: Text("Search", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)) {
                     Text(searchPrompt)
                 }
                 .textFieldStyle(.plain)
@@ -304,7 +304,7 @@ struct LibraryScreenView: View {
                 Button { model.create() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus").font(.system(size: 12, weight: .regular))
-                        Text("Add", bundle: .module)
+                        Text("Add", bundle: .module.prismLocalized)
                     }
                 }
                 .buttonStyle(.prism)
@@ -387,25 +387,25 @@ struct LibraryScreenView: View {
                     PrismStatusAction(Text(verbatim: primaryTitle(entry)), keys: "↵", isPrimary: true) { submit() }
                     if entry.kind == .snippet {
                         PrismStatusDivider()
-                        PrismStatusAction(Text("Paste", bundle: .module), keys: "⌘↵") { model.paste() }
+                        PrismStatusAction(Text("Paste", bundle: .module.prismLocalized), keys: "⌘↵") { model.paste() }
                     }
                     if model.tab != .favorites, entry.kind != .note {
                         PrismStatusDivider()
-                        PrismStatusAction(Text("Edit", bundle: .module), keys: "⌘E") { model.edit() }
+                        PrismStatusAction(Text("Edit", bundle: .module.prismLocalized), keys: "⌘E") { model.edit() }
                     }
                 }
                 PrismStatusDivider()
                 if model.tab == .favorites {
-                    PrismStatusAction(Text("Move", bundle: .module), keys: "⌥⌘↑↓") { model.moveFavorite(by: 1) }
+                    PrismStatusAction(Text("Move", bundle: .module.prismLocalized), keys: "⌥⌘↑↓") { model.moveFavorite(by: 1) }
                     PrismStatusDivider()
-                    PrismStatusAction(Text("Remove", bundle: .module), keys: "⌃X") { model.requestDelete() }
+                    PrismStatusAction(Text("Remove", bundle: .module.prismLocalized), keys: "⌃X") { model.requestDelete() }
                 } else {
-                    PrismStatusAction(Text("Delete", bundle: .module), keys: "⌃X") { model.requestDelete() }
+                    PrismStatusAction(Text("Delete", bundle: .module.prismLocalized), keys: "⌃X") { model.requestDelete() }
                 }
             }
             if model.tab != .favorites {
                 if model.selectedRow != nil { PrismStatusDivider() }
-                PrismStatusAction(Text("New", bundle: .module), keys: "⌘N") { model.create() }
+                PrismStatusAction(Text("New", bundle: .module.prismLocalized), keys: "⌘N") { model.create() }
             }
         }
     }

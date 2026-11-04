@@ -7,7 +7,7 @@ enum PermissionsPane {
 
     @MainActor
     static func make() -> SettingsPane {
-        SettingsPane(id: id, title: String(localized: "Permissions", bundle: .module), systemImage: "checkmark.shield", group: .privacy, order: 20,
+        SettingsPane(id: id, title: String(localized: "Permissions", bundle: .module.prismLocalized), systemImage: "checkmark.shield", group: .privacy, order: 20,
                      keywords: SystemPermission.allCases.map(\.title) + SystemPermission.allCases.map(\.heading)
                          + ["Manage permission", "Current permission target"].map(SystemStrings.localized)) {
             PermissionsView()
@@ -53,10 +53,10 @@ private struct PermissionsView: View {
     @ViewState private var model = PermissionsModel()
 
     var body: some View {
-        PrismSettingsPage(String(localized: "Permissions", bundle: .module)) {
+        PrismSettingsPage(String(localized: "Permissions", bundle: .module.prismLocalized)) {
             PrismCallout(systemImage: "checkmark.shield",
-                         title: Text("Native access, only when needed", bundle: .module),
-                         detail: Text("Check permissions for the microphone, text insertion and modifier shortcuts.", bundle: .module))
+                         title: Text("Native access, only when needed", bundle: .module.prismLocalized),
+                         detail: Text("Check permissions for the microphone, text insertion and modifier shortcuts.", bundle: .module.prismLocalized))
             ForEach(SystemPermission.allCases) { permission in
                 PermissionGroup(permission: permission, state: model.state(permission), isPending: model.pending == permission,
                                 isRefreshing: model.isRefreshing,
@@ -101,21 +101,21 @@ private struct PermissionGroup: View {
                     ProgressView().controlSize(.small)
                 }
             }
-            PrismSettingsRow(Text("Manage permission", bundle: .module), detail: manageDetail, stacked: true) {
+            PrismSettingsRow(Text("Manage permission", bundle: .module.prismLocalized), detail: manageDetail, stacked: true) {
                 HStack(spacing: 8) {
                     if let state, state != .granted, permission.canRequest(in: state) {
                         Button(action: onRequest) {
-                            Label { Text(isPending ? "Waiting for access…" : "Request Access", bundle: .module) } icon: {
+                            Label { Text(isPending ? "Waiting for access…" : "Request Access", bundle: .module.prismLocalized) } icon: {
                                 Image(systemName: "checkmark.shield")
                             }
                         }
                         .disabled(isPending)
                     }
                     Button { permission.openSettings() } label: {
-                        Label { Text("System Settings", bundle: .module) } icon: { Image(systemName: "arrow.up.forward.square") }
+                        Label { Text("System Settings", bundle: .module.prismLocalized) } icon: { Image(systemName: "arrow.up.forward.square") }
                     }
                     Button(action: onRefresh) {
-                        Label { Text("Check Again", bundle: .module) } icon: { Image(systemName: "arrow.clockwise") }
+                        Label { Text("Check Again", bundle: .module.prismLocalized) } icon: { Image(systemName: "arrow.clockwise") }
                     }
                     .disabled(isRefreshing)
                 }
@@ -128,22 +128,22 @@ private struct PermissionGroup: View {
     private var manageDetail: Text? {
         switch permission {
         case .accessibility:
-            Text("Ordinary shortcut combinations do not require access; single and double modifier presses require Accessibility permission.", bundle: .module)
+            Text("Ordinary shortcut combinations do not require access; single and double modifier presses require Accessibility permission.", bundle: .module.prismLocalized)
         case .microphone:
-            Text("Prism asks the first time you dictate. If you declined, allow it in System Settings.", bundle: .module)
+            Text("Prism asks the first time you dictate. If you declined, allow it in System Settings.", bundle: .module.prismLocalized)
         case .screenRecording:
-            Text("macOS may ask you to reopen Prism after you allow it.", bundle: .module)
+            Text("macOS may ask you to reopen Prism after you allow it.", bundle: .module.prismLocalized)
         case .automation:
-            Text("Prism asks the first time it controls Finder.", bundle: .module)
+            Text("Prism asks the first time it controls Finder.", bundle: .module.prismLocalized)
         }
     }
 
     private func label(_ state: SystemPermission.State) -> String {
         switch state {
-        case .granted: String(localized: "Allowed", bundle: .module)
-        case .notDetermined: String(localized: "Not requested", bundle: .module)
-        case .denied: String(localized: "Needs access", bundle: .module)
-        case .unknown: String(localized: "Unknown", bundle: .module)
+        case .granted: String(localized: "Allowed", bundle: .module.prismLocalized)
+        case .notDetermined: String(localized: "Not requested", bundle: .module.prismLocalized)
+        case .denied: String(localized: "Needs access", bundle: .module.prismLocalized)
+        case .unknown: String(localized: "Unknown", bundle: .module.prismLocalized)
         }
     }
 
@@ -172,11 +172,11 @@ private struct RuntimeGroup: View {
     let accessibilityGranted: Bool
 
     var body: some View {
-        PrismSettingsGroup(Text("Current permission target", bundle: .module)) {
+        PrismSettingsGroup(Text("Current permission target", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 12) {
-                PrismSettingsNote(Text(runtime.bundled ? "Permissions are checked for this app." : "This is a development executable. Its permissions can differ from the installed Prism.app.", bundle: .module))
+                PrismSettingsNote(Text(runtime.bundled ? "Permissions are checked for this app." : "This is a development executable. Its permissions can differ from the installed Prism.app.", bundle: .module.prismLocalized))
                 if !accessibilityGranted {
-                    PrismSettingsNote(Text("An enabled Prism entry at another path does not grant this process access. Add and allow the target below. Prism checks again when you return.", bundle: .module))
+                    PrismSettingsNote(Text("An enabled Prism entry at another path does not grant this process access. Add and allow the target below. Prism checks again when you return.", bundle: .module.prismLocalized))
                 }
                 HStack(alignment: .center, spacing: 12) {
                     Text(verbatim: runtime.permissionTarget)
@@ -188,19 +188,19 @@ private struct RuntimeGroup: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Button {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: runtime.permissionTarget)])
-                    } label: { Text("Reveal current executable", bundle: .module) }
+                    } label: { Text("Reveal current executable", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .prismSettingsCard(cornerRadius: 10)
                 if runtime.adHoc {
-                    PrismSettingsNote(Text("This ad-hoc build may need authorization again after a native rebuild.", bundle: .module))
+                    PrismSettingsNote(Text("This ad-hoc build may need authorization again after a native rebuild.", bundle: .module.prismLocalized))
                     if !accessibilityGranted {
-                        PrismSettingsNote(Text("If this exact path is already enabled but was rebuilt, remove that entry and add the current executable again.", bundle: .module))
+                        PrismSettingsNote(Text("If this exact path is already enabled but was rebuilt, remove that entry and add the current executable again.", bundle: .module.prismLocalized))
                     }
                 }
-                PrismDisclosure(Text("Runtime details", bundle: .module)) {
+                PrismDisclosure(Text("Runtime details", bundle: .module.prismLocalized)) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(verbatim: "\(runtime.identifier ?? "—") · PID \(runtime.pid)")
                         Text(verbatim: runtime.codeHash ?? "—")
@@ -218,10 +218,10 @@ extension SystemPermission {
     /// What the permission is for, as the row title of its group.
     var heading: String {
         switch self {
-        case .accessibility: String(localized: "Window management and dictation insertion", bundle: .module)
-        case .screenRecording: String(localized: "Screen capture for AI", bundle: .module)
-        case .microphone: String(localized: "Dictation recording", bundle: .module)
-        case .automation: String(localized: "Finder and scripts", bundle: .module)
+        case .accessibility: String(localized: "Window management and dictation insertion", bundle: .module.prismLocalized)
+        case .screenRecording: String(localized: "Screen capture for AI", bundle: .module.prismLocalized)
+        case .microphone: String(localized: "Dictation recording", bundle: .module.prismLocalized)
+        case .automation: String(localized: "Finder and scripts", bundle: .module.prismLocalized)
         }
     }
 }

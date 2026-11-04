@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
     private let applications = ApplicationsProvider()
     private let hud = HUD()
     private var statusItem: NSStatusItem?
+    private var displayedLanguage = PrismLanguage.identifier
     private lazy var aliases = CommandAliases(paths: paths)
     private lazy var usage = UsageStore(paths: paths)
     private lazy var toggles = CommandToggles(paths: paths)
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LegacyPreferencesImport.runIfNeeded(paths: paths)
+        displayedLanguage = PrismLanguage.identifier
         Appearance.applyStoredTheme()
         NSApp.mainMenu = MainMenu.make(target: self)
         palette.onOpenSettings = { [weak self] in self?.openSettings(nil) }
@@ -55,6 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
             LauncherSettingsPane.make(hotKeys: hotKeys),
             ShortcutsSettingsPane.make(hotKeys: hotKeys, aliases: aliases, toggles: toggles) { await model.allSearchableItems() },
         ] + featurePanes.filter { $0.id != UpdatesFeature.settingsPaneID })
+        for name in [PrismLanguage.didChange, UserDefaults.didChangeNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshLanguage() }
+            }
+        }
         applications.reload()
 
         let arguments = ProcessInfo.processInfo.arguments
@@ -108,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
             aliasesLocked: { aliases.isUnreadable },
             shortcut: { hotKeys.shortcut(for: $0) },
             setShortcut: { hotKeys.setShortcut($1, for: $0) },
-            shortcutProblem: { hotKeys.failures.contains($0) ? String(localized: "Used by macOS or another app", bundle: .module) : nil },
+            shortcutProblem: { hotKeys.failures.contains($0) ? String(localized: "Used by macOS or another app", bundle: .module.prismLocalized) : nil },
             isEnabled: { toggles.isEnabled($0) },
             setEnabled: { toggles.setEnabled($1, for: $0) }
         )
@@ -175,19 +182,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, PrismContext {
 
     func showHUD(_ message: String) { hud.show(message) }
 
+    private func refreshLanguage() {
+        let language = PrismLanguage.identifier
+        guard language != displayedLanguage else { return }
+        displayedLanguage = language
+        if let menu = NSApp.mainMenu { MainMenu.refreshLanguage(menu) }
+        if statusItem != nil { installStatusItem() }
+        settings.refreshLanguage()
+        palette.model.refresh()
+    }
+
     private func installStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "sparkle.magnifyingglass", accessibilityDescription: "Prism")
         let menu = NSMenu()
         menu.delegate = self
-        let open = menu.addItem(withTitle: String(localized: "Open Prism", bundle: .module), action: #selector(togglePalette(_:)), keyEquivalent: "")
+        let open = menu.addItem(withTitle: String(localized: "Open Prism", bundle: .module.prismLocalized), action: #selector(togglePalette(_:)), keyEquivalent: "")
         open.target = self
         menu.addItem(.separator())
-        let settingsItem = menu.addItem(withTitle: String(localized: "Settings…", bundle: .module), action: #selector(openSettings(_:)), keyEquivalent: ",")
+        let settingsItem = menu.addItem(withTitle: String(localized: "Settings…", bundle: .module.prismLocalized), action: #selector(openSettings(_:)), keyEquivalent: ",")
         settingsItem.target = self
-        menu.addItem(withTitle: String(localized: "Check for Updates…", bundle: .module), action: #selector(checkForUpdates(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "Check for Updates…", bundle: .module.prismLocalized), action: #selector(checkForUpdates(_:)), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: String(localized: "Quit Prism", bundle: .module), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: String(localized: "Quit Prism", bundle: .module.prismLocalized), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
     }
@@ -197,7 +214,7 @@ extension AppDelegate: NSMenuDelegate {
     /// Shows the current launcher shortcut, or why it could not be registered.
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard let open = menu.items.first else { return }
-        open.title = String(localized: "Open Prism", bundle: .module) + "  " + hotKeys.launcher.displayName
+        open.title = String(localized: "Open Prism", bundle: .module.prismLocalized) + "  " + hotKeys.launcher.displayName
         open.toolTip = hotKeys.launcherError
     }
 }

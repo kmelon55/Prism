@@ -56,7 +56,7 @@ final class LibraryStore: Sendable {
             let before = try load()
             let incomingIDs = Set(incoming.map(\.id))
             guard !before.entries.contains(where: { incomingIDs.contains($0.id) && $0.kind != kind }) else {
-                throw TransferError("다른 종류의 항목과 ID가 충돌해요.")
+                throw TransferError(String(localized: "An item with a different type has the same ID.", bundle: .module.prismLocalized))
             }
             let retained = before.entries.filter { $0.kind != kind || (!replace && !incomingIDs.contains($0.id)) }
             let combined = retained + incoming

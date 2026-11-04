@@ -1,3 +1,4 @@
+import PrismKit
 // Adapted from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import Foundation
 
@@ -45,11 +46,11 @@ struct LocalWhisperService: Sendable {
         } onCancel: { child.cancel() }
         try Task.checkCancellation()
         guard code == 0 else {
-            throw DictationError(String(localized: "Local transcription failed. Check the executable and model.", bundle: .module))
+            throw DictationError(String(localized: "Local transcription failed. Check the executable and model.", bundle: .module.prismLocalized))
         }
         guard let size = try? textURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1_048_576,
               let text = try? String(contentsOf: textURL, encoding: .utf8) else {
-            throw DictationError(String(localized: "Could not read the local transcription result.", bundle: .module))
+            throw DictationError(String(localized: "Could not read the local transcription result.", bundle: .module.prismLocalized))
         }
         return text
     }

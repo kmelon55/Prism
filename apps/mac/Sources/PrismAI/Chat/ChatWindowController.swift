@@ -136,7 +136,11 @@ final class ChatWindowController: NSObject, NSWindowDelegate {
         let root = ChatRootView(model: model, onClose: { [weak self] in self?.close() },
                                 onExport: { [weak self] session in self?.export(session) },
                                 chooseFolder: { Self.chooseFolder() })
-        window.contentViewController = NSHostingController(rootView: root)
+        window.contentViewController = NSHostingController(rootView: PrismLocalizedContent { [weak window] in
+            root.onReceive(NotificationCenter.default.publisher(for: PrismLanguage.didChange)) { [weak window] _ in
+                window?.title = L("AI Chat")
+            }
+        })
         if !window.setFrameUsingName(Self.autosaveName) {
             window.setFrame(Self.initialFrame(on: NSScreen.main?.visibleFrame), display: false)
         }

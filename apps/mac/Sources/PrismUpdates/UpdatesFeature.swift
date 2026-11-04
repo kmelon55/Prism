@@ -28,7 +28,7 @@ public enum UpdatesFeature {
         return FeatureContribution(
             providers: [provider],
             settingsPanes: [
-                SettingsPane(id: settingsPaneID, title: String(localized: "Updates", bundle: .module),
+                SettingsPane(id: settingsPaneID, title: String(localized: "Updates", bundle: .module.prismLocalized),
                              systemImage: "arrow.triangle.2.circlepath", order: 850) {
                     UpdatesSettingsView(controller: controller)
                 },

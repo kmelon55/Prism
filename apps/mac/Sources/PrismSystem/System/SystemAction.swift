@@ -1,3 +1,4 @@
+import PrismKit
 import AppKit
 import Carbon.HIToolbox
 
@@ -46,23 +47,23 @@ enum SystemAction: String, CaseIterable, Sendable {
 
     var subtitle: String {
         switch self {
-        case .lockScreen: String(localized: "Lock this Mac session", bundle: .module)
-        case .sleep: String(localized: "Put this Mac to sleep", bundle: .module)
-        case .sleepDisplays: String(localized: "Turn off displays until the next input", bundle: .module)
-        case .restart: String(localized: "Restart this Mac after confirmation", bundle: .module)
-        case .shutDown: String(localized: "Shut down this Mac after confirmation", bundle: .module)
-        case .logOut: String(localized: "Log out of this Mac after confirmation", bundle: .module)
-        case .emptyTrash: String(localized: "Permanently erase the items in the Trash after confirmation", bundle: .module)
-        case .quitAllApps: String(localized: "Quit every open app after confirmation", bundle: .module)
+        case .lockScreen: String(localized: "Lock this Mac session", bundle: .module.prismLocalized)
+        case .sleep: String(localized: "Put this Mac to sleep", bundle: .module.prismLocalized)
+        case .sleepDisplays: String(localized: "Turn off displays until the next input", bundle: .module.prismLocalized)
+        case .restart: String(localized: "Restart this Mac after confirmation", bundle: .module.prismLocalized)
+        case .shutDown: String(localized: "Shut down this Mac after confirmation", bundle: .module.prismLocalized)
+        case .logOut: String(localized: "Log out of this Mac after confirmation", bundle: .module.prismLocalized)
+        case .emptyTrash: String(localized: "Permanently erase the items in the Trash after confirmation", bundle: .module.prismLocalized)
+        case .quitAllApps: String(localized: "Quit every open app after confirmation", bundle: .module.prismLocalized)
         }
     }
 
     /// The message shown before a session-ending or irreversible action.
     var confirmationMessage: String {
         switch self {
-        case .emptyTrash: String(localized: "Items in the Trash will be erased permanently. You can't undo this action.", bundle: .module)
-        case .quitAllApps: String(localized: "Every open app will quit. Apps with unsaved changes ask before closing.", bundle: .module)
-        default: String(localized: "Open apps will close. Continue?", bundle: .module)
+        case .emptyTrash: String(localized: "Items in the Trash will be erased permanently. You can't undo this action.", bundle: .module.prismLocalized)
+        case .quitAllApps: String(localized: "Every open app will quit. Apps with unsaved changes ask before closing.", bundle: .module.prismLocalized)
+        default: String(localized: "Open apps will close. Continue?", bundle: .module.prismLocalized)
         }
     }
 
@@ -142,7 +143,7 @@ enum SystemActionExecutor {
         do {
             try event.sendEvent(options: [.noReply, .canInteract], timeout: TimeInterval(kAEDefaultTimeout))
         } catch {
-            throw SystemActionError(message: String(localized: "macOS declined the session request.", bundle: .module))
+            throw SystemActionError(message: String(localized: "macOS declined the session request.", bundle: .module.prismLocalized))
         }
     }
 
@@ -155,13 +156,13 @@ enum SystemActionExecutor {
             process.waitUntilExit()
             return process.terminationStatus
         }.value
-        guard status == 0 else { throw SystemActionError(message: String(localized: "macOS declined Sleep Displays.", bundle: .module)) }
+        guard status == 0 else { throw SystemActionError(message: String(localized: "macOS declined Sleep Displays.", bundle: .module.prismLocalized)) }
     }
 
     /// Control-Command-Q is the public macOS Lock Screen shortcut.
     private static func lockScreen() throws {
         guard CGPreflightPostEventAccess() else {
-            throw SystemActionError(message: String(localized: "Allow Prism Accessibility access before using Lock Screen.", bundle: .module))
+            throw SystemActionError(message: String(localized: "Allow Prism Accessibility access before using Lock Screen.", bundle: .module.prismLocalized))
         }
         let source = CGEventSource(stateID: .hidSystemState)
         for keyDown in [true, false] {
@@ -180,8 +181,8 @@ enum SystemActionExecutor {
         }.value
         if let failure {
             let message = failure == "-1743"
-                ? String(localized: "Allow Prism to control Finder in System Settings > Privacy & Security > Automation.", bundle: .module)
-                : String(localized: "Finder could not empty the Trash.", bundle: .module)
+                ? String(localized: "Allow Prism to control Finder in System Settings > Privacy & Security > Automation.", bundle: .module.prismLocalized)
+                : String(localized: "Finder could not empty the Trash.", bundle: .module.prismLocalized)
             throw SystemActionError(message: message)
         }
     }

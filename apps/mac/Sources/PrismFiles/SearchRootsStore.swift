@@ -19,8 +19,8 @@ struct SearchRootsStore: Sendable {
 
         var errorDescription: String? {
             switch self {
-            case .tooMany: String(localized: "You can add up to 12 search folders.", bundle: .module)
-            case .inaccessible: String(localized: "Prism couldn't access that folder.", bundle: .module)
+            case .tooMany: String(localized: "You can add up to 12 search folders.", bundle: .module.prismLocalized)
+            case .inaccessible: String(localized: "Prism couldn't access that folder.", bundle: .module.prismLocalized)
             }
         }
     }

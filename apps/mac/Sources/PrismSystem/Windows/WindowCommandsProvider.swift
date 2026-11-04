@@ -20,18 +20,18 @@ final class WindowCommandsProvider: PaletteProvider {
 
     private func item(_ layout: WindowLayout) -> PaletteItem {
         let subtitle = layout == .restorePreviousLayout
-            ? String(localized: "Restore the frontmost window to its previous Prism layout", bundle: .module)
-            : String(localized: "Move the frontmost window to \(layout.title.lowercased())", bundle: .module)
+            ? String(localized: "Restore the frontmost window to its previous Prism layout", bundle: .module.prismLocalized)
+            : String(localized: "Move the frontmost window to \(layout.title.lowercased())", bundle: .module.prismLocalized)
         return PaletteItem(
             candidate: SearchCandidate(
                 id: layout.commandID, title: layout.title, subtitle: subtitle,
-                section: String(localized: "Window Management", bundle: .module),
+                section: String(localized: "Window Management", bundle: .module.prismLocalized),
                 keywords: layout.keywords, searchAliases: SystemStrings.bilingual(layout.englishTitle)
             ),
             icon: .image(WindowLayoutIcon.image(for: layout)),
-            accessory: String(localized: "Window", bundle: .module),
+            accessory: String(localized: "Window", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "manage-window-\(layout.rawValue)", title: String(localized: "Apply \(layout.title)", bundle: .module),
+                PaletteAction(id: "manage-window-\(layout.rawValue)", title: String(localized: "Apply \(layout.title)", bundle: .module.prismLocalized),
                               systemImage: "macwindow") { [controller] in
                     controller.run(layout)
                 },
@@ -72,7 +72,7 @@ final class WindowCommandController {
         } catch {
             if error.code == .accessibilityRequired {
                 context.openSettings(paneID: PermissionsPane.id)
-                context.showHUD(String(localized: "Accessibility access required", bundle: .module))
+                context.showHUD(String(localized: "Accessibility access required", bundle: .module.prismLocalized))
                 return .dismiss
             }
             return .notify(error.message)

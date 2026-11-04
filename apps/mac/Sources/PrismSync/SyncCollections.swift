@@ -8,7 +8,7 @@ extension SyncModel {
   }
   func localData(_ adapter: SyncTransfer) throws -> Data {
     let data = try adapter.read()
-    guard data.count <= 1_000_000 else { throw TransferError("이 항목은 1 MB를 초과해 동기화할 수 없어요.") }
+    guard data.count <= 1_000_000 else { throw TransferError(String(localized: "This item exceeds 1 MB and cannot be synced.", bundle: .module.prismLocalized)) }
     try adapter.validate(data)
     return data
   }
@@ -16,27 +16,27 @@ extension SyncModel {
     "prism-v2:\(state.owner):collection:\(source):\(key)"
   }
   func fetchCollection(_ key: String, source: String) async throws -> SyncRecord? {
-    guard let secrets else { throw TransferError("서버에 먼저 연결하세요.") }
+    guard let secrets else { throw TransferError(String(localized: "Connect to a server first.", bundle: .module.prismLocalized)) }
     let result: CollectionResponse = try await client.request(
       "collections/\(key)?source=\(source)", server: state.server, token: secrets.token)
     return result.record
   }
   func decode(_ record: SyncRecord, source: String, adapter: SyncTransfer) throws -> Data {
-    guard let secrets, record.key == adapter.id else { throw TransferError("항목 정보가 일치하지 않아요.") }
+    guard let secrets, record.key == adapter.id else { throw TransferError(String(localized: "Item information does not match.", bundle: .module.prismLocalized)) }
     let value = try SyncCrypto.open(
       record.ciphertext, key: secrets.key, context: context(source, adapter.id), maximum: 1_400_000)
     guard let data = Data(base64Encoded: value), data.count <= 1_000_000 else {
-      throw TransferError("항목 데이터가 올바르지 않아요.")
+      throw TransferError(String(localized: "The item data is invalid.", bundle: .module.prismLocalized))
     }
     try adapter.validate(data)
     return data
   }
   func upload(_ key: String, data: Data, source: String, revision: Int) async throws -> Int {
-    guard let secrets else { throw TransferError("서버에 먼저 연결하세요.") }
+    guard let secrets else { throw TransferError(String(localized: "Connect to a server first.", bundle: .module.prismLocalized)) }
     // Base64 inner payload permits any feature's bounded binary representation.
     let cipher = try SyncCrypto.seal(
       data.base64EncodedString(), key: secrets.key, context: context(source, key))
-    guard cipher.utf8.count <= 2_000_000 else { throw TransferError("암호화된 항목이 전송 한도를 초과해요.") }
+    guard cipher.utf8.count <= 2_000_000 else { throw TransferError(String(localized: "The encrypted item exceeds the transfer limit.", bundle: .module.prismLocalized)) }
     let raw = try JSONSerialization.data(withJSONObject: [
       "revision": revision, "ciphertext": cipher,
     ])
@@ -90,12 +90,12 @@ extension SyncModel {
       }
       try check(epoch)
       guard !payloads.isEmpty else {
-        throw TransferError("선택한 항목이 이 기기/공통 저장소에 없어요. 원래 기기에서 먼저 저장하세요.")
+        throw TransferError(String(localized: "The selected items are missing from the device or shared storage. Save them on the original device first.", bundle: .module.prismLocalized))
       }
       transferPreview = CollectionPreview(
         source: source, created: Date(), records: records, payloads: payloads,
         localFingerprints: local)
-      status = "가져올 항목을 확인하세요. API 키 본문은 화면에 표시하지 않아요."
+      status = String(localized: "Review the items to import. API key contents are not shown.", bundle: .module.prismLocalized)
     } catch { status = error.localizedDescription }
   }
   func importPreview(automatic: Bool) async {
@@ -109,10 +109,10 @@ extension SyncModel {
     var completed: [String] = []
     do {
       guard Date().timeIntervalSince(preview.created) < 300 else {
-        throw TransferError("미리보기가 만료됐어요. 다시 확인하세요.")
+        throw TransferError(String(localized: "The preview has expired. Preview the items again.", bundle: .module.prismLocalized))
       }
       if automatic && preview.source != "shared" {
-        throw TransferError("기기 설정은 먼저 한 번 가져온 뒤, 이 기기 값으로 자동 동기화를 시작하세요.")
+        throw TransferError(String(localized: "Import the device settings once, then start automatic sync with this device's values.", bundle: .module.prismLocalized))
       }
       // Verify every source revision and every local baseline before the first write.
       for adapter in adapters where preview.payloads[adapter.id] != nil {
@@ -120,13 +120,13 @@ extension SyncModel {
         try check(epoch)
         guard latest?.revision == preview.records[adapter.id]?.revision,
           Self.fingerprint(try localData(adapter)) == preview.localFingerprints[adapter.id]
-        else { throw TransferError("미리보기 후 설정이 바뀌었어요. 다시 확인하세요.") }
+        else { throw TransferError(String(localized: "Settings changed after the preview. Preview the items again.", bundle: .module.prismLocalized)) }
       }
       for adapter in adapters {
         guard let data = preview.payloads[adapter.id] else { continue }
         // There are no awaits between the final local check and the feature-owned write.
         guard Self.fingerprint(try localData(adapter)) == preview.localFingerprints[adapter.id]
-        else { throw TransferError("적용 전에 로컬 값이 바뀌었어요.") }
+        else { throw TransferError(String(localized: "Local values changed before the import.", bundle: .module.prismLocalized)) }
         try adapter.apply(data, false)
         completed.append(adapter.title)
         if automatic {
@@ -138,10 +138,10 @@ extension SyncModel {
           try persistTransfers(options)
         }
       }
-      status = "가져왔어요: " + completed.joined(separator: ", ")
+      status = String(localized: "Imported: ", bundle: .module.prismLocalized) + completed.joined(separator: ", ")
     } catch {
       status =
-        (completed.isEmpty ? "" : "적용 완료: \(completed.joined(separator:", ")). ")
+        (completed.isEmpty ? "" : String(localized: "Applied: \(completed.joined(separator: ", ")). ", bundle: .module.prismLocalized))
         + error.localizedDescription
     }
   }
@@ -160,7 +160,7 @@ extension SyncModel {
         let remote = try await fetchCollection(adapter.id, source: source)
         try check(epoch)
         guard Self.fingerprint(try localData(adapter)) == fingerprint else {
-          throw TransferError("전송 전에 로컬 값이 바뀌었어요. 다시 시도하세요.")
+          throw TransferError(String(localized: "Local values changed before the transfer. Try again.", bundle: .module.prismLocalized))
         }
         let revision = try await upload(
           adapter.id, data: data, source: source, revision: remote?.revision ?? 0)
@@ -179,10 +179,10 @@ extension SyncModel {
         completed.append(adapter.title)
       }
       status =
-        (automatic ? "자동 동기화를 시작했어요: " : "이 기기 설정을 서버에 저장했어요: ") + completed.joined(separator: ", ")
+        (automatic ? String(localized: "Started automatic sync: ", bundle: .module.prismLocalized) : String(localized: "Saved this device's settings to the server: ", bundle: .module.prismLocalized)) + completed.joined(separator: ", ")
     } catch {
       status =
-        (completed.isEmpty ? "" : "완료: \(completed.joined(separator:", ")). ")
+        (completed.isEmpty ? "" : String(localized: "Completed: \(completed.joined(separator: ", ")). ", bundle: .module.prismLocalized))
         + error.localizedDescription
     }
   }
@@ -208,7 +208,7 @@ extension SyncModel {
             knownRevision: options.revisions[adapter.id] ?? 0, remote: remoteHash,
             remoteRevision: remote?.revision, useRemote: false)
           switch decision {
-          case .conflict: throw TransferError("다른 기기의 수정과 충돌했어요. 미리보기에서 가져오거나 이 기기 값을 공통값으로 선택하세요.")
+          case .conflict: throw TransferError(String(localized: "Changes conflict with another device. Import from the preview or use this device's values as the shared values.", bundle: .module.prismLocalized))
           case .adoptRemote:
             if let remoteData, let remote {
               try adapter.apply(remoteData, true)

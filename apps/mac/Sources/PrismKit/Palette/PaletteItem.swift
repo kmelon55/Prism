@@ -110,15 +110,16 @@ public enum PaletteActionOutcome {
 /// The screen owns its own search field and keyboard handling. The palette handles Escape.
 public struct PaletteScreen: Identifiable {
     public let id: String
-    public var title: String
+    private let titleProvider: () -> String
+    public var title: String { titleProvider() }
     /// Grows the palette into the larger workspace (1080×760, as in the Tauri app) while this screen is on top.
     /// The palette shrinks back when the screen is popped.
     public var expanded: Bool
     public var content: @MainActor () -> AnyView
 
-    public init<Content: View>(id: String, title: String, expanded: Bool = false, @ViewBuilder content: @escaping @MainActor () -> Content) {
+    public init<Content: View>(id: String, title: @autoclosure @escaping () -> String, expanded: Bool = false, @ViewBuilder content: @escaping @MainActor () -> Content) {
         self.id = id
-        self.title = title
+        self.titleProvider = title
         self.expanded = expanded
         self.content = { AnyView(content()) }
     }

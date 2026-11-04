@@ -15,7 +15,7 @@ struct KeyComboRecorder: View {
         Button(action: toggle) {
             Group {
                 if isRecording {
-                    Text("Type Keys", bundle: .module)
+                    Text("Type Keys", bundle: .module.prismLocalized)
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(PrismTheme.text)
                 } else if let combo {
@@ -23,7 +23,7 @@ struct KeyComboRecorder: View {
                         ForEach(Array(KeyNames.caps(for: combo).enumerated()), id: \.offset) { _, key in KeyCap(key) }
                     }
                 } else {
-                    Text("Record", bundle: .module)
+                    Text("Record", bundle: .module.prismLocalized)
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(PrismTheme.textMuted)
                 }

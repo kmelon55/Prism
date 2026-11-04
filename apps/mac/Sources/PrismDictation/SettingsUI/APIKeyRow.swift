@@ -17,8 +17,8 @@ struct APIKeyRow: View {
     private var shared: Bool { DictationKeys.isShared(provider) }
 
     var body: some View {
-        PrismSettingsRow(Text("API key", bundle: .module),
-                         detail: Text(shared ? "Shared with the key saved in AI settings." : "Stored in the macOS Keychain.", bundle: .module)) {
+        PrismSettingsRow(Text("API key", bundle: .module.prismLocalized),
+                         detail: Text(shared ? "Shared with the key saved in AI settings." : "Stored in the macOS Keychain.", bundle: .module.prismLocalized)) {
             VStack(alignment: .trailing, spacing: 6) {
                 if info.configured, !editing {
                     HStack(spacing: 8) {
@@ -26,24 +26,24 @@ struct APIKeyRow: View {
                         Text(verbatim: info.maskedKey ?? "•••• ••••")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundStyle(PrismTheme.textSecondary)
-                        Button { editing = true; message = nil } label: { Text("Change", bundle: .module) }
+                        Button { editing = true; message = nil } label: { Text("Change", bundle: .module.prismLocalized) }
                             .buttonStyle(.prismGhost).disabled(busy)
-                        Button { confirmingDelete = true } label: { Text("Delete", bundle: .module) }
+                        Button { confirmingDelete = true } label: { Text("Delete", bundle: .module.prismLocalized) }
                             .buttonStyle(.prismGhost).disabled(busy)
                     }
                 } else {
                     HStack(spacing: 6) {
-                        SecureField(text: $key, prompt: Text(info.configured ? "New API key" : "Paste API key", bundle: .module)) { EmptyView() }
+                        SecureField(text: $key, prompt: Text(info.configured ? "New API key" : "Paste API key", bundle: .module.prismLocalized)) { EmptyView() }
                             .labelsHidden()
                             .textFieldStyle(.prism)
                             .frame(minWidth: 140, idealWidth: 200, maxWidth: 200)
                             .onSubmit(save)
-                        Button(action: save) { Text(busy ? "Saving…" : "Save key", bundle: .module) }
+                        Button(action: save) { Text(busy ? "Saving…" : "Save key", bundle: .module.prismLocalized) }
                             .buttonStyle(.prism)
                             .fixedSize()
                             .disabled(busy || key.trimmingCharacters(in: .whitespaces).isEmpty)
                         if editing {
-                            Button { editing = false; key = "" } label: { Text("Cancel", bundle: .module) }.buttonStyle(.prism)
+                            Button { editing = false; key = "" } label: { Text("Cancel", bundle: .module.prismLocalized) }.buttonStyle(.prism)
                         }
                     }
                 }
@@ -52,10 +52,10 @@ struct APIKeyRow: View {
                 }
             }
         }
-        .confirmationDialog(Text("Delete this API key?", bundle: .module), isPresented: $confirmingDelete) {
-            Button(role: .destructive) { remove() } label: { Text("Delete Key", bundle: .module) }
+        .confirmationDialog(Text("Delete this API key?", bundle: .module.prismLocalized), isPresented: $confirmingDelete) {
+            Button(role: .destructive) { remove() } label: { Text("Delete Key", bundle: .module.prismLocalized) }
         } message: {
-            Text(shared ? "AI chat also uses this key and will stop working until you add it again." : "The saved provider key is removed from the Keychain.", bundle: .module)
+            Text(shared ? "AI chat also uses this key and will stop working until you add it again." : "The saved provider key is removed from the Keychain.", bundle: .module.prismLocalized)
         }
     }
 
@@ -70,7 +70,7 @@ struct APIKeyRow: View {
                 key = ""
                 editing = false
                 failed = false
-                message = String(localized: "Key saved.", bundle: .module)
+                message = String(localized: "Key saved.", bundle: .module.prismLocalized)
             } catch {
                 failed = true
                 message = error.localizedDescription
@@ -85,7 +85,7 @@ struct APIKeyRow: View {
             do {
                 try await service.deleteKey(for: provider)
                 failed = false
-                message = String(localized: "Key deleted.", bundle: .module)
+                message = String(localized: "Key deleted.", bundle: .module.prismLocalized)
             } catch {
                 failed = true
                 message = error.localizedDescription

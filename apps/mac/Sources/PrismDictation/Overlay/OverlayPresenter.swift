@@ -1,3 +1,4 @@
+import PrismKit
 // Ported from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import AppKit
 import SwiftUI
@@ -64,7 +65,7 @@ final class OverlayPresenter {
     func show() {
         guard let controller else { return }
         configureSurface(contentSize: NSSize(width: Self.contentWidth(for: controller), height: 50))
-        hosting.rootView = AnyView(DictationOverlayView(controller: controller, message: nil, usesNativeGlass: nativeGlassView != nil))
+        hosting.rootView = AnyView(PrismLocalizedContent { [usesNativeGlass = nativeGlassView != nil] in DictationOverlayView(controller: controller, message: nil, usesNativeGlass: usesNativeGlass) })
         positionOnActiveScreen()
         panel.orderFrontRegardless()
     }
@@ -72,7 +73,7 @@ final class OverlayPresenter {
     func showToast(_ message: String) {
         guard let controller else { return }
         configureSurface(contentSize: NSSize(width: 330, height: 58))
-        hosting.rootView = AnyView(DictationOverlayView(controller: controller, message: message, usesNativeGlass: nativeGlassView != nil))
+        hosting.rootView = AnyView(PrismLocalizedContent { [usesNativeGlass = nativeGlassView != nil] in DictationOverlayView(controller: controller, message: message, usesNativeGlass: usesNativeGlass) })
         positionOnActiveScreen()
         panel.orderFrontRegardless()
     }

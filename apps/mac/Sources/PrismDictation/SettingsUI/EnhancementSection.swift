@@ -10,11 +10,11 @@ struct EnhancementSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            PrismSectionHeading(Text("Dictation enhancement", bundle: .module)) {
+            PrismSectionHeading(Text("Dictation enhancement", bundle: .module.prismLocalized)) {
                 if settings.mode == .off {
-                    Text("Off · Original transcription", bundle: .module)
+                    Text("Off · Original transcription", bundle: .module.prismLocalized)
                 } else {
-                    Text("Enable either or both", bundle: .module)
+                    Text("Enable either or both", bundle: .module.prismLocalized)
                 }
             }
             HStack(alignment: .top, spacing: 12) {
@@ -23,7 +23,7 @@ struct EnhancementSection: View {
                 }
             }
             if settings.mode != .off {
-                DictationNote(Text("Only dictated text is sent to the selected provider. One extra AI request per processed result.", bundle: .module))
+                DictationNote(Text("Only dictated text is sent to the selected provider. One extra AI request per processed result.", bundle: .module.prismLocalized))
             }
         }
         .padding(.vertical, 8)
@@ -43,7 +43,7 @@ private struct EnhancementCard: View {
             Button(action: toggle) {
                 HStack(spacing: 9) {
                     Image(systemName: mode == .cleanup ? "sparkles" : "wand.and.stars").font(.system(size: 14))
-                    Text(mode == .cleanup ? "Refine speech" : "Structure prompt", bundle: .module)
+                    Text(mode == .cleanup ? "Refine speech" : "Structure prompt", bundle: .module.prismLocalized)
                         .font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 8)
                     Circle()
@@ -61,7 +61,7 @@ private struct EnhancementCard: View {
             .accessibilityAddTraits(.isToggle)
             .accessibilityValue(enabled ? Text(verbatim: "1") : Text(verbatim: "0"))
 
-            Text(mode == .cleanup ? "Automatically polish every dictation." : "Use a shortcut when you want a polished prompt.", bundle: .module)
+            Text(mode == .cleanup ? "Automatically polish every dictation." : "Use a shortcut when you want a polished prompt.", bundle: .module.prismLocalized)
                 .font(.system(size: 11))
                 .foregroundStyle(PrismTheme.textMuted)
                 .lineSpacing(2)
@@ -71,7 +71,7 @@ private struct EnhancementCard: View {
                 .padding(.bottom, 14)
 
             HStack {
-                Text("Text processing model", bundle: .module)
+                Text("Text processing model", bundle: .module.prismLocalized)
                 Spacer(minLength: 8)
                 if let selection { Text(verbatim: selection.provider.title).font(.system(size: 10)).lineLimit(1) }
             }
@@ -85,11 +85,11 @@ private struct EnhancementCard: View {
             }
             .padding(.bottom, 16)
 
-            Text("Processing prompt", bundle: .module)
+            Text("Processing prompt", bundle: .module.prismLocalized)
                 .font(.system(size: 11))
                 .foregroundStyle(PrismTheme.textMuted)
                 .padding(.bottom, 7)
-            TextEditor(text: Binding(get: { settings.instruction(for: mode) }, set: { value in
+            TextEditor(text: Binding(get: { ProcessingPrompts.displayInstruction(mode, stored: settings.instruction(for: mode)) }, set: { value in
                 var next = service.settings
                 let text = String(value.prefix(2000))
                 if mode == .cleanup { next.cleanupInstruction = text } else { next.promptInstruction = text }
@@ -108,26 +108,26 @@ private struct EnhancementCard: View {
                 if mode == .cleanup { next.cleanupInstruction = ProcessingPrompts.cleanup } else { next.promptInstruction = ProcessingPrompts.prompt }
                 service.update(next)
             } label: {
-                Text("Reset prompt", bundle: .module)
+                Text("Reset prompt", bundle: .module.prismLocalized)
                     .font(.system(size: 10))
                     .foregroundStyle(PrismTheme.textMuted)
                     .padding(.top, 8)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(settings.instruction(for: mode) == ProcessingPrompts.defaultInstruction(mode))
-            .opacity(settings.instruction(for: mode) == ProcessingPrompts.defaultInstruction(mode) ? 0.6 : 1)
+            .disabled(ProcessingPrompts.isDefaultInstruction(mode, stored: settings.instruction(for: mode)))
+            .opacity(ProcessingPrompts.isDefaultInstruction(mode, stored: settings.instruction(for: mode)) ? 0.6 : 1)
 
             if enabled, mode == .prompt {
                 VStack(alignment: .leading, spacing: 6) {
-                    DictationCommandRow(title: String(localized: "Prompt shortcut", bundle: .module), systemImage: "wand.and.stars",
+                    DictationCommandRow(title: String(localized: "Prompt shortcut", bundle: .module.prismLocalized), systemImage: "wand.and.stars",
                                         shortcut: service.promptShortcut)
-                    DictationNote(Text("This shortcut structures and pastes a prompt. Your usual shortcut follows speech refinement settings.", bundle: .module))
+                    DictationNote(Text("This shortcut structures and pastes a prompt. Your usual shortcut follows speech refinement settings.", bundle: .module.prismLocalized))
                 }
                 .padding(.top, 12)
             }
             if enabled, selection == nil {
-                Text("Choose a text processing model.", bundle: .module)
+                Text("Choose a text processing model.", bundle: .module.prismLocalized)
                     .font(.system(size: 11))
                     .foregroundStyle(PrismTheme.danger)
                     .padding(.top, 8)
@@ -162,16 +162,16 @@ struct TextModelPicker: View {
 
     var body: some View {
         Button { if SharedModelPicker.make != nil { browsing = true } else { editing = true } } label: {
-            PrismTriggerLabel(selection.map { Text(verbatim: $0.modelName ?? $0.model) } ?? Text("Choose model", bundle: .module),
+            PrismTriggerLabel(selection.map { Text(verbatim: $0.modelName ?? $0.model) } ?? Text("Choose model", bundle: .module.prismLocalized),
                               systemImage: "sparkles")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(PrismTriggerButtonStyle(fill: false))
-        .accessibilityLabel(Text("Text processing model", bundle: .module))
+        .accessibilityLabel(Text("Text processing model", bundle: .module.prismLocalized))
         .popover(isPresented: $editing, arrowEdge: .bottom) { editor }
         .sheet(isPresented: $browsing) {
             if let make = SharedModelPicker.make {
-                make(String(localized: "Text processing model", bundle: .module),
+                make(String(localized: "Text processing model", bundle: .module.prismLocalized),
                      selection.map { .init(provider: $0.provider.rawValue, model: $0.model, modelName: $0.modelName) },
                      { choice in
                          guard let provider = TextProvider(rawValue: choice.provider) else { return }
@@ -191,20 +191,20 @@ struct TextModelPicker: View {
 
     private var editor: some View {
         PrismPickerPanel {
-            Text("Text processing model", bundle: .module).font(.system(size: 13, weight: .semibold))
+            Text("Text processing model", bundle: .module.prismLocalized).font(.system(size: 13, weight: .semibold))
             PrismPillTabs(selection: Binding(get: { provider }, set: { provider = $0; commit() }),
                           options: TextProvider.allCases.map { ($0, $0 == .vercel ? "Vercel" : $0.title) }, expands: true)
             PrismSearchWell {
                 TextField(text: $model, prompt: Text(verbatim: provider == .openai ? "gpt-5-mini" : "openai/gpt-5-mini")) {
-                    Text("Model ID", bundle: .module)
+                    Text("Model ID", bundle: .module.prismLocalized)
                 }
                 .labelsHidden()
                 .focused($focused)
                 .onSubmit { commit(); editing = false }
             }
             HStack {
-                DictationNote(Text("Keys come from AI settings.", bundle: .module))
-                Button { commit(); editing = false } label: { Text("Use Model", bundle: .module) }
+                DictationNote(Text("Keys come from AI settings.", bundle: .module.prismLocalized))
+                Button { commit(); editing = false } label: { Text("Use Model", bundle: .module.prismLocalized) }
                     .buttonStyle(.prismPrimary)
                     .keyboardShortcut(.defaultAction)
             }

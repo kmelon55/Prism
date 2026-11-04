@@ -388,3 +388,6 @@
 "Change model" = "모델 변경";
 "Connect your own API key" = "본인 API 키로 연결";
 "Tools and permissions" = "도구와 접근 권한";
+"Error type: %@" = "오류 유형: %@";
+"OpenAI-compatible" = "OpenAI 호환 서버";
+"OpenAI-compatible API" = "OpenAI 호환 API";

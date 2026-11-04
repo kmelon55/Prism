@@ -43,7 +43,7 @@ public struct ShortcutRecorder: View {
 
     public init(shortcut: Binding<Shortcut?>, placeholder: Text? = nil) {
         _shortcut = shortcut
-        self.placeholder = placeholder ?? Text("Record Hotkey", bundle: .module)
+        self.placeholder = placeholder ?? Text("Record Hotkey", bundle: .module.prismLocalized)
     }
 
     /// Tauri's `.command-hotkey`: quiet text until a shortcut exists, then key caps; a small × clears it.
@@ -52,7 +52,7 @@ public struct ShortcutRecorder: View {
             Button(action: toggle) {
                 Group {
                     if isRecording {
-                        Text("Recording Shortcut…", bundle: .module)
+                        Text("Recording Shortcut…", bundle: .module.prismLocalized)
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(PrismTheme.text)
                     } else if let shortcut {
@@ -85,7 +85,7 @@ public struct ShortcutRecorder: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(Text("Remove Shortcut", bundle: .module))
+                .help(Text("Remove Shortcut", bundle: .module.prismLocalized))
             }
         }
         .onDisappear(perform: stop)

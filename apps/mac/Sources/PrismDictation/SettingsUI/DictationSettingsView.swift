@@ -14,7 +14,7 @@ struct DictationSettingsView: View {
     private var controller: DictationController { service.controller }
 
     var body: some View {
-        PrismSettingsPage(String(localized: "Dictation", bundle: .module)) {
+        PrismSettingsPage(String(localized: "Dictation", bundle: .module.prismLocalized)) {
             VStack(alignment: .leading, spacing: 16) {
                 currentModel
                 EnhancementSection(service: service)
@@ -48,14 +48,14 @@ struct DictationSettingsView: View {
 
     private var currentModel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            PrismCurrentModelBlock(eyebrow: Text("Current model", bundle: .module), title: currentModelName,
+            PrismCurrentModelBlock(eyebrow: Text("Current model", bundle: .module.prismLocalized), title: currentModelName,
                                    details: [settings.provider.title]) {
                 Button { showingModelPicker = true } label: {
-                    PrismTriggerLabel(Text("Change model", bundle: .module))
+                    PrismTriggerLabel(Text("Change model", bundle: .module.prismLocalized))
                 }
                 .buttonStyle(PrismTriggerButtonStyle())
                 .disabled(controller.busy)
-                .accessibilityLabel(Text("Change dictation model", bundle: .module))
+                .accessibilityLabel(Text("Change dictation model", bundle: .module.prismLocalized))
             }
             if let error = service.loadError {
                 DictationNote(Text(verbatim: error), tone: .warning)
@@ -69,9 +69,9 @@ struct DictationSettingsView: View {
             if !settings.model.isEmpty { return settings.model }
             // An empty path would resolve against the working directory, so check it before taking the file name.
             let file = settings.modelPath.isEmpty ? "" : URL(filePath: settings.modelPath).lastPathComponent
-            return file.isEmpty ? String(localized: "Choose a model", bundle: .module) : file
+            return file.isEmpty ? String(localized: "Choose a model", bundle: .module.prismLocalized) : file
         case .xai: return "Grok STT"
-        default: return settings.model.isEmpty ? String(localized: "Choose a model", bundle: .module) : settings.model
+        default: return settings.model.isEmpty ? String(localized: "Choose a model", bundle: .module.prismLocalized) : settings.model
         }
     }
 
@@ -80,19 +80,19 @@ struct DictationSettingsView: View {
     /// The dictation command row (`.dictation-command`): glyph, name and the start shortcut as key caps.
     private var command: some View {
         PrismSettingsGroup {
-            PrismSettingsRow(Text("Dictation", bundle: .module),
-                             detail: Text("Press to start recording, press again to insert into the current app.", bundle: .module)) {
+            PrismSettingsRow(Text("Dictation", bundle: .module.prismLocalized),
+                             detail: Text("Press to start recording, press again to insert into the current app.", bundle: .module.prismLocalized)) {
                 Image(systemName: "mic").font(.system(size: 17)).foregroundStyle(PrismTheme.text)
             }
-            DictationCommandRow(title: String(localized: "Dictation", bundle: .module), systemImage: "mic",
+            DictationCommandRow(title: String(localized: "Dictation", bundle: .module.prismLocalized), systemImage: "mic",
                                 shortcut: service.dictationShortcut)
             if !service.unregisteredShortcuts.isEmpty {
-                PrismSettingsRow(Text(verbatim: ""), detail: Text("Double-tap shortcuts need Accessibility permission for Prism.", bundle: .module)) {
-                    Button { DictationService.openPrivacySettings("Privacy_Accessibility") } label: { Text("Open Settings", bundle: .module) }
+                PrismSettingsRow(Text(verbatim: ""), detail: Text("Double-tap shortcuts need Accessibility permission for Prism.", bundle: .module.prismLocalized)) {
+                    Button { DictationService.openPrivacySettings("Privacy_Accessibility") } label: { Text("Open Settings", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
             }
-            PrismSettingsNote(Text("Change these shortcuts in Prism's command shortcut settings.", bundle: .module))
+            PrismSettingsNote(Text("Change these shortcuts in Prism's command shortcut settings.", bundle: .module.prismLocalized))
                 .padding(.top, 10)
         }
     }
@@ -101,22 +101,22 @@ struct DictationSettingsView: View {
 
     @ViewBuilder
     private var delivery: some View {
-        PrismSettingsRow(Text("Default action", bundle: .module),
-                         detail: Text("What happens when you press the start shortcut again.", bundle: .module)) {
+        PrismSettingsRow(Text("Default action", bundle: .module.prismLocalized),
+                         detail: Text("What happens when you press the start shortcut again.", bundle: .module.prismLocalized)) {
             PrismSelect(selection: binding(\.defaultDelivery), options: [
-                (DefaultDelivery.copy, String(localized: "Copy to clipboard only", bundle: .module)),
-                (DefaultDelivery.paste, String(localized: "Paste at the insertion point", bundle: .module)),
+                (DefaultDelivery.copy, String(localized: "Copy to clipboard only", bundle: .module.prismLocalized)),
+                (DefaultDelivery.paste, String(localized: "Paste at the insertion point", bundle: .module.prismLocalized)),
             ])
         }
-        Text("If no insertion point is found, the text is only copied and Enter is not sent.", bundle: .module)
+        Text("If no insertion point is found, the text is only copied and Enter is not sent.", bundle: .module.prismLocalized)
             .font(.system(size: 12))
             .foregroundStyle(PrismTheme.textSecondary)
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
-        PrismSettingsRow(Text("Save dictation results to clipboard history", bundle: .module),
-                         detail: Text("Saved when clipboard history is on. Failed recordings and text stay recoverable either way.", bundle: .module)) {
+        PrismSettingsRow(Text("Save dictation results to clipboard history", bundle: .module.prismLocalized),
+                         detail: Text("Saved when clipboard history is on. Failed recordings and text stay recoverable either way.", bundle: .module.prismLocalized)) {
             Toggle(isOn: binding(\.saveToClipboardHistory)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
         }
     }
@@ -125,20 +125,20 @@ struct DictationSettingsView: View {
 
     private var overlay: some View {
         PrismSettingsGroup {
-            PrismSettingsRow(Text("Waveform overlay", bundle: .module),
-                             detail: Text("Shown near the bottom of the screen without taking focus.", bundle: .module)) {
+            PrismSettingsRow(Text("Waveform overlay", bundle: .module.prismLocalized),
+                             detail: Text("Shown near the bottom of the screen without taking focus.", bundle: .module.prismLocalized)) {
                 Button { service.preview() } label: {
-                    Label { Text("Preview waveform", bundle: .module) } icon: { Image(systemName: "play").font(.system(size: 11)) }
+                    Label { Text("Preview waveform", bundle: .module.prismLocalized) } icon: { Image(systemName: "play").font(.system(size: 11)) }
                 }
                 .buttonStyle(.prism)
                 .disabled(controller.busy)
             }
-            PrismSettingsRow(Text("Show shortcut hints while recording", bundle: .module),
-                             detail: Text("Shows the cancel, paste and send keys beside the waveform.", bundle: .module)) {
+            PrismSettingsRow(Text("Show shortcut hints while recording", bundle: .module.prismLocalized),
+                             detail: Text("Shows the cancel, paste and send keys beside the waveform.", bundle: .module.prismLocalized)) {
                 Toggle(isOn: overlayBinding(\.showRecordingShortcutHints)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
             }
-            PrismSettingsRow(Text("Show transcription status", bundle: .module),
-                             detail: Text("Describes the current step beside the waveform while transcribing.", bundle: .module)) {
+            PrismSettingsRow(Text("Show transcription status", bundle: .module.prismLocalized),
+                             detail: Text("Describes the current step beside the waveform while transcribing.", bundle: .module.prismLocalized)) {
                 Toggle(isOn: overlayBinding(\.showTranscriptionStatus)) { EmptyView() }.toggleStyle(.prism).labelsHidden()
             }
         }
@@ -156,7 +156,7 @@ struct DictationSettingsView: View {
     // MARK: Recognition
 
     private var recognition: some View {
-        PrismSettingsGroup(Text("Recognition", bundle: .module)) {
+        PrismSettingsGroup(Text("Recognition", bundle: .module.prismLocalized)) {
             if settings.provider != .local {
                 APIKeyRow(service: service, provider: settings.provider)
                     .id(settings.provider)
@@ -173,20 +173,20 @@ struct DictationSettingsView: View {
                     .frame(width: 280)
                 }
             }
-            PrismSettingsRow(Text("Spoken language", bundle: .module)) {
+            PrismSettingsRow(Text("Spoken language", bundle: .module.prismLocalized)) {
                 DictationOptionButtons(selection: binding(\.language), options: [
-                    ("auto", String(localized: "Automatic", bundle: .module)), ("ko", "한국어"), ("en", "English"),
+                    ("auto", String(localized: "Automatic", bundle: .module.prismLocalized)), ("ko", "한국어"), ("en", "English"),
                 ])
             }
-            PrismDisclosure(Text("Recognition hints and vocabulary", bundle: .module)) {
+            PrismDisclosure(Text("Recognition hints and vocabulary", bundle: .module.prismLocalized)) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("Recognition hint", bundle: .module).font(.system(size: 12)).foregroundStyle(PrismTheme.text)
+                    Text("Recognition hint", bundle: .module.prismLocalized).font(.system(size: 12)).foregroundStyle(PrismTheme.text)
                     PrismTextEditor(text: Binding(get: { settings.prompt }, set: { value in
                         var next = settings
                         next.prompt = String(value.prefix(2000))
                         service.update(next, delay: .milliseconds(400))
                     }), minHeight: 52)
-                    Text("Vocabulary · one per line", bundle: .module).font(.system(size: 12)).foregroundStyle(PrismTheme.text).padding(.top, 6)
+                    Text("Vocabulary · one per line", bundle: .module.prismLocalized).font(.system(size: 12)).foregroundStyle(PrismTheme.text).padding(.top, 6)
                     PrismTextEditor(text: Binding(get: { settings.vocabulary.joined(separator: "\n") }, set: { value in
                         var next = settings
                         next.vocabulary = value.components(separatedBy: "\n")
@@ -205,12 +205,12 @@ struct DictationSettingsView: View {
         switch service.saveState {
         case .failed(let message):
             PrismSettingsRow(Text(verbatim: message).foregroundStyle(PrismTheme.warning)) {
-                Button { service.flush() } label: { Text("Retry", bundle: .module) }.buttonStyle(.prism)
+                Button { service.flush() } label: { Text("Retry", bundle: .module.prismLocalized) }.buttonStyle(.prism)
             }
         case .pending:
-            DictationNote(Text("Saving…", bundle: .module)).padding(.vertical, 12)
+            DictationNote(Text("Saving…", bundle: .module.prismLocalized)).padding(.vertical, 12)
         case .saved:
-            DictationNote(Text("Changes are saved automatically.", bundle: .module)).padding(.vertical, 12)
+            DictationNote(Text("Changes are saved automatically.", bundle: .module.prismLocalized)).padding(.vertical, 12)
         }
     }
 
@@ -218,35 +218,35 @@ struct DictationSettingsView: View {
 
     private var permissions: some View {
         PrismSettingsGroup {
-            PrismSettingsRow(Text("Permissions", bundle: .module),
-                             detail: Text("Recording needs microphone access; insertion needs Accessibility access.", bundle: .module)) {
+            PrismSettingsRow(Text("Permissions", bundle: .module.prismLocalized),
+                             detail: Text("Recording needs microphone access; insertion needs Accessibility access.", bundle: .module.prismLocalized)) {
                 Button {
                     service.refreshPermissions()
                 } label: {
                     Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .medium)).frame(width: 14, height: 30)
                 }
                 .buttonStyle(.prism)
-                .help(Text("Check Again", bundle: .module))
-                .accessibilityLabel(Text("Check Again", bundle: .module))
+                .help(Text("Check Again", bundle: .module.prismLocalized))
+                .accessibilityLabel(Text("Check Again", bundle: .module.prismLocalized))
             }
-            PermissionRow(title: Text("Microphone", bundle: .module),
-                          detail: Text("Used only while a dictation is recording.", bundle: .module),
+            PermissionRow(title: Text("Microphone", bundle: .module.prismLocalized),
+                          detail: Text("Used only while a dictation is recording.", bundle: .module.prismLocalized),
                           granted: service.microphoneStatus == .authorized) {
                 if service.microphoneStatus == .notDetermined {
-                    Button { Task { await service.requestMicrophone() } } label: { Text("Request Access", bundle: .module) }
+                    Button { Task { await service.requestMicrophone() } } label: { Text("Request Access", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 } else {
-                    Button { DictationService.openPrivacySettings("Privacy_Microphone") } label: { Text("Open Settings", bundle: .module) }
+                    Button { DictationService.openPrivacySettings("Privacy_Microphone") } label: { Text("Open Settings", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
             }
-            PermissionRow(title: Text("Accessibility", bundle: .module),
-                          detail: Text("Needed to paste into other apps and for double-tap and single-modifier shortcuts.", bundle: .module),
+            PermissionRow(title: Text("Accessibility", bundle: .module.prismLocalized),
+                          detail: Text("Needed to paste into other apps and for double-tap and single-modifier shortcuts.", bundle: .module.prismLocalized),
                           granted: service.accessibilityTrusted) {
                 Button {
                     Permissions.requestAccessibility()
                     DictationService.openPrivacySettings("Privacy_Accessibility")
-                } label: { Text("Open Settings", bundle: .module) }
+                } label: { Text("Open Settings", bundle: .module.prismLocalized) }
                 .buttonStyle(.prism)
             }
         }
@@ -256,9 +256,9 @@ struct DictationSettingsView: View {
 
     private var recovery: some View {
         PrismSettingsGroup {
-            PrismSettingsRow(Text("Dictation Recovery", bundle: .module),
-                             detail: Text("Original and processed text are saved on this Mac. Failed recordings are kept so your speech is not lost. Open the folder to recover or delete them.", bundle: .module)) {
-                Button { service.openRecoveryFolder() } label: { Text("Open recovery folder", bundle: .module) }
+            PrismSettingsRow(Text("Dictation Recovery", bundle: .module.prismLocalized),
+                             detail: Text("Original and processed text are saved on this Mac. Failed recordings are kept so your speech is not lost. Open the folder to recover or delete them.", bundle: .module.prismLocalized)) {
+                Button { service.openRecoveryFolder() } label: { Text("Open recovery folder", bundle: .module.prismLocalized) }
                     .buttonStyle(.prism)
             }
             if controller.busy || !controller.lastTranscript.isEmpty || !controller.originalTranscript.isEmpty {
@@ -267,15 +267,15 @@ struct DictationSettingsView: View {
                     Spacer()
                     if controller.busy {
                         Button { controller.cancel() } label: {
-                            Label { Text("Cancel Dictation", bundle: .module) } icon: { Image(systemName: "xmark") }
+                            Label { Text("Cancel Dictation", bundle: .module.prismLocalized) } icon: { Image(systemName: "xmark") }
                         }
                         .buttonStyle(.prism)
                     }
                     if !controller.originalTranscript.isEmpty {
-                        Button { copy(original: true) } label: { Text("Copy original text", bundle: .module) }.buttonStyle(.prism)
+                        Button { copy(original: true) } label: { Text("Copy original text", bundle: .module.prismLocalized) }.buttonStyle(.prism)
                     }
                     if !controller.lastTranscript.isEmpty {
-                        Button { copy(original: false) } label: { Text("Copy last result", bundle: .module) }.buttonStyle(.prism)
+                        Button { copy(original: false) } label: { Text("Copy last result", bundle: .module.prismLocalized) }.buttonStyle(.prism)
                     }
                 }
                 .padding(.vertical, 8)
@@ -284,7 +284,7 @@ struct DictationSettingsView: View {
                 DictationNote(Text(verbatim: controller.recoveryWarning), tone: .warning).textSelection(.enabled)
             }
             if controller.shortcutWarning {
-                DictationNote(Text("A recording shortcut could not be registered. Check other apps' shortcuts or Accessibility permission.", bundle: .module),
+                DictationNote(Text("A recording shortcut could not be registered. Check other apps' shortcuts or Accessibility permission.", bundle: .module.prismLocalized),
                               tone: .warning)
             }
         }
@@ -293,7 +293,7 @@ struct DictationSettingsView: View {
     private func copy(original: Bool) {
         let saved = original ? controller.copyOriginal(saveToHistory: settings.saveToClipboardHistory)
                              : controller.copyLast(saveToHistory: settings.saveToClipboardHistory)
-        notice = saved ? String(localized: "Copied.", bundle: .module) : String(localized: "Could not copy to the clipboard.", bundle: .module)
+        notice = saved ? String(localized: "Copied.", bundle: .module.prismLocalized) : String(localized: "Could not copy to the clipboard.", bundle: .module.prismLocalized)
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<DictationSettings, Value>) -> Binding<Value> {
@@ -315,7 +315,7 @@ struct ShortcutLabel: View {
                 ForEach(Array(shortcut.label.split(separator: " ").enumerated()), id: \.offset) { _, key in KeyCap(String(key)) }
             }
         } else {
-            Text("Not set", bundle: .module)
+            Text("Not set", bundle: .module.prismLocalized)
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(PrismTheme.textMuted)
         }
@@ -405,7 +405,7 @@ private struct PermissionRow<Action: View>: View {
     @ViewBuilder let action: () -> Action
 
     var body: some View {
-        PrismSettingsRow(title + Text(verbatim: " · ") + (granted ? Text("Allowed", bundle: .module) : Text("Needs access", bundle: .module)),
+        PrismSettingsRow(title + Text(verbatim: " · ") + (granted ? Text("Allowed", bundle: .module.prismLocalized) : Text("Needs access", bundle: .module.prismLocalized)),
                          detail: detail) {
             if granted {
                 Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.textMuted)

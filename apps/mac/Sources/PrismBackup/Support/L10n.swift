@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 enum L10n {
@@ -7,7 +8,7 @@ enum L10n {
     /// Translates an English message, including the error strings this module keeps in English like the Tauri app.
     static func tr(_ key: String) -> String {
         if let overrideBundle { return overrideBundle.localizedString(forKey: key, value: key, table: nil) }
-        return Bundle.module.localizedString(forKey: key, value: key, table: nil)
+        return Bundle.module.prismLocalized.localizedString(forKey: key, value: key, table: nil)
     }
 
     /// `tr` for a key with `%@` or `%lld` placeholders.

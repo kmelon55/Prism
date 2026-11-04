@@ -41,8 +41,8 @@ struct FileBrowserView: View {
                     let actions = model.selectedActions
                     PrismActionPanel(
                         title: hit.name, actions: actions, selection: model.actionSelection,
-                        searchPrompt: String(localized: "Search actions…", bundle: .module),
-                        emptyText: String(localized: "No matching actions", bundle: .module),
+                        searchPrompt: String(localized: "Search actions…", bundle: .module.prismLocalized),
+                        emptyText: String(localized: "No matching actions", bundle: .module.prismLocalized),
                         onSelect: { index in
                             guard actions.indices.contains(index) else { return }
                             model.toggleActions()
@@ -58,12 +58,12 @@ struct FileBrowserView: View {
 
     private var header: some View {
         PrismScreenHeader {
-            PrismBackButton(help: Text("Back", bundle: .module), action: onClose)
+            PrismBackButton(help: Text("Back", bundle: .module.prismLocalized), action: onClose)
             HStack(spacing: 9) {
                 PrismSearchGlyph()
                 ScreenSearchField(
                     text: $model.query,
-                    placeholder: String(localized: "Search files by name", bundle: .module),
+                    placeholder: String(localized: "Search files by name", bundle: .module.prismLocalized),
                     onCommand: model.handle,
                     onKeyEquivalent: model.handleKeyEquivalent
                 )
@@ -74,7 +74,7 @@ struct FileBrowserView: View {
                         Label(filter.title, systemImage: filter.systemImage).tag(filter)
                     }
                 } label: {
-                    Text("File type", bundle: .module)
+                    Text("File type", bundle: .module.prismLocalized)
                 }
                 .pickerStyle(.inline)
             } label: {
@@ -93,7 +93,7 @@ struct FileBrowserView: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(Text("File type (⇥)", bundle: .module))
+            .help(Text("File type (⇥)", bundle: .module.prismLocalized))
         }
     }
 
@@ -110,7 +110,7 @@ struct FileBrowserView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
-                            PrismSectionLabel(String(localized: "Recently Used", bundle: .module), isFirst: true)
+                            PrismSectionLabel(String(localized: "Recently Used", bundle: .module.prismLocalized), isFirst: true)
                         }
                         ForEach(Array(model.results.enumerated()), id: \.element.id) { index, hit in
                             FileRow(hit: hit, isSelected: index == model.selection)
@@ -160,16 +160,16 @@ struct FileBrowserView: View {
     private var emptyTitle: String {
         if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
             return model.service.spotlightEnabled
-                ? String(localized: "No recently used files", bundle: .module)
-                : String(localized: "Type to search files", bundle: .module)
+                ? String(localized: "No recently used files", bundle: .module.prismLocalized)
+                : String(localized: "Type to search files", bundle: .module.prismLocalized)
         }
-        return String(localized: "No matching files", bundle: .module)
+        return String(localized: "No matching files", bundle: .module.prismLocalized)
     }
 
     private var emptyDetail: String {
         model.query.trimmingCharacters(in: .whitespaces).isEmpty
-            ? String(localized: "Search your home folder and the folders you add in Settings.", bundle: .module)
-            : String(localized: "Try another name, or add folders outside your home folder in Settings.", bundle: .module)
+            ? String(localized: "Search your home folder and the folders you add in Settings.", bundle: .module.prismLocalized)
+            : String(localized: "Try another name, or add folders outside your home folder in Settings.", bundle: .module.prismLocalized)
     }
 
     private var footer: some View {
@@ -178,7 +178,7 @@ struct FileBrowserView: View {
                 if let status = model.status {
                     Text(verbatim: status)
                 } else if model.service.isIndexing {
-                    Text("Updating the file index…", bundle: .module)
+                    Text("Updating the file index…", bundle: .module.prismLocalized)
                 } else if model.isCurrent, !model.results.isEmpty, !model.query.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text(countText)
                 }
@@ -187,14 +187,14 @@ struct FileBrowserView: View {
             .padding(.horizontal, 7)
         } trailing: {
             if model.selectedHit != nil {
-                PrismStatusAction(Text("Open", bundle: .module), keys: "↵", isPrimary: true) { _ = model.handle(.submit) }
+                PrismStatusAction(Text("Open", bundle: .module.prismLocalized), keys: "↵", isPrimary: true) { _ = model.handle(.submit) }
                     .disabled(model.showsActions)
                 PrismStatusDivider()
-                PrismStatusAction(Text("Quick Look", bundle: .module), keys: "⌘Y") {
+                PrismStatusAction(Text("Quick Look", bundle: .module.prismLocalized), keys: "⌘Y") {
                     if let action = model.selectedActions.first(where: { $0.id == "file-quick-look" }) { model.perform(action) }
                 }
                 PrismStatusDivider()
-                PrismStatusAction(Text("Actions", bundle: .module), keys: "⌘K", isActive: model.showsActions) { model.toggleActions() }
+                PrismStatusAction(Text("Actions", bundle: .module.prismLocalized), keys: "⌘K", isActive: model.showsActions) { model.toggleActions() }
             }
         }
     }
@@ -202,8 +202,8 @@ struct FileBrowserView: View {
     private var countText: String {
         let shown = model.results.count
         return model.total > shown
-            ? String(localized: "\(shown) of \(model.total) files", bundle: .module)
-            : String(localized: "\(shown) files", bundle: .module)
+            ? String(localized: "\(shown) of \(model.total) files", bundle: .module.prismLocalized)
+            : String(localized: "\(shown) files", bundle: .module.prismLocalized)
     }
 }
 
@@ -274,14 +274,14 @@ struct FilePreviewPane: View {
                     .truncationMode(.middle)
                 PrismRule()
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 7) {
-                    row(String(localized: "Kind", bundle: .module), info?.kind ?? FileActions.kind(of: hit))
+                    row(String(localized: "Kind", bundle: .module.prismLocalized), info?.kind ?? FileActions.kind(of: hit))
                     if let size = info?.size {
-                        row(String(localized: "Size", bundle: .module), size.formatted(.byteCount(style: .file)))
+                        row(String(localized: "Size", bundle: .module.prismLocalized), size.formatted(.byteCount(style: .file)))
                     }
                     if let modified = info?.modified {
-                        row(String(localized: "Modified", bundle: .module), modified.formatted(date: .abbreviated, time: .shortened))
+                        row(String(localized: "Modified", bundle: .module.prismLocalized), modified.formatted(date: .abbreviated, time: .shortened))
                     }
-                    row(String(localized: "Where", bundle: .module), hit.displayLocation)
+                    row(String(localized: "Where", bundle: .module.prismLocalized), hit.displayLocation)
                 }
                 .font(.prism(11))
                 Spacer(minLength: 0)

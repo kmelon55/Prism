@@ -171,4 +171,4 @@ final class NotchModel {
     func symbol(for id: String) -> String { id == "timer" ? "timer" : widgets.first { $0.id == id }?.systemImage ?? "square.grid.2x2" }
 }
 
-func N(_ value: String) -> String { String(localized: String.LocalizationValue(value), bundle: .module) }
+func N(_ value: String) -> String { String(localized: String.LocalizationValue(value), bundle: .module.prismLocalized) }

@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// Filename matching shared by Spotlight and the folder index, ported from `library/file_index.rs`.
@@ -69,11 +70,11 @@ enum FileTypeFilter: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .all: String(localized: "All Files", bundle: .module)
-        case .folder: String(localized: "Folders", bundle: .module)
-        case .text: String(localized: "Text", bundle: .module)
-        case .image: String(localized: "Images", bundle: .module)
-        case .document: String(localized: "Documents", bundle: .module)
+        case .all: String(localized: "All Files", bundle: .module.prismLocalized)
+        case .folder: String(localized: "Folders", bundle: .module.prismLocalized)
+        case .text: String(localized: "Text", bundle: .module.prismLocalized)
+        case .image: String(localized: "Images", bundle: .module.prismLocalized)
+        case .document: String(localized: "Documents", bundle: .module.prismLocalized)
         }
     }
 

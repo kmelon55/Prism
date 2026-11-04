@@ -95,7 +95,7 @@ final class ScriptActions {
     }
 
     func screen(_ scriptID: String) -> PaletteScreen {
-        PaletteScreen(id: "scripts:run:\(scriptID)", title: model.command(scriptID)?.title ?? ScriptStrings.localized("Script command")) {
+        PaletteScreen(id: "scripts:run:\(scriptID)", title: self.model.command(scriptID)?.title ?? ScriptStrings.localized("Script command")) {
             ScriptRunView(model: self.model, actions: self, scriptID: scriptID)
         }
     }

@@ -17,7 +17,7 @@ struct ConfirmationView: View {
     var body: some View {
         VStack(spacing: 0) {
             PrismScreenHeader(height: PrismPaletteMetrics.searchHeight) {
-                PrismBackButton(help: Text("Cancel", bundle: .module), action: onCancel)
+                PrismBackButton(help: Text("Cancel", bundle: .module.prismLocalized), action: onCancel)
                 Text(verbatim: title)
                     .font(.prism(15, weight: 550))
                     .foregroundStyle(PrismTheme.text)
@@ -52,7 +52,7 @@ struct ConfirmationView: View {
                 HStack(spacing: 8) {
                     Button(action: onCancel) {
                         HStack(spacing: 6) {
-                            Text("Cancel", bundle: .module)
+                            Text("Cancel", bundle: .module.prismLocalized)
                             KeyCap("esc")
                         }
                         .frame(minWidth: 110)

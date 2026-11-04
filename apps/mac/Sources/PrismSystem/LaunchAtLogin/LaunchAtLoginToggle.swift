@@ -13,14 +13,14 @@ public struct LaunchAtLoginToggle: View {
     public init() {}
 
     public var body: some View {
-        PrismSettingsRow(Text("Launch at login", bundle: .module), detail: detail) {
+        PrismSettingsRow(Text("Launch at login", bundle: .module.prismLocalized), detail: detail) {
             HStack(spacing: 8) {
                 if model.status == .requiresApproval {
-                    Button { model.openLoginItems() } label: { Text("Open Login Items", bundle: .module) }
+                    Button { model.openLoginItems() } label: { Text("Open Login Items", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
                 if model.error != nil {
-                    Button { model.refresh() } label: { Text("Refresh", bundle: .module) }
+                    Button { model.refresh() } label: { Text("Refresh", bundle: .module.prismLocalized) }
                         .buttonStyle(.prism)
                 }
                 Toggle(isOn: Binding(get: { model.status?.isOn ?? false }, set: { model.set($0) })) { EmptyView() }
@@ -36,7 +36,7 @@ public struct LaunchAtLoginToggle: View {
 
     private var detail: Text {
         if let error = model.error { return Text(verbatim: error).foregroundColor(PrismTheme.danger) }
-        return Text(verbatim: model.status?.description ?? String(localized: "Checking login item settings…", bundle: .module))
+        return Text(verbatim: model.status?.description ?? String(localized: "Checking login item settings…", bundle: .module.prismLocalized))
     }
 }
 
@@ -67,7 +67,7 @@ final class LaunchAtLoginModel {
         do {
             try LoginItem.set(enabled, service: service)
         } catch {
-            self.error = String(localized: "Could not change login item settings. Try again.", bundle: .module)
+            self.error = String(localized: "Could not change login item settings. Try again.", bundle: .module.prismLocalized)
         }
         self.status = LoginItem.status(service: service, installed: installed)
         isBusy = false

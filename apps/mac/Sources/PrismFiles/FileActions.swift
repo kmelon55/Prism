@@ -10,38 +10,38 @@ enum FileActions {
     static func actions(for hit: FileHit, openWith: @escaping @MainActor (FileHit) -> PaletteActionOutcome) -> [PaletteAction] {
         let url = hit.url
         return [
-            PaletteAction(id: "file-open", title: String(localized: "Open", bundle: .module), systemImage: hit.isDirectory ? "folder" : "arrow.up.forward.app") {
+            PaletteAction(id: "file-open", title: String(localized: "Open", bundle: .module.prismLocalized), systemImage: hit.isDirectory ? "folder" : "arrow.up.forward.app") {
                 guard exists(hit) else { return missing }
                 NSWorkspace.shared.open(url)
                 return .dismiss
             },
-            PaletteAction(id: "file-reveal", title: String(localized: "Show in Finder", bundle: .module), systemImage: "folder",
+            PaletteAction(id: "file-reveal", title: String(localized: "Show in Finder", bundle: .module.prismLocalized), systemImage: "folder",
                           shortcut: .init("r", modifiers: [.command, .shift])) {
                 guard exists(hit) else { return missing }
                 NSWorkspace.shared.activateFileViewerSelecting([url])
                 return .dismiss
             },
-            PaletteAction(id: "file-open-with", title: String(localized: "Open With…", bundle: .module), systemImage: "arrow.up.right.square",
+            PaletteAction(id: "file-open-with", title: String(localized: "Open With…", bundle: .module.prismLocalized), systemImage: "arrow.up.right.square",
                           shortcut: .init("o", modifiers: .command)) {
                 guard exists(hit) else { return missing }
                 return openWith(hit)
             },
-            PaletteAction(id: "file-quick-look", title: String(localized: "Quick Look", bundle: .module), systemImage: "eye",
+            PaletteAction(id: "file-quick-look", title: String(localized: "Quick Look", bundle: .module.prismLocalized), systemImage: "eye",
                           shortcut: .init("y", modifiers: .command)) {
                 guard exists(hit) else { return missing }
                 QuickLookPanel.shared.toggle(url)
                 return .keepOpen
             },
-            PaletteAction(id: "file-copy", title: String(localized: "Copy Path", bundle: .module), systemImage: "doc.on.clipboard",
+            PaletteAction(id: "file-copy", title: String(localized: "Copy Path", bundle: .module.prismLocalized), systemImage: "doc.on.clipboard",
                           shortcut: .init("c", modifiers: [.command, .shift])) {
                 PasteService.copy(hit.path)
-                return .notify(String(localized: "Path copied", bundle: .module))
+                return .notify(String(localized: "Path copied", bundle: .module.prismLocalized))
             },
-            PaletteAction(id: "file-copy-file", title: String(localized: "Copy File", bundle: .module), systemImage: "doc.on.doc",
+            PaletteAction(id: "file-copy-file", title: String(localized: "Copy File", bundle: .module.prismLocalized), systemImage: "doc.on.doc",
                           shortcut: .init("c", modifiers: [.command, .option])) {
                 guard exists(hit) else { return missing }
                 PasteService.copy([url as NSURL])
-                return .notify(String(localized: "File copied", bundle: .module))
+                return .notify(String(localized: "File copied", bundle: .module.prismLocalized))
             },
         ]
     }
@@ -51,16 +51,16 @@ enum FileActions {
     }
 
     static var missing: PaletteActionOutcome {
-        .notify(String(localized: "The file was moved or deleted", bundle: .module))
+        .notify(String(localized: "The file was moved or deleted", bundle: .module.prismLocalized))
     }
 
     /// The localized kind, such as "PDF document" or "Folder", shown as the row accessory.
     static func kind(of hit: FileHit) -> String {
-        if hit.isDirectory { return String(localized: "Folder", bundle: .module) }
+        if hit.isDirectory { return String(localized: "Folder", bundle: .module.prismLocalized) }
         let ext = (hit.name as NSString).pathExtension
         // Some type names are long ("Office Open XML word processing document"); the extension reads better.
         if let description = UTType(filenameExtension: ext)?.localizedDescription, description.count <= 24 { return description }
-        return ext.isEmpty ? String(localized: "File", bundle: .module) : ext.uppercased()
+        return ext.isEmpty ? String(localized: "File", bundle: .module.prismLocalized) : ext.uppercased()
     }
 }
 

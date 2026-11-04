@@ -26,7 +26,7 @@ final class KeyboardModel {
             if let loaded = store.load() {
                 config = loaded
             } else {
-                lastError = String(localized: "Could not read keyboard settings. Remapping is off.", bundle: .module)
+                lastError = String(localized: "Could not read keyboard settings. Remapping is off.", bundle: .module.prismLocalized)
             }
         }
         // Without a Caps Lock rule there is nothing to clean up at launch, so `hidutil` is not run.
@@ -56,7 +56,7 @@ final class KeyboardModel {
             try store.save(next)
             lastError = nil
         } catch {
-            lastError = String(localized: "Settings could not be saved.", bundle: .module)
+            lastError = String(localized: "Settings could not be saved.", bundle: .module.prismLocalized)
         }
         config = next
         if next.enabled && !AXIsProcessTrusted() { _ = Permissions.requestAccessibility() }
@@ -81,7 +81,7 @@ final class KeyboardModel {
         tap.update(rules: rules)
         let wanted = config.enabled && !rules.isEmpty
         if wanted && accessibilityGranted && !tap.isRunning {
-            if !tap.start() { lastError = String(localized: "Keyboard remapping could not start. Review permissions and retry.", bundle: .module) }
+            if !tap.start() { lastError = String(localized: "Keyboard remapping could not start. Review permissions and retry.", bundle: .module.prismLocalized) }
         }
         if !(wanted && accessibilityGranted) && tap.isRunning { tap.stop() }
         isActive = tap.isRunning

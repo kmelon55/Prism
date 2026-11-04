@@ -4,18 +4,19 @@ import Foundation
 @MainActor
 public struct SyncTransfer: Identifiable {
   public let id: String
-  public let title: String
+  private let titleProvider: () -> String
+    public var title: String { titleProvider() }
   public let sensitive: Bool
   public let read: () throws -> Data
   public let validate: (Data) throws -> Void
   /// replace is true only after the user joins ongoing synchronization; one-time imports merge library data.
   public let apply: (Data, Bool) throws -> Void
   public init(
-    id: String, title: String, sensitive: Bool = false, read: @escaping () throws -> Data,
+    id: String, title: @autoclosure @escaping () -> String, sensitive: Bool = false, read: @escaping () throws -> Data,
     validate: @escaping (Data) throws -> Void, apply: @escaping (Data, Bool) throws -> Void
   ) {
     self.id = id
-    self.title = title
+    self.titleProvider = title
     self.sensitive = sensitive
     self.read = read
     self.validate = validate

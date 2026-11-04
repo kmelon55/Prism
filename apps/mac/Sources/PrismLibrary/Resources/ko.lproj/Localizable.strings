@@ -165,3 +165,7 @@
 "Write something to remember…" = "기억해둘 내용을 적어보세요…";
 "Saves to Notes" = "노트에 저장돼요";
 "Retry" = "다시 시도";
+"There are duplicate or too many items." = "중복되거나 너무 많은 항목이 있어요.";
+"An item with a different type has the same ID." = "다른 종류의 항목과 ID가 충돌해요.";
+"Notes are being saved. Sync again after saving finishes." = "메모를 저장 중이에요. 저장이 끝나면 다시 동기화해요.";
+"Sync again after the library finishes saving." = "라이브러리 저장이 끝나면 다시 동기화해요.";

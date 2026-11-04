@@ -1,3 +1,4 @@
+import PrismKit
 import AppKit
 import QuartzCore
 import SwiftUI
@@ -52,6 +53,7 @@ final class NotchCanvas: NSView {
     }
 
     func present(_ content: AnyView, size: CGSize, mode nextMode: NotchPresentation.Mode, animated: Bool) {
+        let content = AnyView(PrismLocalizedContent { content })
         let changesSize = size != targetSize
         let changesPage = mode != nextMode
         let firstPresentation = targetSize == .zero

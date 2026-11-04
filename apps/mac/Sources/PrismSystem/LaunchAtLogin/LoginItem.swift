@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 import ServiceManagement
 
@@ -34,11 +35,11 @@ enum LoginItemStatus: Equatable, Sendable {
 
     var description: String {
         switch self {
-        case .unsupported: String(localized: "Available in the installed macOS app in Applications.", bundle: .module)
-        case .notRegistered: String(localized: "Start Prism in the background when you sign in to your Mac.", bundle: .module)
-        case .enabled: String(localized: "Prism will start in the background when you sign in.", bundle: .module)
-        case .requiresApproval: String(localized: "Allow Prism in System Settings → General → Login Items to finish enabling automatic startup.", bundle: .module)
-        case .notFound: String(localized: "macOS could not find Prism's login item. Try enabling it again.", bundle: .module)
+        case .unsupported: String(localized: "Available in the installed macOS app in Applications.", bundle: .module.prismLocalized)
+        case .notRegistered: String(localized: "Start Prism in the background when you sign in to your Mac.", bundle: .module.prismLocalized)
+        case .enabled: String(localized: "Prism will start in the background when you sign in.", bundle: .module.prismLocalized)
+        case .requiresApproval: String(localized: "Allow Prism in System Settings → General → Login Items to finish enabling automatic startup.", bundle: .module.prismLocalized)
+        case .notFound: String(localized: "macOS could not find Prism's login item. Try enabling it again.", bundle: .module.prismLocalized)
         }
     }
 }

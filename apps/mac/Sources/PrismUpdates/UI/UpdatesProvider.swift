@@ -28,17 +28,17 @@ final class UpdatesProvider: PaletteProvider {
         let actionTitle: String
         switch status.phase {
         case .installing:
-            title = String(localized: "Installing Prism update…", bundle: .module)
-            actionTitle = String(localized: "Installing…", bundle: .module)
+            title = String(localized: "Installing Prism update…", bundle: .module.prismLocalized)
+            actionTitle = String(localized: "Installing…", bundle: .module.prismLocalized)
         case .installed:
-            title = String(localized: "Restart Prism to update", bundle: .module)
-            actionTitle = String(localized: "Restart Prism", bundle: .module)
+            title = String(localized: "Restart Prism to update", bundle: .module.prismLocalized)
+            actionTitle = String(localized: "Restart Prism", bundle: .module.prismLocalized)
         case .error:
-            title = String(localized: "Retry Prism update", bundle: .module)
-            actionTitle = String(localized: "Download and install", bundle: .module)
+            title = String(localized: "Retry Prism update", bundle: .module.prismLocalized)
+            actionTitle = String(localized: "Download and install", bundle: .module.prismLocalized)
         default:
-            title = String(localized: "Update Prism", bundle: .module)
-            actionTitle = String(localized: "Download and install", bundle: .module)
+            title = String(localized: "Update Prism", bundle: .module.prismLocalized)
+            actionTitle = String(localized: "Download and install", bundle: .module.prismLocalized)
         }
         return PaletteItem(
             candidate: SearchCandidate(
@@ -50,7 +50,7 @@ final class UpdatesProvider: PaletteProvider {
             ),
             icon: .symbol(status.phase == .installed ? "arrow.clockwise.circle.fill" : "arrow.down.circle.fill",
                           tint: status.phase == .error ? .orange : .mint),
-            accessory: installing ? String(localized: "Installing…", bundle: .module) : version,
+            accessory: installing ? String(localized: "Installing…", bundle: .module.prismLocalized) : version,
             actions: [
                 PaletteAction(id: "prism-update:run", title: actionTitle,
                               systemImage: status.phase == .installed ? "arrow.clockwise" : "arrow.down.circle") { [controller] in
@@ -65,15 +65,15 @@ final class UpdatesProvider: PaletteProvider {
     func checkRow(_ status: UpdateStatus) -> PaletteItem? {
         PaletteItem(
             candidate: SearchCandidate(
-                id: Self.checkRowID, title: String(localized: "Check for updates", bundle: .module),
+                id: Self.checkRowID, title: String(localized: "Check for updates", bundle: .module.prismLocalized),
                 subtitle: status.currentTitle, section: Self.section,
                 keywords: ["update", "upgrade", "version", "업데이트", "버전"],
                 searchAliases: ["Check for updates", "업데이트 확인"]
             ),
             icon: .symbol("arrow.triangle.2.circlepath"),
-            accessory: String(localized: "Command", bundle: .module),
+            accessory: String(localized: "Command", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "prism-update:check", title: String(localized: "Check for updates", bundle: .module),
+                PaletteAction(id: "prism-update:check", title: String(localized: "Check for updates", bundle: .module.prismLocalized),
                               systemImage: "arrow.triangle.2.circlepath") { [controller] in
                     await Self.check(controller)
                 },
@@ -82,7 +82,7 @@ final class UpdatesProvider: PaletteProvider {
         )
     }
 
-    private static var section: String { String(localized: "Prism updates", bundle: .module) }
+    private static var section: String { String(localized: "Prism updates", bundle: .module.prismLocalized) }
 
     /// Installs, retries or restarts. The row itself shows progress, so the palette stays as it is.
     static func run(_ controller: UpdateController) async -> PaletteActionOutcome {

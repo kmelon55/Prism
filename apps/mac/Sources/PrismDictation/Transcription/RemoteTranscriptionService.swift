@@ -1,3 +1,4 @@
+import PrismKit
 // Adapted from Whisp RemoteTranscriptionService.swift and VercelGatewayService.swift.
 // Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import Foundation
@@ -125,7 +126,7 @@ struct RemoteTranscriptionService: Sendable {
             form.addFile(name: "file", filename: "recording.wav", mimeType: "audio/wav", data: try Data(contentsOf: audioURL))
             return try await perform(endpoint: endpoint, apiKey: configuration.apiKey, form: form)
         case .local:
-            throw DictationError(String(localized: "This provider is not supported.", bundle: .module))
+            throw DictationError(String(localized: "This provider is not supported.", bundle: .module.prismLocalized))
         }
     }
 
@@ -175,25 +176,25 @@ struct RemoteTranscriptionService: Sendable {
     /// Appends the provider path unless the base already ends with it. Only HTTPS or local HTTP.
     static func endpointURL(baseURL: String, suffix: String) throws -> URL {
         let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw DictationError(String(localized: "Enter the API base URL.", bundle: .module)) }
+        guard !trimmed.isEmpty else { throw DictationError(String(localized: "Enter the API base URL.", bundle: .module.prismLocalized)) }
         let full = trimmed.hasSuffix("/" + suffix) ? trimmed : trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + suffix
         guard let url = URL(string: full),
               url.scheme == "https" || (url.scheme == "http" && ["localhost", "127.0.0.1", "::1"].contains(url.host ?? "")) else {
-            throw DictationError(String(localized: "Enter a valid HTTPS API base URL.", bundle: .module))
+            throw DictationError(String(localized: "Enter a valid HTTPS API base URL.", bundle: .module.prismLocalized))
         }
         return url
     }
 
     // Provider error bodies are never shown; they can echo prompts or account details.
     private static func requestFailed(_ status: Int) -> DictationError {
-        DictationError(String(localized: "Transcription API error (\(status)): The request could not be processed. Check the API key, model and usage limits.", bundle: .module))
+        DictationError(String(localized: "Transcription API error (\(status)): The request could not be processed. Check the API key, model and usage limits.", bundle: .module.prismLocalized))
     }
 
     private static var invalidResponse: DictationError {
-        DictationError(String(localized: "Could not read the transcription API response.", bundle: .module))
+        DictationError(String(localized: "Could not read the transcription API response.", bundle: .module.prismLocalized))
     }
 
-    private static var tooLarge: String { String(localized: "The transcription response is too large.", bundle: .module) }
+    private static var tooLarge: String { String(localized: "The transcription response is too large.", bundle: .module.prismLocalized) }
 }
 
 struct MultipartFormData {

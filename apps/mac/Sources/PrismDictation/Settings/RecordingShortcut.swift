@@ -1,3 +1,4 @@
+import PrismKit
 // Recording shortcut settings and labels reused from Whisp AppSettings.swift. MIT; see Resources/LICENSE-Whisp.txt.
 import AppKit
 import Carbon.HIToolbox
@@ -9,29 +10,29 @@ enum RecordingAction: CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .cancel: String(localized: "Cancel", bundle: .module)
-        case .copy: String(localized: "Copy to clipboard only", bundle: .module)
-        case .paste: String(localized: "Paste", bundle: .module)
-        case .send: String(localized: "Paste and Enter", bundle: .module)
+        case .cancel: String(localized: "Cancel", bundle: .module.prismLocalized)
+        case .copy: String(localized: "Copy to clipboard only", bundle: .module.prismLocalized)
+        case .paste: String(localized: "Paste", bundle: .module.prismLocalized)
+        case .send: String(localized: "Paste and Enter", bundle: .module.prismLocalized)
         }
     }
 
     var subtitle: String {
         switch self {
-        case .cancel: String(localized: "Discard the recording without an API request.", bundle: .module)
-        case .copy: String(localized: "Copy the result without pasting.", bundle: .module)
-        case .paste: String(localized: "Pastes even when the default action is copy.", bundle: .module)
-        case .send: String(localized: "Paste, then press Enter to send.", bundle: .module)
+        case .cancel: String(localized: "Discard the recording without an API request.", bundle: .module.prismLocalized)
+        case .copy: String(localized: "Copy the result without pasting.", bundle: .module.prismLocalized)
+        case .paste: String(localized: "Pastes even when the default action is copy.", bundle: .module.prismLocalized)
+        case .send: String(localized: "Paste, then press Enter to send.", bundle: .module.prismLocalized)
         }
     }
 
     /// Short overlay hint label.
     var hint: String {
         switch self {
-        case .cancel: String(localized: "Cancel", bundle: .module)
-        case .copy: String(localized: "Copy", bundle: .module)
-        case .paste: String(localized: "Paste", bundle: .module)
-        case .send: String(localized: "Send", bundle: .module)
+        case .cancel: String(localized: "Cancel", bundle: .module.prismLocalized)
+        case .copy: String(localized: "Copy", bundle: .module.prismLocalized)
+        case .paste: String(localized: "Paste", bundle: .module.prismLocalized)
+        case .send: String(localized: "Send", bundle: .module.prismLocalized)
         }
     }
 
@@ -163,10 +164,10 @@ struct RecordingShortcutSetting: Codable, Equatable, Sendable {
             if (binding.mode == .sameAsPrimary && index != 1) || binding.keyCode > 126 || binding.modifiers & ~UInt32(6912) != 0
                 || binding.label.utf8.count > 64 || (binding.mode == .custom && binding.label.trimmingCharacters(in: .whitespaces).isEmpty)
                 || binding.label.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
-                return String(localized: "The recording shortcut settings are not valid.", bundle: .module)
+                return String(localized: "The recording shortcut settings are not valid.", bundle: .module.prismLocalized)
             }
             if bindings[..<index].contains(where: { $0.conflicts(with: binding) }) {
-                return String(localized: "Use a different shortcut for each recording action.", bundle: .module)
+                return String(localized: "Use a different shortcut for each recording action.", bundle: .module.prismLocalized)
             }
         }
         return nil

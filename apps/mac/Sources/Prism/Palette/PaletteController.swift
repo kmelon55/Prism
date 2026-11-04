@@ -198,7 +198,7 @@ final class PaletteController: NSObject, NSWindowDelegate {
 
         let background = NSView.prismGlassBackground(opacity: Self.backgroundOpacity)
         background.setBlurRadius(Glass.blur)
-        let hosting = FirstClickHostingView(rootView: PaletteView(model: model) { [weak self] in self?.onOpenSettings?() })
+        let hosting = FirstClickHostingView(rootView: PrismLocalizedContent { [model, weak self] in PaletteView(model: model) { self?.onOpenSettings?() } })
         hosting.translatesAutoresizingMaskIntoConstraints = false
         background.contentView.addSubview(hosting)
         NSLayoutConstraint.activate([

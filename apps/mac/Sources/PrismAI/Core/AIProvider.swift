@@ -1,8 +1,9 @@
+import PrismKit
 import Foundation
 
 /// Localized text from this module's strings table.
 func L(_ key: String.LocalizationValue) -> String {
-    String(localized: key, bundle: .module)
+    String(localized: key, bundle: .module.prismLocalized)
 }
 
 /// A user-facing failure. Messages never contain keys, raw provider bodies or echoed prompts.
@@ -11,7 +12,7 @@ public struct AIError: Error, LocalizedError, Equatable, Sendable {
     public init(_ message: String) { self.message = message }
     public var errorDescription: String? { message }
 
-    static let cancelled = AIError(L("Request stopped. The provider may bill usage already processed."))
+    static var cancelled: AIError { AIError(L("Request stopped. The provider may bill usage already processed.")) }
 }
 
 public enum AIProvider: String, Codable, CaseIterable, Sendable, Identifiable {
@@ -27,7 +28,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable, Identifiable {
         case .vercel: "Vercel AI Gateway"
         case .openai: "OpenAI"
         case .openrouter: "OpenRouter"
-        case .compatible: "OpenAI-compatible"
+        case .compatible: L("OpenAI-compatible")
         }
     }
 
@@ -71,7 +72,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable, Identifiable {
         }
     }
 
-    var diagnosticName: String { self == .compatible ? "OpenAI-compatible API" : name }
+    var diagnosticName: String { self == .compatible ? L("OpenAI-compatible API") : name }
 
     /// Settings and pickers list connections in the Tauri order.
     public static let displayOrder: [AIProvider] = [.compatible, .vercel, .openai, .openrouter]

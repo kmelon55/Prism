@@ -23,14 +23,14 @@ public enum FileSearchFeature {
     static func browserScreen(service: FileSearchService, context: any PrismContext, query: String = "") -> PaletteScreen {
         // Built once per opening: the palette may evaluate the screen's content many times.
         let model = FileBrowserModel(service: service, context: context, query: query)
-        return PaletteScreen(id: "files", title: String(localized: "File Search", bundle: .module), expanded: true) { [weak context] in
+        return PaletteScreen(id: "files", title: String(localized: "File Search", bundle: .module.prismLocalized), expanded: true) { [weak context] in
             FileBrowserView(model: model, onClose: { context?.popScreen() })
         }
     }
 
     @MainActor
     static func openWithScreen(_ hit: FileHit, context: any PrismContext) -> PaletteScreen {
-        PaletteScreen(id: "files-open-with", title: String(localized: "Open With…", bundle: .module)) { [weak context] in
+        PaletteScreen(id: "files-open-with", title: String(localized: "Open With…", bundle: .module.prismLocalized)) { [weak context] in
             OpenWithView(hit: hit, onOpen: { context?.hidePalette() }, onCancel: { context?.popScreen() })
         }
     }
@@ -52,9 +52,9 @@ final class FileCommandProvider: PaletteProvider {
         if query.isEmpty { service.refresh() }
         let candidate = SearchCandidate(
             id: FileSearchFeature.commandID,
-            title: String(localized: "File Search", bundle: .module),
-            subtitle: String(localized: "Search filenames directly in the palette", bundle: .module),
-            section: String(localized: "Productivity", bundle: .module),
+            title: String(localized: "File Search", bundle: .module.prismLocalized),
+            subtitle: String(localized: "Search filenames directly in the palette", bundle: .module.prismLocalized),
+            section: String(localized: "Productivity", bundle: .module.prismLocalized),
             keywords: ["files", "파일", "검색", "folders", "finder", "폴더"],
             searchAliases: ["File Search", "파일 검색", "Search Files"]
         )
@@ -62,9 +62,9 @@ final class FileCommandProvider: PaletteProvider {
         return [PaletteItem(
             candidate: candidate,
             icon: .symbol("doc.text.magnifyingglass", tint: .blue),
-            accessory: String(localized: "Command", bundle: .module),
+            accessory: String(localized: "Command", bundle: .module.prismLocalized),
             actions: [
-                PaletteAction(id: "open-files", title: String(localized: "Open", bundle: .module), systemImage: "doc.text.magnifyingglass") { [weak context] in
+                PaletteAction(id: "open-files", title: String(localized: "Open", bundle: .module.prismLocalized), systemImage: "doc.text.magnifyingglass") { [weak context] in
                     guard let context else { return .keepOpen }
                     return .push(FileSearchFeature.browserScreen(service: service, context: context))
                 },
@@ -100,7 +100,7 @@ final class FileResultsProvider: PaletteProvider {
         guard !Task.isCancelled else { return [] }
         let found = await service.search(query, limit: FileSearchFeature.rootLimit)
         guard !Task.isCancelled else { return [] }
-        let section = String(localized: "Files", bundle: .module)
+        let section = String(localized: "Files", bundle: .module.prismLocalized)
         var items = found.hits.map { item(for: $0, section: section) }
         if found.total > found.hits.count {
             items.append(showAllItem(query: query, total: found.total, section: section))
@@ -125,12 +125,12 @@ final class FileResultsProvider: PaletteProvider {
         let service = service
         return PaletteItem(
             candidate: SearchCandidate(
-                id: "files:search-broader", title: String(localized: "Show All \(total) Files", bundle: .module),
+                id: "files:search-broader", title: String(localized: "Show All \(total) Files", bundle: .module.prismLocalized),
                 subtitle: trimmed, section: section
             ),
             icon: .symbol("doc.text.magnifyingglass"),
             actions: [
-                PaletteAction(id: "files-search-broader", title: String(localized: "Open in File Search", bundle: .module), systemImage: "doc.text.magnifyingglass") { [weak context] in
+                PaletteAction(id: "files-search-broader", title: String(localized: "Open in File Search", bundle: .module.prismLocalized), systemImage: "doc.text.magnifyingglass") { [weak context] in
                     guard let context else { return .keepOpen }
                     return .push(FileSearchFeature.browserScreen(service: service, context: context, query: trimmed))
                 },

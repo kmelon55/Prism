@@ -280,7 +280,7 @@ public struct PrismPickerHeader: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .medium))
                             .rotationEffect(.degrees(refreshing ? 180 : 0))
-                        Text(refreshing ? "Loading" : "Refresh", bundle: .module)
+                        Text(refreshing ? "Loading" : "Refresh", bundle: .module.prismLocalized)
                     }
                 }
                 .buttonStyle(.prismGhost)
@@ -290,8 +290,8 @@ public struct PrismPickerHeader: View {
                 Button(action: onClose) { Image(systemName: "xmark").font(.system(size: 12, weight: .medium)) }
                     .buttonStyle(.prismGhost)
                     .keyboardShortcut(.cancelAction)
-                    .help(Text("Close model picker", bundle: .module))
-                    .accessibilityLabel(Text("Close model picker", bundle: .module))
+                    .help(Text("Close model picker", bundle: .module.prismLocalized))
+                    .accessibilityLabel(Text("Close model picker", bundle: .module.prismLocalized))
             }
         }
         .frame(minHeight: 28)

@@ -15,7 +15,7 @@ struct DictationNotchView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(controller.phase == .recording ? .orange : .secondary)
                 Spacer()
-                NotchIconButton("gearshape", label: String(localized: "Dictation Settings", bundle: .module), action: settings)
+                NotchIconButton("gearshape", label: String(localized: "Dictation Settings", bundle: .module.prismLocalized), action: settings)
             }
             HStack(spacing: 18) {
                 ZStack {
@@ -29,12 +29,12 @@ struct DictationNotchView: View {
                         WaveformView(amplitude: controller.amplitude, phase: controller.phase)
                             .frame(maxWidth: .infinity).frame(height: 34).foregroundStyle(.orange)
                     } else {
-                        Text("Speak naturally.", bundle: .module).font(.system(size: 18, weight: .medium))
+                        Text("Speak naturally.", bundle: .module.prismLocalized).font(.system(size: 18, weight: .medium))
                     }
                     if !controller.message.isEmpty, controller.phase == .error {
                         Text(verbatim: controller.message).foregroundStyle(.red).font(.system(size: 11)).lineLimit(3)
                     } else {
-                        Text("Speak into the app you were using.", bundle: .module)
+                        Text("Speak into the app you were using.", bundle: .module.prismLocalized)
                             .foregroundStyle(.secondary).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -45,14 +45,14 @@ struct DictationNotchView: View {
                         dismiss()
                         service.toggle(promptMode: false)
                     } label: {
-                        Label(controller.phase == .recording ? String(localized: "Finish Dictation", bundle: .module) : String(localized: "Start Dictation", bundle: .module),
+                        Label(controller.phase == .recording ? String(localized: "Finish Dictation", bundle: .module.prismLocalized) : String(localized: "Start Dictation", bundle: .module.prismLocalized),
                               systemImage: controller.phase == .recording ? "stop.fill" : "mic.fill")
                             .font(.system(size: 12, weight: .medium)).frame(maxWidth: .infinity).frame(height: 36)
                     }.buttonStyle(NotchButtonStyle(prominent: true))
                 }
                 if controller.busy {
                     Button { controller.cancel() } label: {
-                        Text("Cancel", bundle: .module).font(.system(size: 11)).padding(.horizontal, 14).frame(height: 36)
+                        Text("Cancel", bundle: .module.prismLocalized).font(.system(size: 11)).padding(.horizontal, 14).frame(height: 36)
                     }.buttonStyle(NotchButtonStyle())
                 }
             }
@@ -71,7 +71,7 @@ struct DictationNotchView: View {
         case .error: value = "Dictation needs attention"
         case .idle, .preview: value = "Ready to listen"
         }
-        return String(localized: String.LocalizationValue(value), bundle: .module)
+        return String(localized: String.LocalizationValue(value), bundle: .module.prismLocalized)
     }
 }
 

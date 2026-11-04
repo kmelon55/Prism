@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 /// Messages shown under "Error details". They match the Tauri app's wording where one exists.
@@ -20,21 +21,21 @@ enum UpdateError: Error, Equatable {
 
     var message: String {
         switch self {
-        case .busy: String(localized: "An update operation is already running.", bundle: .module)
-        case .noPendingUpdate: String(localized: "Check for an update first.", bundle: .module)
-        case .development: String(localized: "Development builds cannot install updates.", bundle: .module)
-        case .notInstalledApp: String(localized: "Install Prism in Applications before updating.", bundle: .module)
-        case .network: String(localized: "Could not reach the update server.", bundle: .module)
-        case .invalidFeed: String(localized: "The update information is invalid.", bundle: .module)
-        case .missingPlatform: String(localized: "The update is not available for this Mac.", bundle: .module)
-        case .signature: String(localized: "The update signature is invalid. The installed app was not changed.", bundle: .module)
-        case .archive: String(localized: "Invalid app update archive.", bundle: .module)
-        case .unsupportedEntry: String(localized: "The update contains an unsupported app archive entry.", bundle: .module)
-        case .tooLarge: String(localized: "The update is too large.", bundle: .module)
-        case .identityChanged: String(localized: "This update changes Prism's signing identity and would reset macOS permissions. The installed app was not changed.", bundle: .module)
-        case .versionMismatch: String(localized: "The downloaded app is not the announced version. The installed app was not changed.", bundle: .module)
-        case .replaceFailed: String(localized: "Could not replace Prism. Check that Prism is in a folder you can write to.", bundle: .module)
-        case .notInstalled: String(localized: "No installed update is ready.", bundle: .module)
+        case .busy: String(localized: "An update operation is already running.", bundle: .module.prismLocalized)
+        case .noPendingUpdate: String(localized: "Check for an update first.", bundle: .module.prismLocalized)
+        case .development: String(localized: "Development builds cannot install updates.", bundle: .module.prismLocalized)
+        case .notInstalledApp: String(localized: "Install Prism in Applications before updating.", bundle: .module.prismLocalized)
+        case .network: String(localized: "Could not reach the update server.", bundle: .module.prismLocalized)
+        case .invalidFeed: String(localized: "The update information is invalid.", bundle: .module.prismLocalized)
+        case .missingPlatform: String(localized: "The update is not available for this Mac.", bundle: .module.prismLocalized)
+        case .signature: String(localized: "The update signature is invalid. The installed app was not changed.", bundle: .module.prismLocalized)
+        case .archive: String(localized: "Invalid app update archive.", bundle: .module.prismLocalized)
+        case .unsupportedEntry: String(localized: "The update contains an unsupported app archive entry.", bundle: .module.prismLocalized)
+        case .tooLarge: String(localized: "The update is too large.", bundle: .module.prismLocalized)
+        case .identityChanged: String(localized: "This update changes Prism's signing identity and would reset macOS permissions. The installed app was not changed.", bundle: .module.prismLocalized)
+        case .versionMismatch: String(localized: "The downloaded app is not the announced version. The installed app was not changed.", bundle: .module.prismLocalized)
+        case .replaceFailed: String(localized: "Could not replace Prism. Check that Prism is in a folder you can write to.", bundle: .module.prismLocalized)
+        case .notInstalled: String(localized: "No installed update is ready.", bundle: .module.prismLocalized)
         }
     }
 

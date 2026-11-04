@@ -18,7 +18,7 @@ struct RecordingKeysSection: View {
             if let error {
                 DictationNote(Text(verbatim: error), tone: .warning).padding(.vertical, 6)
             }
-            PrismSettingsNote(Text("These keys work only while recording, so they never block other apps. Single modifier keys need Accessibility.", bundle: .module))
+            PrismSettingsNote(Text("These keys work only while recording, so they never block other apps. Single modifier keys need Accessibility.", bundle: .module.prismLocalized))
                 .padding(.top, 6)
         }
         .onChange(of: recording) { _, value in service.monitor.setSuspended(value != nil) }
@@ -29,10 +29,10 @@ struct RecordingKeysSection: View {
         let binding = settings.binding(action)
         var options: [(value: RecordingShortcutMode, title: String)] = []
         if action == .paste {
-            options.append((.sameAsPrimary, String(localized: "Same as start shortcut · default", bundle: .module)))
+            options.append((.sameAsPrimary, String(localized: "Same as start shortcut · default", bundle: .module.prismLocalized)))
         }
-        options.append((.custom, String(localized: "Custom", bundle: .module)))
-        options.append((.disabled, String(localized: "None", bundle: .module)))
+        options.append((.custom, String(localized: "Custom", bundle: .module.prismLocalized)))
+        options.append((.disabled, String(localized: "None", bundle: .module.prismLocalized)))
         return PrismSettingsRow(Text(verbatim: action.title), detail: Text(verbatim: action.subtitle)) {
             HStack(spacing: 8) {
                 PrismSelect(selection: Binding(get: { binding.mode }, set: { mode in
@@ -55,11 +55,11 @@ struct RecordingKeysSection: View {
         next.setBinding(binding, for: action)
         if let primary = service.dictationShortcut?.label, binding.mode == .custom,
            binding.label.replacingOccurrences(of: " ", with: "").lowercased() == primary.replacingOccurrences(of: " ", with: "").lowercased() {
-            error = String(localized: "This matches the start shortcut. For paste, choose “Same as start shortcut”.", bundle: .module)
+            error = String(localized: "This matches the start shortcut. For paste, choose “Same as start shortcut”.", bundle: .module.prismLocalized)
             return
         }
         if binding.mode == .custom, RecordingAction.allCases.contains(where: { $0 != action && next.binding($0).conflicts(with: binding) }) {
-            error = String(localized: "Use a different shortcut for each recording action.", bundle: .module)
+            error = String(localized: "Use a different shortcut for each recording action.", bundle: .module.prismLocalized)
             return
         }
         error = nil
@@ -81,9 +81,9 @@ struct ShortcutRecorderButton: View {
         Button {
             isRecording.toggle()
         } label: {
-            Text(verbatim: isRecording ? String(localized: "Press a key…", bundle: .module)
-                 : invalid ? String(localized: "Key not supported", bundle: .module)
-                 : label.isEmpty ? String(localized: "Record Shortcut", bundle: .module) : label)
+            Text(verbatim: isRecording ? String(localized: "Press a key…", bundle: .module.prismLocalized)
+                 : invalid ? String(localized: "Key not supported", bundle: .module.prismLocalized)
+                 : label.isEmpty ? String(localized: "Record Shortcut", bundle: .module.prismLocalized) : label)
                 .font(.system(size: 11.5, weight: .medium))
                 .lineLimit(1)
                 .foregroundStyle(isRecording ? PrismTheme.text : PrismTheme.textSecondary)

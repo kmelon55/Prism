@@ -93,7 +93,7 @@ final class NotesModel {
 
     func ensureTransferReady() throws {
         guard !isBusy, !(autosave?.hasUnsavedChanges ?? false), status != .saving else {
-            throw TransferError("메모를 저장 중이에요. 저장이 끝나면 다시 동기화해요.")
+            throw TransferError(String(localized: "Notes are being saved. Sync again after saving finishes.", bundle: .module.prismLocalized))
         }
     }
 
@@ -202,13 +202,13 @@ struct NotesView: View {
         VStack(spacing: 0) {
             HStack(spacing: 7) {
                 if let onBack {
-                    PrismBackButton(help: Text("Back", bundle: .module), action: onBack)
+                    PrismBackButton(help: Text("Back", bundle: .module.prismLocalized), action: onBack)
                 }
-                Text("Notes", bundle: .module)
+                Text("Notes", bundle: .module.prismLocalized)
                     .font(.prism(13, weight: 600))
                     .foregroundStyle(PrismTheme.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                PrismIconButton(systemImage: "square.and.pencil", help: Text("New Note", bundle: .module)) {
+                PrismIconButton(systemImage: "square.and.pencil", help: Text("New Note", bundle: .module.prismLocalized)) {
                     Task { await model.select(nil) }
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -218,8 +218,8 @@ struct NotesView: View {
             .frame(height: 58)
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(PrismTheme.textMuted)
-                TextField(text: $model.query, prompt: Text("Search", bundle: .module).foregroundStyle(PrismTheme.textMuted)) {
-                    Text("Search notes", bundle: .module)
+                TextField(text: $model.query, prompt: Text("Search", bundle: .module.prismLocalized).foregroundStyle(PrismTheme.textMuted)) {
+                    Text("Search notes", bundle: .module.prismLocalized)
                 }
                 .textFieldStyle(.plain)
                 .font(.prism(12))
@@ -250,7 +250,7 @@ struct NotesView: View {
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
                 .disabled(model.document == nil || model.isBusy)
-                PrismIconButton(systemImage: "trash", help: Text("Delete Note", bundle: .module)) {
+                PrismIconButton(systemImage: "trash", help: Text("Delete Note", bundle: .module.prismLocalized)) {
                     model.isConfirmingDelete = true
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
@@ -268,7 +268,7 @@ struct NotesView: View {
                                      isEditable: !model.isBusy && !model.isConfirmingDelete, focusToken: model.focusToken)
                             .overlay(alignment: .topLeading) {
                                 if model.documentText.isEmpty {
-                                    Text("Start writing…", bundle: .module)
+                                    Text("Start writing…", bundle: .module.prismLocalized)
                                         .font(.prism(15))
                                         .foregroundStyle(PrismTheme.textMuted)
                                         .padding(.leading, NoteStyle.inset.width + 5)
@@ -345,7 +345,7 @@ struct NotesSidebarList: View {
                         }
                 }
                 if !model.query.isEmpty && model.notes.isEmpty {
-                    Text("No results found.", bundle: .module)
+                    Text("No results found.", bundle: .module.prismLocalized)
                         .font(.prism(12))
                         .foregroundStyle(PrismTheme.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)

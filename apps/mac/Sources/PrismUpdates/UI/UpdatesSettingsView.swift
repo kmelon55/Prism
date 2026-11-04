@@ -22,7 +22,7 @@ struct UpdatesSettingsView: View {
                 }
             }
             if let error = status.error {
-                PrismDisclosure(Text("Error details", bundle: .module)) {
+                PrismDisclosure(Text("Error details", bundle: .module.prismLocalized)) {
                     Text(verbatim: error)
                         .font(.system(size: 11))
                         .foregroundStyle(PrismTheme.textMuted)
@@ -32,8 +32,8 @@ struct UpdatesSettingsView: View {
                 }
                 .padding(.bottom, 8)
             }
-            PrismSettingsRow(Text("Install updates automatically", bundle: .module),
-                             detail: Text("Download and install new versions in the background. Changes take effect when you restart Prism.", bundle: .module)) {
+            PrismSettingsRow(Text("Install updates automatically", bundle: .module.prismLocalized),
+                             detail: Text("Download and install new versions in the background. Changes take effect when you restart Prism.", bundle: .module.prismLocalized)) {
                 Toggle(isOn: Binding(get: { status.automaticInstall }, set: { setAutomatic($0) })) { EmptyView() }
                     .toggleStyle(.prism)
                     .labelsHidden()
@@ -41,7 +41,7 @@ struct UpdatesSettingsView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Prism updates", bundle: .module))
+        .accessibilityLabel(Text("Prism updates", bundle: .module.prismLocalized))
     }
 
     /// The status line, and the failure of the last button press under it (`role="alert"` in `Updates.tsx`).
@@ -88,7 +88,7 @@ struct UpdatesSettingsView: View {
                     try await controller.check()
                 }
             } catch {
-                failure = String(localized: "Could not update Prism. Check your connection and try again.", bundle: .module)
+                failure = String(localized: "Could not update Prism. Check your connection and try again.", bundle: .module.prismLocalized)
             }
         }
     }
@@ -98,7 +98,7 @@ struct UpdatesSettingsView: View {
         do {
             try controller.setAutomaticInstall(enabled)
         } catch {
-            failure = String(localized: "Could not save update settings.", bundle: .module)
+            failure = String(localized: "Could not save update settings.", bundle: .module.prismLocalized)
         }
     }
 }

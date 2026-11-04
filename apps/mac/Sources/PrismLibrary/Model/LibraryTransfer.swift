@@ -21,12 +21,12 @@ extension LibraryStore {
     ensureReady: @escaping () throws -> Void, didApply: @escaping ([LibraryEntry]) -> Void
   ) {
     for (kind, id, title) in [
-      (LibraryEntry.Kind.note, "notes", "메모"), (.snippet, "snippets", "스니펫"),
-      (.link, "links", "빠른 링크"),
+      (LibraryEntry.Kind.note, "notes", "Notes"), (.snippet, "snippets", "Snippets"),
+      (.link, "links", "Quicklinks"),
     ] {
       SyncTransfers.register(
         SyncTransfer(
-          id: id, title: title,
+          id: id, title: String(localized: String.LocalizationValue(title), bundle: .module.prismLocalized),
           read: {
             try ensureReady()
             return try TransferCodec.encode(
@@ -43,7 +43,7 @@ extension LibraryStore {
   static func decodeTransfer(_ data: Data, kind: LibraryEntry.Kind) throws -> [LibraryEntry] {
     let raw = try JSONDecoder().decode([TransferEntry].self, from: data)
     guard raw.count <= LibraryLimits.maxEntries, Set(raw.map(\.id)).count == raw.count else {
-      throw TransferError("중복되거나 너무 많은 항목이 있어요.")
+      throw TransferError(String(localized: "There are duplicate or too many items.", bundle: .module.prismLocalized))
     }
     let entries = raw.map { $0.entry(kind) }
     for entry in entries {

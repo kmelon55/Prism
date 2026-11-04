@@ -1,3 +1,4 @@
+import PrismKit
 import Foundation
 
 public enum ClipboardKind: String, Codable, Sendable, CaseIterable {
@@ -126,6 +127,6 @@ public enum ClipboardClock {
 
 enum ClipboardText {
     static func localize(_ message: String) -> String {
-        Bundle.module.localizedString(forKey: message, value: message, table: nil)
+        Bundle.module.prismLocalized.localizedString(forKey: message, value: message, table: nil)
     }
 }

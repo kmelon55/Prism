@@ -197,7 +197,7 @@ public enum UsagePresentation {
         case "xai": "xAI"
         case "local": L("Local")
         case "custom": L("Custom")
-        case "compatible": "OpenAI-compatible"
+        case "compatible": L("OpenAI-compatible")
         default: provider
         }
     }

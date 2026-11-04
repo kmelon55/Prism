@@ -38,7 +38,7 @@ struct CommandAliasStore: Sendable {
 ///
 /// - `theme` and `showApplicationIcons`: the shell's `UserDefaults` keys of the same names, same values.
 /// - `language`: the per-app language macOS itself uses (`AppleLanguages` in Prism's own defaults domain), which
-///   applies the next time Prism opens. `system` removes the override.
+///   also refreshes the interface immediately. `system` removes the override.
 /// - `commandAliases`: `CommandAliasStore`.
 /// - `reduceMotion` and `backgroundOpacity`: the shell's own keys (`reduceMotion`; `backgroundOpacity` as 0.1...1,
 ///   where the backup file uses percent).
@@ -88,11 +88,7 @@ struct NativePreferences {
         try aliases.save(preferences.commandAliases)
         defaults.set(preferences.theme, forKey: Key.theme)
         defaults.set(preferences.showApplicationIcons, forKey: Key.showApplicationIcons)
-        if preferences.language == "system" {
-            defaults.removeObject(forKey: Key.language)
-        } else {
-            defaults.set([preferences.language], forKey: Key.language)
-        }
+        PrismLanguage.set(PrismLanguage(rawValue: preferences.language) ?? .system, defaults: defaults)
         defaults.set(preferences.reduceMotion, forKey: Key.reduceMotion)
         defaults.set(preferences.backgroundOpacity / 100, forKey: Key.backgroundOpacity)
         defaults.set(preferences.backgroundBlur, forKey: Key.backgroundBlur)

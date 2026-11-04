@@ -8,18 +8,18 @@ enum SpeechProvider: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .local: "Local · whisper.cpp"
+        case .local: String(localized: "Local · whisper.cpp", bundle: .module.prismLocalized)
         case .openai: "OpenAI"
         case .vercel: "Vercel AI Gateway"
         case .groq: "Groq"
         case .xai: "xAI"
-        case .custom: String(localized: "OpenAI-compatible", bundle: .module)
+        case .custom: String(localized: "OpenAI-compatible", bundle: .module.prismLocalized)
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .local: String(localized: "Local", bundle: .module)
+        case .local: String(localized: "Local", bundle: .module.prismLocalized)
         case .vercel: "Vercel"
         default: title
         }
@@ -47,7 +47,7 @@ enum TextProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .openai: "OpenAI"
         case .openrouter: "OpenRouter"
         case .vercel: "Vercel AI Gateway"
-        case .compatible: String(localized: "OpenAI-compatible", bundle: .module)
+        case .compatible: String(localized: "OpenAI-compatible", bundle: .module.prismLocalized)
         }
     }
 }
@@ -251,10 +251,10 @@ struct DictationSettings: Codable, Equatable, Sendable {
     /// The same checks as the Rust `validate`, so a file this app writes always loads in the Tauri app.
     func validate() throws {
         for selection in [processingModel, cleanupModel, promptModel].compactMap({ $0 }) where !selection.isValid {
-            throw DictationError(String(localized: "Choose a text processing model.", bundle: .module))
+            throw DictationError(String(localized: "Choose a text processing model.", bundle: .module.prismLocalized))
         }
         for text in [cleanupInstruction, promptInstruction] where text.utf8.count > 8000 || text.contains("\0") {
-            throw DictationError(String(localized: "Processing prompt is too long.", bundle: .module))
+            throw DictationError(String(localized: "Processing prompt is too long.", bundle: .module.prismLocalized))
         }
         if let message = RecordingShortcutSetting.validationError(recordingBindings) { throw DictationError(message) }
         let invalidWord = vocabulary.contains { $0.utf8.count > 200 || $0.contains(where: { "\r\n\0".contains($0) }) }
@@ -262,17 +262,17 @@ struct DictationSettings: Codable, Equatable, Sendable {
             || whisperPath.utf8.count > 4096 || modelPath.utf8.count > 4096 || whisperPath.contains("\0") || modelPath.contains("\0")
             || !["ko", "en"].contains(uiLanguage) || language.isEmpty || language.utf8.count > 16
             || !language.unicodeScalars.allSatisfy({ ($0.isASCII && CharacterSet.letters.contains($0)) || $0 == "-" }) {
-            throw DictationError(String(localized: "Some dictation settings are invalid.", bundle: .module))
+            throw DictationError(String(localized: "Some dictation settings are invalid.", bundle: .module.prismLocalized))
         }
         guard provider != .local else { return }
         let lowered = model.lowercased()
         if model.isEmpty || !model.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 32 && $0.value < 127 })
             || lowered.contains("realtime") || model.hasSuffix("-live") || (provider == .openai && model.contains("diarize")) {
-            throw DictationError(String(localized: "Choose a speech model that supports file transcription.", bundle: .module))
+            throw DictationError(String(localized: "Choose a speech model that supports file transcription.", bundle: .module.prismLocalized))
         }
         try Self.validateEndpoint(baseURL)
         if let expected = provider.fixedBaseURL, baseURL.trimmingTrailing("/") != expected {
-            throw DictationError(String(localized: "The provider API address is not valid. Choose OpenAI-compatible for other servers.", bundle: .module))
+            throw DictationError(String(localized: "The provider API address is not valid. Choose OpenAI-compatible for other servers.", bundle: .module.prismLocalized))
         }
     }
 
@@ -282,7 +282,7 @@ struct DictationSettings: Codable, Equatable, Sendable {
               components.query == nil, components.fragment == nil,
               scheme == "https" || (scheme == "http" && ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host))
         else {
-            throw DictationError(String(localized: "Enter an HTTPS URL or a local HTTP address. Do not put credentials or queries in the URL.", bundle: .module))
+            throw DictationError(String(localized: "Enter an HTTPS URL or a local HTTP address. Do not put credentials or queries in the URL.", bundle: .module.prismLocalized))
         }
     }
 
@@ -293,10 +293,10 @@ struct DictationSettings: Codable, Equatable, Sendable {
         var isDirectory: ObjCBool = false
         guard whisperPath.hasPrefix("/"), FileManager.default.fileExists(atPath: whisperPath, isDirectory: &isDirectory), !isDirectory.boolValue,
               FileManager.default.isExecutableFile(atPath: whisperPath) else {
-            throw DictationError(String(localized: "Choose an executable whisper.cpp file.", bundle: .module))
+            throw DictationError(String(localized: "Choose an executable whisper.cpp file.", bundle: .module.prismLocalized))
         }
         guard modelPath.hasPrefix("/"), FileManager.default.fileExists(atPath: modelPath, isDirectory: &isDirectory), !isDirectory.boolValue else {
-            throw DictationError(String(localized: "Choose a local Whisper model file.", bundle: .module))
+            throw DictationError(String(localized: "Choose a local Whisper model file.", bundle: .module.prismLocalized))
         }
     }
 }
@@ -312,13 +312,13 @@ struct DictationSettingsStore: Sendable {
     func load() throws -> DictationSettings {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return DictationSettings() }
         guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 65_536, let data = try? Data(contentsOf: url) else {
-            throw DictationError(String(localized: "Could not read dictation settings.", bundle: .module))
+            throw DictationError(String(localized: "Could not read dictation settings.", bundle: .module.prismLocalized))
         }
         // Like the Rust reader, reject unknown fields such as a stray `apiKey`.
         let keys = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?.keys
         guard let keys, Set(keys).isSubset(of: DictationSettings.knownKeys),
               var settings = try? JSONDecoder().decode(DictationSettings.self, from: data) else {
-            throw DictationError(String(localized: "The dictation settings file is not valid.", bundle: .module))
+            throw DictationError(String(localized: "The dictation settings file is not valid.", bundle: .module.prismLocalized))
         }
         settings.upgrade()
         try settings.validate()

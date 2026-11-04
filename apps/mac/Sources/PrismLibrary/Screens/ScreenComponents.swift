@@ -11,7 +11,7 @@ struct ScreenHeader<Field: View, Trailing: View>: View {
     var body: some View {
         PrismScreenHeader {
             if let onBack {
-                PrismBackButton(help: Text("Back", bundle: .module), action: onBack)
+                PrismBackButton(help: Text("Back", bundle: .module.prismLocalized), action: onBack)
             }
             field
             trailing
@@ -123,7 +123,7 @@ struct LibraryConfirmation: View {
             }
             .buttonStyle(.prismDestructive)
             Button(action: onCancel) {
-                HStack(spacing: 6) { Text("Cancel", bundle: .module); KeyCap("esc") }
+                HStack(spacing: 6) { Text("Cancel", bundle: .module.prismLocalized); KeyCap("esc") }
             }
             .buttonStyle(.prism)
         }

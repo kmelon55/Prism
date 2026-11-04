@@ -1,3 +1,4 @@
+import PrismKit
 // Whisp recording, waveform and text delivery adapted for Prism. MIT; see Resources/LICENSE-Whisp.txt.
 import AppKit
 import Observation
@@ -170,7 +171,7 @@ final class DictationController {
                     try? await Task.sleep(for: .seconds(300))
                     guard !Task.isCancelled, session == generation, phase == .recording else { return }
                     // Never spend money automatically when the recording limit is reached.
-                    fail(String(localized: "Recording reached the five-minute limit. Please start again.", bundle: .module))
+                    fail(String(localized: "Recording reached the five-minute limit. Please start again.", bundle: .module.prismLocalized))
                 }
             } catch {
                 guard !Task.isCancelled, session == generation else { return }
@@ -197,7 +198,7 @@ final class DictationController {
         let shouldPaste = paste ?? (pressEnter || settings.defaultDelivery != .copy)
         timer?.cancel()
         guard let audio = recorder.stop() else {
-            fail(String(localized: "Could not create the recording file.", bundle: .module))
+            fail(String(localized: "Could not create the recording file.", bundle: .module.prismLocalized))
             return
         }
         let session = generation
@@ -205,7 +206,7 @@ final class DictationController {
         do { recoveryEntry = try recovery?.preserve(audio) } catch {
             // Keep the source when the recovery folder is unavailable.
             transcriptionAudio = nil
-            fail(String(localized: "Could not back up the recording. Original location: ", bundle: .module) + audio.path)
+            fail(String(localized: "Could not back up the recording. Original location: ", bundle: .module.prismLocalized) + audio.path)
             return
         }
         installControls(recording: false)
@@ -223,7 +224,7 @@ final class DictationController {
                 guard generation == session else { return }
                 var text = TextPostProcessor.clean(raw, vocabulary: settings.vocabulary)
                 guard !text.isEmpty, text.utf8.count <= 1_048_576 else {
-                    throw DictationError(String(localized: "No speech was recognized. Please try again.", bundle: .module))
+                    throw DictationError(String(localized: "No speech was recognized. Please try again.", bundle: .module.prismLocalized))
                 }
                 originalTranscript = text
                 lastTranscript = text
@@ -274,7 +275,7 @@ final class DictationController {
         timer = Task {
             try? await Task.sleep(for: .seconds(180))
             guard !Task.isCancelled, generation == session, busy else { return }
-            fail(String(localized: "Transcription timed out. Please try again.", bundle: .module))
+            fail(String(localized: "Transcription timed out. Please try again.", bundle: .module.prismLocalized))
         }
     }
 
@@ -294,7 +295,7 @@ final class DictationController {
                     try? FileManager.default.removeItem(at: audio)
                 }
             } catch {
-                recoveryWarning = String(localized: "Recording location: ", bundle: .module) + audio.path
+                recoveryWarning = String(localized: "Recording location: ", bundle: .module.prismLocalized) + audio.path
             }
         }
         clear()
@@ -398,16 +399,16 @@ final class DictationController {
         timer = Task {
             try? await Task.sleep(for: .seconds(22))
             guard !Task.isCancelled, generation == session, phase == .processing else { return }
-            processed(ProcessingResult(error: String(localized: "Text processing timed out. Used the original text.", bundle: .module)), session: session)
+            processed(ProcessingResult(error: String(localized: "Text processing timed out. Used the original text.", bundle: .module.prismLocalized)), session: session)
         }
         return await withCheckedContinuation { continuation in
             processingContinuation = continuation
             guard let selection = settings.selection(for: mode), selection.isValid else {
-                processed(ProcessingResult(error: String(localized: "Choose a text processing model.", bundle: .module)), session: session)
+                processed(ProcessingResult(error: String(localized: "Choose a text processing model.", bundle: .module.prismLocalized)), session: session)
                 return
             }
             guard let process else {
-                processed(ProcessingResult(error: String(localized: "Text processing is unavailable.", bundle: .module)), session: session)
+                processed(ProcessingResult(error: String(localized: "Text processing is unavailable.", bundle: .module.prismLocalized)), session: session)
                 return
             }
             let request = ProcessingRequest(mode: mode, selection: selection, instruction: settings.instruction(for: mode), transcript: text)

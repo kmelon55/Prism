@@ -1,3 +1,4 @@
+import PrismKit
 // Adapted from Whisp. Copyright (c) 2026 Whisp contributors. MIT; see Resources/LICENSE-Whisp.txt.
 import AppKit
 import ApplicationServices
@@ -36,11 +37,11 @@ enum TextDeliveryResult: Equatable, Sendable {
 
     var fallbackMessage: String {
         switch self {
-        case .copyFailed: String(localized: "Could not copy the text. Copy the last result again in settings.", bundle: .module)
-        case .permissionRequired: String(localized: "Accessibility permission is off, so the text was copied", bundle: .module)
-        case .unverified: String(localized: "Could not confirm insertion. The text is on the clipboard.", bundle: .module)
-        case .sendFailed: String(localized: "Could not send automatically. The text is on the clipboard.", bundle: .module)
-        default: String(localized: "No insertion point was found, so the text was copied", bundle: .module)
+        case .copyFailed: String(localized: "Could not copy the text. Copy the last result again in settings.", bundle: .module.prismLocalized)
+        case .permissionRequired: String(localized: "Accessibility permission is off, so the text was copied", bundle: .module.prismLocalized)
+        case .unverified: String(localized: "Could not confirm insertion. The text is on the clipboard.", bundle: .module.prismLocalized)
+        case .sendFailed: String(localized: "Could not send automatically. The text is on the clipboard.", bundle: .module.prismLocalized)
+        default: String(localized: "No insertion point was found, so the text was copied", bundle: .module.prismLocalized)
         }
     }
 }

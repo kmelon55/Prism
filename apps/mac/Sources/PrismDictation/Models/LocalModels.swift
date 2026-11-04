@@ -15,11 +15,11 @@ struct LocalModel: Identifiable, Equatable, Sendable {
 
     var localizedDescription: String {
         switch id {
-        case "large-v3-turbo-q5_0": String(localized: "Smaller download with 5-bit quantization. Supports Korean and multilingual dictation.", bundle: .module)
-        case "large-v3-turbo": String(localized: "Fewer decoder layers than Large v3 for faster transcription. Supports Korean.", bundle: .module)
-        case "large-v3": String(localized: "Full-size multilingual model. Needs more memory and processing time. Supports Korean.", bundle: .module)
-        case "small": String(localized: "A smaller multilingual model for Macs with limited memory. Supports Korean.", bundle: .module)
-        case "medium": String(localized: "A multilingual model between Small and Large in size. Supports Korean.", bundle: .module)
+        case "large-v3-turbo-q5_0": String(localized: "Smaller download with 5-bit quantization. Supports Korean and multilingual dictation.", bundle: .module.prismLocalized)
+        case "large-v3-turbo": String(localized: "Fewer decoder layers than Large v3 for faster transcription. Supports Korean.", bundle: .module.prismLocalized)
+        case "large-v3": String(localized: "Full-size multilingual model. Needs more memory and processing time. Supports Korean.", bundle: .module.prismLocalized)
+        case "small": String(localized: "A smaller multilingual model for Macs with limited memory. Supports Korean.", bundle: .module.prismLocalized)
+        case "medium": String(localized: "A multilingual model between Small and Large in size. Supports Korean.", bundle: .module.prismLocalized)
         default: description
         }
     }
@@ -68,7 +68,7 @@ enum LocalModelFiles {
     static func verify(bytes: Int64, digest: SHA256.Digest, model: LocalModel) throws {
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         guard bytes == model.bytes, hex == model.sha256 else {
-            throw DictationError(String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module))
+            throw DictationError(String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module.prismLocalized))
         }
     }
 
@@ -127,7 +127,7 @@ private final class ModelDownload: NSObject, URLSessionDataDelegate, @unchecked 
         // A crashed earlier download leaves a stale partial file; replace it.
         try? FileManager.default.removeItem(at: partial)
         guard FileManager.default.createFile(atPath: partial.path, contents: nil) else {
-            throw DictationError(String(localized: "Could not create the model file.", bundle: .module))
+            throw DictationError(String(localized: "Could not create the model file.", bundle: .module.prismLocalized))
         }
         handle = try FileHandle(forWritingTo: partial)
         let configuration = URLSessionConfiguration.ephemeral
@@ -155,8 +155,8 @@ private final class ModelDownload: NSObject, URLSessionDataDelegate, @unchecked 
         let lengthMatches = response.expectedContentLength < 0 || response.expectedContentLength == model.bytes
         if !ok || !lengthMatches {
             lock.lock()
-            failure = DictationError(ok ? String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module)
-                                         : String(localized: "Could not download the model (\(http?.statusCode ?? 0)).", bundle: .module))
+            failure = DictationError(ok ? String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module.prismLocalized)
+                                         : String(localized: "Could not download the model (\(http?.statusCode ?? 0)).", bundle: .module.prismLocalized))
             lock.unlock()
             completionHandler(.cancel)
             return
@@ -170,7 +170,7 @@ private final class ModelDownload: NSObject, URLSessionDataDelegate, @unchecked 
         guard failure == nil else { return }
         received += Int64(data.count)
         guard received <= model.bytes else {
-            failure = DictationError(String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module))
+            failure = DictationError(String(localized: "The model download is incomplete or damaged. Please retry.", bundle: .module.prismLocalized))
             dataTask.cancel()
             return
         }
@@ -195,7 +195,7 @@ private final class ModelDownload: NSObject, URLSessionDataDelegate, @unchecked 
             outcome = .failure(failure)
         } else if let error {
             outcome = .failure((error as? URLError)?.code == .cancelled
-                ? DictationError(String(localized: "Model download cancelled.", bundle: .module)) : error)
+                ? DictationError(String(localized: "Model download cancelled.", bundle: .module.prismLocalized)) : error)
         } else {
             do {
                 try LocalModelFiles.verify(bytes: received, digest: digest.finalize(), model: model)
@@ -263,7 +263,7 @@ final class LocalModelManager {
     /// Verifies an existing file or downloads the model. Returns the model path.
     func prepare(_ model: LocalModel) async throws -> String {
         guard download == nil, verifying == nil else {
-            throw DictationError(String(localized: "Another local model is downloading. Wait or cancel it first.", bundle: .module))
+            throw DictationError(String(localized: "Another local model is downloading. Wait or cancel it first.", bundle: .module.prismLocalized))
         }
         let target = directory.appending(path: model.fileName)
         if LocalModelFiles.isComplete(target, model: model) {
@@ -302,9 +302,9 @@ final class LocalModelManager {
     func installEngine() async throws -> String {
         if let path = LocalModelFiles.whisperPath(preferred: "") { return path }
         guard let brew = LocalModelFiles.brewPath else {
-            throw DictationError(String(localized: "Install Homebrew or choose an existing whisper-cli in Advanced settings.", bundle: .module))
+            throw DictationError(String(localized: "Install Homebrew or choose an existing whisper-cli in Advanced settings.", bundle: .module.prismLocalized))
         }
-        guard !installingEngine else { throw DictationError(String(localized: "Speech engine installation is already running.", bundle: .module)) }
+        guard !installingEngine else { throw DictationError(String(localized: "Speech engine installation is already running.", bundle: .module.prismLocalized)) }
         installingEngine = true
         defer { installingEngine = false }
         let directory = directory
@@ -330,10 +330,10 @@ final class LocalModelManager {
             return process.terminationStatus
         }.value
         guard status == 0 else {
-            throw DictationError(String(localized: "Speech engine installation failed. Run brew install whisper.cpp in Terminal, then check again.", bundle: .module))
+            throw DictationError(String(localized: "Speech engine installation failed. Run brew install whisper.cpp in Terminal, then check again.", bundle: .module.prismLocalized))
         }
         guard let path = LocalModelFiles.whisperPath(preferred: "") else {
-            throw DictationError(String(localized: "The speech engine was not found. Choose whisper-cli in Advanced settings.", bundle: .module))
+            throw DictationError(String(localized: "The speech engine was not found. Choose whisper-cli in Advanced settings.", bundle: .module.prismLocalized))
         }
         whisperPath = path
         return path

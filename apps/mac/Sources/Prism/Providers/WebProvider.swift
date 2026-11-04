@@ -12,9 +12,9 @@ final class WebProvider: PaletteProvider {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         switch WebIntent(trimmed) {
         case .url(let url)?:
-            return [Self.item(id: "web:url", title: String(localized: "Open \(Self.bounded(trimmed))", bundle: .module),
-                              subtitle: String(localized: "Open this HTTP(S) URL in the default browser", bundle: .module),
-                              action: String(localized: "Open in default browser", bundle: .module), url: url, matchedQuery: trimmed)]
+            return [Self.item(id: "web:url", title: String(localized: "Open \(Self.bounded(trimmed))", bundle: .module.prismLocalized),
+                              subtitle: String(localized: "Open this HTTP(S) URL in the default browser", bundle: .module.prismLocalized),
+                              action: String(localized: "Open in default browser", bundle: .module.prismLocalized), url: url, matchedQuery: trimmed)]
         case .search(let terms)?:
             guard let url = WebIntent.searchURL(terms) else { return [] }
             return [Self.searchItem(terms, url: url, matchedQuery: trimmed)]
@@ -24,26 +24,26 @@ final class WebProvider: PaletteProvider {
     }
 
     static func searchItem(_ terms: String, url: URL, matchedQuery: String?) -> PaletteItem {
-        item(id: "web:search", title: String(localized: "Search the web for “\(bounded(terms))”", bundle: .module),
-             subtitle: String(localized: "Explicit web search", bundle: .module),
-             action: String(localized: "Search in default browser", bundle: .module), url: url, matchedQuery: matchedQuery)
+        item(id: "web:search", title: String(localized: "Search the web for “\(bounded(terms))”", bundle: .module.prismLocalized),
+             subtitle: String(localized: "Explicit web search", bundle: .module.prismLocalized),
+             action: String(localized: "Search in default browser", bundle: .module.prismLocalized), url: url, matchedQuery: matchedQuery)
     }
 
     private static func item(id: String, title: String, subtitle: String, action: String, url: URL, matchedQuery: String?) -> PaletteItem {
         PaletteItem(
-            candidate: SearchCandidate(id: id, title: title, subtitle: subtitle, section: String(localized: "Web", bundle: .module),
+            candidate: SearchCandidate(id: id, title: title, subtitle: subtitle, section: String(localized: "Web", bundle: .module.prismLocalized),
                                        rankingBoost: 72, matchedQuery: matchedQuery),
             icon: .symbol("globe"),
-            accessory: String(localized: "Web", bundle: .module),
+            accessory: String(localized: "Web", bundle: .module.prismLocalized),
             actions: [
                 PaletteAction(id: id == "web:url" ? "open-web-url" : "search-web", title: action, systemImage: "safari") {
                     NSWorkspace.shared.open(url)
                     return .dismiss
                 },
-                PaletteAction(id: "copy-url", title: String(localized: "Copy URL", bundle: .module), systemImage: "doc.on.doc",
+                PaletteAction(id: "copy-url", title: String(localized: "Copy URL", bundle: .module.prismLocalized), systemImage: "doc.on.doc",
                               shortcut: .init("c", modifiers: [.command, .shift])) {
                     PasteService.copy(url.absoluteString)
-                    return .notify(String(localized: "Copied to Clipboard", bundle: .module))
+                    return .notify(String(localized: "Copied to Clipboard", bundle: .module.prismLocalized))
                 },
             ]
         )
@@ -65,7 +65,7 @@ final class WebFallbackProvider: PaletteProvider {
         guard !trimmed.isEmpty, WebIntent(trimmed) == nil, let url = WebIntent.searchURL(trimmed) else { return [] }
         var item = WebProvider.searchItem(trimmed, url: url, matchedQuery: nil)
         item.candidate.id = "web:fallback"
-        item.candidate.subtitle = String(localized: "Search in default browser", bundle: .module)
+        item.candidate.subtitle = String(localized: "Search in default browser", bundle: .module.prismLocalized)
         return [item]
     }
 }
