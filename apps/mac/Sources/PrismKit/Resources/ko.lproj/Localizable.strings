@@ -1,8 +1,8 @@
 /* Korean strings for PrismKit. Keys are the English source strings. */
 "Record Shortcut" = "단축키 기록";
-"Type Shortcut" = "단축키 입력";
+"Recording Shortcut…" = "단축키 기록 중…";
 "Remove Shortcut" = "단축키 제거";
-"Record Hotkey" = "단축키 지정";
+"Record Hotkey" = "단축키 기록";
 "Add alias" = "별칭 추가";
 "Command" = "명령";
 "Alias" = "별칭";

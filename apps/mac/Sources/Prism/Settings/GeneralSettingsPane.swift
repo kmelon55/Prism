@@ -1,3 +1,5 @@
+import AppKit
+import Carbon.HIToolbox
 import PrismKit
 import PrismSystem
 import SwiftUI
@@ -113,7 +115,7 @@ enum LauncherSettingsPane {
     @MainActor
     static func make(hotKeys: CommandHotKeys) -> SettingsPane {
         SettingsPane(id: id, title: String(localized: "Launcher", bundle: .module), systemImage: "keyboard", order: 10,
-                     keywords: [String(localized: "Global hotkey", bundle: .module), String(localized: "Open or hide Prism", bundle: .module)]) {
+                     keywords: [String(localized: "Global hotkey", bundle: .module), String(localized: "Open or hide Prism", bundle: .module), "Command Space", "⌘ Space", "Spotlight"]) {
             LauncherSettingsView(hotKeys: hotKeys)
         }
     }
@@ -121,10 +123,48 @@ enum LauncherSettingsPane {
 
 private struct LauncherSettingsView: View {
     let hotKeys: CommandHotKeys
+    private static let commandSpace = Shortcut(keyCode: UInt32(kVK_Space), modifiers: .command)
+    @ViewState private var commandSpaceUsedBySystem = false
+
+    private var commandSpaceIsActive: Bool {
+        hotKeys.launcher == Self.commandSpace && hotKeys.launcherError == nil && !commandSpaceUsedBySystem
+    }
 
     var body: some View {
         PrismSettingsPage(String(localized: "Launcher", bundle: .module)) {
             PrismSettingsGroup(Text("Global hotkey", bundle: .module)) {
+                PrismSettingsRow(Text(verbatim: "⌘ Space"),
+                                 detail: commandSpaceIsActive
+                                     ? Text("⌘ Space opens Prism.", bundle: .module)
+                                     : Text("Open Prism with Command Space.", bundle: .module)) {
+                    Button {
+                        commandSpaceUsedBySystem = Self.commandSpace.isUsedBySystem
+                        guard !commandSpaceUsedBySystem else {
+                            openKeyboardSettings()
+                            return
+                        }
+                        hotKeys.setLauncher(Self.commandSpace)
+                    } label: {
+                        if commandSpaceIsActive {
+                            Label { Text("In use", bundle: .module) } icon: { Image(systemName: "checkmark") }
+                        } else {
+                            Text("Use ⌘ Space", bundle: .module)
+                        }
+                    }
+                    .buttonStyle(.prism)
+                    .disabled(commandSpaceIsActive)
+                }
+                if commandSpaceUsedBySystem {
+                    PrismSettingsRow(Text("Free up ⌘ Space", bundle: .module),
+                                     detail: Text("In System Settings → Keyboard → Keyboard Shortcuts → Spotlight, turn off Show Spotlight search. If another system shortcut uses ⌘ Space, change it too. Then return here and choose Use ⌘ Space.", bundle: .module)) {
+                        Button {
+                            openKeyboardSettings()
+                        } label: {
+                            Text("Open Keyboard Settings", bundle: .module)
+                        }
+                        .buttonStyle(.prism)
+                    }
+                }
                 PrismSettingsRow(Text("Open or hide Prism", bundle: .module),
                                  detail: hotKeys.launcherError.map { Text(verbatim: $0) }) {
                     ShortcutRecorder(shortcut: Binding(
@@ -146,5 +186,13 @@ private struct LauncherSettingsView: View {
                 }
             }
         }
+        .onAppear { commandSpaceUsedBySystem = Self.commandSpace.isUsedBySystem }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            commandSpaceUsedBySystem = Self.commandSpace.isUsedBySystem
+        }
+    }
+
+    private func openKeyboardSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts")!)
     }
 }

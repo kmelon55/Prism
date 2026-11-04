@@ -66,19 +66,19 @@
 "Global hotkey" = "전역 단축키";
 "Open or hide Prism" = "Prism 열기 또는 숨기기";
 "Shortcut" = "단축키";
-"Using the default shortcut." = "기본 단축키를 사용합니다.";
-"Using a custom shortcut." = "사용자 지정 단축키를 사용합니다.";
+"Using the default shortcut." = "기본 단축키를 사용하고 있어요.";
+"Using a custom shortcut." = "직접 지정한 단축키를 사용하고 있어요.";
 "Reset" = "초기화";
 "Commands" = "명령";
 
 /* Settings → Commands (settings-core) */
 "Command" = "명령";
 "Hotkey" = "단축키";
-"Record Hotkey" = "단축키 지정";
+"Record Hotkey" = "단축키 기록";
 "Remove Shortcut" = "단축키 제거";
 "Off" = "꺼짐";
 "No commands match this search." = "검색과 일치하는 명령이 없습니다.";
-"Key combo / modifier twice…" = "키 조합 / 보조 키 두 번…";
+"Key combo / modifier twice…" = "단축키 기록 중…";
 "Press a key combination, or tap a modifier twice." = "조합 키를 누르거나 보조 키를 두 번 누르세요.";
 "Open AI Chat" = "AI 대화 열기";
 "Clear search" = "검색 지우기";
@@ -109,3 +109,10 @@
 "Copy URL" = "URL 복사";
 "Web" = "웹";
 "Configure Application" = "앱 설정";
+"Open Prism with Command Space." = "커맨드 + 스페이스로 Prism을 열어요.";
+"⌘ Space opens Prism." = "⌘ Space로 Prism을 열 수 있어요.";
+"Use ⌘ Space" = "⌘ Space로 변경";
+"In use" = "사용 중";
+"Free up ⌘ Space" = "⌘ Space 중복 설정 해제";
+"In System Settings → Keyboard → Keyboard Shortcuts → Spotlight, turn off Show Spotlight search. If another system shortcut uses ⌘ Space, change it too. Then return here and choose Use ⌘ Space." = "시스템 설정 → 키보드 → 키보드 단축키 → Spotlight에서 ‘Spotlight 검색 보기’를 꺼주세요. 다른 시스템 단축키도 ⌘ Space를 쓰고 있다면 함께 바꿔주세요. 돌아와서 ‘⌘ Space로 변경’을 누르면 돼요.";
+"Open Keyboard Settings" = "키보드 설정 열기";

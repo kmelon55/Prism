@@ -7,6 +7,29 @@ import SwiftUI
 @MainActor
 public enum ShortcutRecording {
     public static var onRecordingChanged: ((Bool) -> Void)?
+
+    /// Consumes key events while recording. Resume global registration before committing the binding.
+    static func capture(_ event: NSEvent, stop: () -> Void, commit: (Shortcut?) -> Void) -> NSEvent? {
+        let code = Int(event.keyCode)
+        if code == kVK_Escape {
+            stop()
+            return nil
+        }
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if (code == kVK_Delete || code == kVK_ForwardDelete) && modifiers.isEmpty {
+            stop()
+            commit(nil)
+            return nil
+        }
+        let isFunctionKey = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10, kVK_F11, kVK_F12].contains(code)
+        guard isFunctionKey || !modifiers.intersection([.command, .option, .control]).isEmpty else {
+            NSSound.beep()
+            return nil
+        }
+        stop()
+        commit(Shortcut(keyCode: UInt32(code), modifiers: modifiers))
+        return nil
+    }
 }
 
 /// A System Settings style shortcut field. Click, then press the combination. Escape cancels and
@@ -29,7 +52,7 @@ public struct ShortcutRecorder: View {
             Button(action: toggle) {
                 Group {
                     if isRecording {
-                        Text("Type Shortcut", bundle: .module)
+                        Text("Recording Shortcut…", bundle: .module)
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(PrismTheme.text)
                     } else if let shortcut {
@@ -76,25 +99,7 @@ public struct ShortcutRecorder: View {
         isRecording = true
         ShortcutRecording.onRecordingChanged?(true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let code = Int(event.keyCode)
-            if code == kVK_Escape {
-                stop()
-                return nil
-            }
-            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
-            if (code == kVK_Delete || code == kVK_ForwardDelete) && modifiers.isEmpty {
-                shortcut = nil
-                stop()
-                return nil
-            }
-            let isFunctionKey = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10, kVK_F11, kVK_F12].contains(code)
-            guard isFunctionKey || !modifiers.intersection([.command, .option, .control]).isEmpty else {
-                NSSound.beep()
-                return nil
-            }
-            shortcut = Shortcut(keyCode: UInt32(code), modifiers: modifiers)
-            stop()
-            return nil
+            ShortcutRecording.capture(event, stop: stop) { shortcut = $0 }
         }
     }
 
